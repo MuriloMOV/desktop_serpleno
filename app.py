@@ -17,7 +17,7 @@ class App(ctk.CTk):
 
         self.usuario_logado = False
 
-        self.container = ctk.CTkFrame(self, fg_color="#f4f6fb")
+        self.container = ctk.CTkFrame(self, fg_color="#f7fbf4")
         self.container.pack(fill="both", expand=True)
 
         self.mostrar_login()
