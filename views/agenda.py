@@ -1,177 +1,197 @@
 import customtkinter as ctk
+from datetime import datetime, timedelta
 
-
-class AgendaFrame(ctk.CTkFrame):
-    def __init__(self, parent, app):
+class AgendaFrame(ctk.CTkScrollableFrame):
+    def __init__(self, parent, controller):
         super().__init__(parent, fg_color="#f4f6fb")
-        self.app = app
+        self.controller = controller
 
-        self.horarios = ["18:00"]
+        # Mock Data
+        self.current_date = datetime.now()
+        self.horarios = ["18:00", "19:00", "20:00", "21:00"] # Mock available slots
+        self.appointments = {
+            "18:00": {"student": "Ana Beatriz", "status": "confirmed"},
+            # "19:00": free
+            "20:00": {"student": "Diego Martins", "status": "pending"},
+        }
+        
+        self.grid_columnconfigure(0, weight=1)
 
-        self.criar_layout()
-        self.renderizar_horarios()
-
-    # ================= LAYOUT =================
-    def criar_layout(self):
         self.criar_header()
         self.criar_agenda_dia()
         self.criar_proxima_semana()
 
-    # ================= HEADER =================
     def criar_header(self):
+        # Container Header
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=30, pady=(30, 20))
+        header.grid(row=0, column=0, sticky="ew", padx=20, pady=20)
+        
+        # Título e Botão Gerir
+        left_header = ctk.CTkFrame(header, fg_color="transparent")
+        left_header.pack(side="left")
 
         ctk.CTkLabel(
-            header,
-            text="Agenda",
-            font=ctk.CTkFont(size=22, weight="bold"),
-            text_color="#111827"
+            left_header, 
+            text="Agenda", 
+            font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"),
+            text_color="#1f2937"
+        ).pack(side="left", padx=(0, 20))
+
+        ctk.CTkButton(
+            left_header,
+            text="⚙️ Gerir Horários",
+            fg_color="#e5e7eb",
+            text_color="#374151",
+            hover_color="#d1d5db",
+            font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold"),
+            command=self.abrir_gerir_horarios
         ).pack(side="left")
 
+        # Navegação de Data
+        right_header = ctk.CTkFrame(header, fg_color="transparent")
+        right_header.pack(side="right")
+
         ctk.CTkButton(
-            header,
-            text="Gerir Horários",
-            fg_color="#e5e7eb",
-            text_color="#111827",
-            hover_color="#6d28d9",
-            width=140,
-            command=self.abrir_modal_horarios
-        ).pack(side="left", padx=20)
+            right_header, text="◄", width=30, fg_color="#e5e7eb", text_color="#374151", hover_color="#d1d5db",
+            command=lambda: self.mudar_dia(-1)
+        ).pack(side="left", padx=5)
 
-        ctk.CTkLabel(
-            header,
-            text="quinta-feira, 15 de janeiro de 2026",
-            font=ctk.CTkFont(size=13),
-            text_color="#374151"
-        ).pack(side="right")
-
-    # ================= AGENDA DO DIA =================
-    def criar_agenda_dia(self):
-        container = ctk.CTkFrame(self, fg_color="white", corner_radius=12)
-        container.pack(fill="x", padx=30, pady=(0, 20))
-
-        ctk.CTkLabel(
-            container,
-            text="Agenda do Dia",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color="#111827"
-        ).pack(anchor="w", padx=20, pady=(20, 10))
-
-        self.lista_dia = ctk.CTkFrame(container, fg_color="transparent")
-        self.lista_dia.pack(anchor="w", padx=20, pady=(0, 20))
-
-    # ================= PRÓXIMA SEMANA =================
-    def criar_proxima_semana(self):
-        container = ctk.CTkFrame(self, fg_color="white", corner_radius=12)
-        container.pack(fill="x", padx=30)
-
-        ctk.CTkLabel(
-            container,
-            text="Próxima Semana",
-            font=ctk.CTkFont(size=16, weight="bold"),
-            text_color="#111827"
-        ).pack(anchor="w", padx=20, pady=(20, 10))
-
-        self.lista_semana = ctk.CTkFrame(container, fg_color="transparent")
-        self.lista_semana.pack(anchor="w", padx=20, pady=(0, 20))
-
-    # ================= HORÁRIOS =================
-    def renderizar_horarios(self):
-        for frame in (self.lista_dia, self.lista_semana):
-            for widget in frame.winfo_children():
-                widget.destroy()
-
-            for horario in self.horarios:
-                card = ctk.CTkFrame(
-                    frame,
-                    fg_color="#d1fae5",
-                    corner_radius=10,
-                    width=140,
-                    height=60
-                )
-                card.pack(side="left", padx=10)
-                card.pack_propagate(False)
-
-                ctk.CTkLabel(
-                    card,
-                    text=horario,
-                    font=ctk.CTkFont(size=16, weight="bold"),
-                    text_color="#065f46"
-                ).pack(pady=(8, 0))
-
-                ctk.CTkLabel(
-                    card,
-                    text="Disponível",
-                    font=ctk.CTkFont(size=12),
-                    text_color="#047857"
-                ).pack()
-
-    # ================= MODAL =================
-    def abrir_modal_horarios(self):
-        self.modal_bg = ctk.CTkFrame(self, fg_color="#1f2937")
-        self.modal_bg.place(relwidth=1, relheight=1)
-
-        modal = ctk.CTkFrame(
-            self.modal_bg,
-            fg_color="white",
-            corner_radius=14,
-            width=420,
-            height=300
+        self.lbl_data = ctk.CTkLabel(
+            right_header,
+            text=self.current_date.strftime("%A, %d de %B"), # Format simplified
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color="#1f2937"
         )
-        modal.place(relx=0.5, rely=0.5, anchor="center")
-        modal.pack_propagate(False)
+        self.lbl_data.pack(side="left", padx=10)
 
+        ctk.CTkButton(
+            right_header, text="►", width=30, fg_color="#e5e7eb", text_color="#374151", hover_color="#d1d5db",
+            command=lambda: self.mudar_dia(1)
+        ).pack(side="left", padx=5)
+
+
+    def criar_agenda_dia(self):
+        # Container Card
+        card = ctk.CTkFrame(self, fg_color="white", corner_radius=10)
+        card.grid(row=1, column=0, sticky="ew", padx=20, pady=(0, 20))
+
+        # Titulo
         ctk.CTkLabel(
-            modal,
-            text="Gerir Horários de Atendimento",
-            font=ctk.CTkFont(size=18, weight="bold")
-        ).pack(pady=(20, 15))
+            card,
+            text="Agenda do Dia",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color="#374151"
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+        
+        # Grid de Slots (Container)
+        self.slots_container = ctk.CTkFrame(card, fg_color="transparent")
+        self.slots_container.pack(fill="x", padx=20, pady=20)
+        
+        # Render Slots
+        self.renderizar_slots(self.slots_container)
 
-        for h in self.horarios:
-            linha = ctk.CTkFrame(modal, fg_color="#f3f4f6", corner_radius=8)
-            linha.pack(fill="x", padx=30, pady=5)
+    def criar_proxima_semana(self):
+         # Container Card
+        card = ctk.CTkFrame(self, fg_color="white", corner_radius=10)
+        card.grid(row=2, column=0, sticky="ew", padx=20, pady=(0, 20))
 
-            ctk.CTkLabel(linha, text=h).pack(side="left", padx=12)
+        # Titulo com Data (+7 dias)
+        next_week = self.current_date + timedelta(days=7)
+        ctk.CTkLabel(
+            card,
+            text=f"Próxima Semana ({next_week.strftime('%d/%m/%Y')})",
+            font=ctk.CTkFont(family="Segoe UI", size=16, weight="bold"),
+            text_color="#374151"
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+        
+        # Grid de Slots (Container)
+        self.slots_next_week = ctk.CTkFrame(card, fg_color="transparent")
+        self.slots_next_week.pack(fill="x", padx=20, pady=20)
 
-            ctk.CTkButton(
-                linha,
-                text="Remover",
-                fg_color="transparent",
-                text_color="#dc2626",
-                width=80,
-                command=lambda x=h: self.remover_horario(x)
-            ).pack(side="right", padx=10)
+        # Mock Render (Same slots for ease)
+        self.renderizar_slots(self.slots_next_week, is_next_week=True)
 
-        self.input_horario = ctk.CTkEntry(modal, placeholder_text="Ex: 18:00")
-        self.input_horario.pack(pady=15)
+    def renderizar_slots(self, parent, is_next_week=False):
+        # Limpar
+        for w in parent.winfo_children(): w.destroy()
 
-        ctk.CTkButton(
-            modal,
-            text="Adicionar",
-            fg_color="#6d28d9",
-            command=self.adicionar_horario
-        ).pack()
+        # Grid layout manager logic manually or using .grid
+        # Vamos usar .grid com 2 colunas para simular o "grid-cols-2"
+        parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=1)
 
-        ctk.CTkButton(
-            modal,
-            text="Fechar",
-            fg_color="#111827",
-            command=self.fechar_modal
-        ).pack(pady=15)
+        row = 0
+        col = 0
+        
+        data_source = self.appointments if not is_next_week else {} # Mock: Next week empty
 
-    # ================= AÇÕES =================
-    def fechar_modal(self):
-        self.modal_bg.destroy()
-        self.renderizar_horarios()
+        for i, time in enumerate(self.horarios):
+            appt = data_source.get(time)
+            
+            # Frame do Slot
+            slot = ctk.CTkFrame(parent, corner_radius=8, border_width=1)
+            slot.grid(row=row, column=col, sticky="nsew", padx=5, pady=5)
+            
+            # Info Time
+            ctk.CTkLabel(
+                slot, 
+                text=time, 
+                font=ctk.CTkFont(size=18, weight="bold"),
+                text_color="#1f2937" if appt else "#059669" # Gray if occupied, Green if free
+            ).pack(anchor="w", padx=15, pady=(10, 0))
 
-    def adicionar_horario(self):
-        valor = self.input_horario.get()
-        if valor and valor not in self.horarios:
-            self.horarios.append(valor)
-        self.fechar_modal()
+            if appt:
+                # Ocupado (Red/Orange style depending on status in real app, here Gray/Blue)
+                slot.configure(fg_color="#f3f4f6", border_color="#e5e7eb") # Occupied Style
+                
+                ctk.CTkLabel(
+                    slot,
+                    text=appt["student"],
+                    font=ctk.CTkFont(size=14),
+                    text_color="#4b5563"
+                ).pack(anchor="w", padx=15, pady=(2, 10))
+                
+                # Edit Icon (Button)
+                edit_btn = ctk.CTkButton(
+                    slot, text="✏️", width=30, height=30, fg_color="transparent", hover_color="#e5e7eb", text_color="#374151",
+                    command=lambda t=time: self.editar_agendamento(t)
+                )
+                edit_btn.place(relx=1.0, rely=0.0, anchor="ne", x=-5, y=5)
 
-    def remover_horario(self, horario):
-        if horario in self.horarios:
-            self.horarios.remove(horario)
-        self.fechar_modal()
+            else:
+                # Livre (Green Style)
+                slot.configure(fg_color="#d1fae5", border_color="#a7f3d0") # bg-emerald-100 border-emerald-200
+                
+                ctk.CTkLabel(
+                    slot,
+                    text="Disponível",
+                    font=ctk.CTkFont(size=13, weight="bold"),
+                    text_color="#059669" # text-emerald-600
+                ).pack(anchor="w", padx=15, pady=(2, 10))
+
+                # Click to schedule
+                slot.bind("<Button-1>", lambda e, t=time: self.agendar_horario(t))
+                for child in slot.winfo_children():
+                    child.bind("<Button-1>", lambda e, t=time: self.agendar_horario(t))
+
+            # Grid Calc
+            col += 1
+            if col > 1:
+                col = 0
+                row += 1
+
+
+    def mudar_dia(self, delta):
+        self.current_date += timedelta(days=delta)
+        self.lbl_data.configure(text=self.current_date.strftime("%A, %d de %B"))
+        # Reload slots (Mock refresh)
+        self.renderizar_slots(self.slots_container)
+
+    def abrir_gerir_horarios(self):
+        print("Abrir Modal de Gerência de Horários")
+
+    def agendar_horario(self, time):
+        print(f"Agendar para {time}")
+    
+    def editar_agendamento(self, time):
+        print(f"Editar agendamento de {time}")
