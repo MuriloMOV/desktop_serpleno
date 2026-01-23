@@ -5,7 +5,10 @@ from views.estudantes import EstudantesFrame
 from views.agenda import AgendaFrame
 from views.login import LoginFrame
 from views.analise_triagem import AnaliseTriagemFrame
-
+from views.comunicacao_interna import ComunicacaoInternaFrame
+from views.orientacoes import OrientacoesFrame
+from views.quadro_avisos import QuadroAvisosFrame
+from views.configuracoes import ConfiguracoesFrame
 
 class App(ctk.CTk):
     def __init__(self):
@@ -57,10 +60,10 @@ class App(ctk.CTk):
         self.botao_sidebar("Análise de Triagem", self.mostrar_analise_triagem)
 
         self.botao_sidebar("Relatórios")
-        self.botao_sidebar("Comunicação Interna")
-        self.botao_sidebar("Orientações")
-        self.botao_sidebar("Quadro de Avisos")
-        self.botao_sidebar("Configurações")
+        self.botao_sidebar("Comunicação Interna", self.mostrar_comunicacao_interna)
+        self.botao_sidebar("Orientações", self.mostrar_orientacoes)
+        self.botao_sidebar("Quadro de Avisos", self.mostrar_quadro_avisos)
+        self.botao_sidebar("Configurações", self.mostrar_configuracoes)
 
     def botao_sidebar(self, texto, comando=None):
         ctk.CTkButton(
@@ -90,6 +93,18 @@ class App(ctk.CTk):
 
     def mostrar_analise_triagem(self):
         self.trocar_frame(AnaliseTriagemFrame)
+
+    def mostrar_comunicacao_interna(self):
+        self.trocar_frame(ComunicacaoInternaFrame)
+
+    def mostrar_orientacoes(self):
+        self.trocar_frame(OrientacoesFrame)
+
+    def mostrar_quadro_avisos(self):
+        self.trocar_frame(QuadroAvisosFrame)
+
+    def mostrar_configuracoes(self):
+        self.trocar_frame(ConfiguracoesFrame)
 
     def trocar_frame(self, FrameClasse):
         for widget in self.content.winfo_children():
