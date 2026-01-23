@@ -5,7 +5,7 @@ from views.estudantes import EstudantesFrame
 from views.agenda import AgendaFrame
 from views.login import LoginFrame
 from views.analise_triagem import AnaliseTriagemFrame
-
+from views.relatorio import RelatorioFrame
 
 class App(ctk.CTk):
     def __init__(self):
@@ -56,7 +56,7 @@ class App(ctk.CTk):
         self.botao_sidebar("Agenda", self.mostrar_agenda)
         self.botao_sidebar("Análise de Triagem", self.mostrar_analise_triagem)
 
-        self.botao_sidebar("Relatórios")
+        self.botao_sidebar("Relatórios", self.mostrar_relatorio)
         self.botao_sidebar("Comunicação Interna")
         self.botao_sidebar("Orientações")
         self.botao_sidebar("Quadro de Avisos")
@@ -90,6 +90,9 @@ class App(ctk.CTk):
 
     def mostrar_analise_triagem(self):
         self.trocar_frame(AnaliseTriagemFrame)
+
+    def mostrar_relatorio(self):
+        self.trocar_frame(RelatorioFrame)
 
     def trocar_frame(self, FrameClasse):
         for widget in self.content.winfo_children():
