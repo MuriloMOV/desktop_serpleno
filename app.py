@@ -9,6 +9,7 @@ from views.comunicacao_interna import ComunicacaoInternaFrame
 from views.orientacoes import OrientacoesFrame
 from views.quadro_avisos import QuadroAvisosFrame
 from views.configuracoes import ConfiguracoesFrame
+from views.relatorio import RelatorioFrame
 
 class App(ctk.CTk):
     def __init__(self):
@@ -46,36 +47,51 @@ class App(ctk.CTk):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
+        brand_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        brand_frame.pack(pady=(30, 40), padx=20, fill="x")
+
         ctk.CTkLabel(
-            self.sidebar,
+            brand_frame,
+            text="🧬", # Brain/DNA-like icon
+            font=ctk.CTkFont(size=24),
+            text_color="#6366f1"
+        ).pack(side="left", padx=(0, 10))
+
+        ctk.CTkLabel(
+            brand_frame,
             text="SerPleno",
-            font=ctk.CTkFont(size=20, weight="bold"),
-            text_color="#111827"
-        ).pack(pady=(30, 40))
+            font=ctk.CTkFont(family="Segoe UI", size=22, weight="bold"),
+            text_color="#1e1b4b" # Dark Indigo
+        ).pack(side="left")
+
 
         # ===== MENU =====
-        self.botao_sidebar("Início", self.mostrar_dashboard)
-        self.botao_sidebar("Estudantes", self.mostrar_estudantes)
-        self.botao_sidebar("Agenda", self.mostrar_agenda)
-        self.botao_sidebar("Análise de Triagem", self.mostrar_analise_triagem)
+        self.botao_sidebar("🏠  Início", self.mostrar_dashboard, active=True)
+        self.botao_sidebar("👥  Estudantes", self.mostrar_estudantes)
+        self.botao_sidebar("📅  Agenda", self.mostrar_agenda)
+        self.botao_sidebar("📈  Análise de Triagem", self.mostrar_analise_triagem)
 
-        self.botao_sidebar("Relatórios")
-        self.botao_sidebar("Comunicação Interna", self.mostrar_comunicacao_interna)
-        self.botao_sidebar("Orientações", self.mostrar_orientacoes)
-        self.botao_sidebar("Quadro de Avisos", self.mostrar_quadro_avisos)
-        self.botao_sidebar("Configurações", self.mostrar_configuracoes)
+        self.botao_sidebar("📋  Relatórios", self.mostrar_relatorio)
+        self.botao_sidebar("💬  Comunicação Interna", self.mostrar_comunicacao_interna)
+        self.botao_sidebar("🧡  Orientações", self.mostrar_orientacoes)
+        self.botao_sidebar("📢  Quadro de Avisos", self.mostrar_quadro_avisos)
+        self.botao_sidebar("⚙  Configurações", self.mostrar_configuracoes)
 
-    def botao_sidebar(self, texto, comando=None):
-        ctk.CTkButton(
+    def botao_sidebar(self, texto, comando=None, active=False):
+        btn = ctk.CTkButton(
             self.sidebar,
             text=texto,
-            height=40,
-            fg_color="#e5e7eb",
-            text_color="#111827",
-            hover_color="#6d28d9",
-            corner_radius=8,
+            height=45,
+            fg_color="#4f46e5" if active else "transparent",
+            text_color="white" if active else "#4b5563",
+            hover_color="#f3f4f6" if not active else "#4338ca",
+            corner_radius=10,
+            font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold" if active else "normal"),
+            anchor="w",
             command=comando
-        ).pack(fill="x", padx=20, pady=6)
+        )
+        btn.pack(fill="x", padx=15, pady=4)
+
 
     def criar_area_conteudo(self):
         self.content = ctk.CTkFrame(self.container, fg_color="#f4f6fb")
@@ -102,6 +118,9 @@ class App(ctk.CTk):
 
     def mostrar_quadro_avisos(self):
         self.trocar_frame(QuadroAvisosFrame)
+
+    def mostrar_relatorio(self):
+        self.trocar_frame(RelatorioFrame)
 
     def mostrar_configuracoes(self):
         self.trocar_frame(ConfiguracoesFrame)

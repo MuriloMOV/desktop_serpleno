@@ -63,8 +63,9 @@ class LoginFrame(ctk.CTkFrame):
         # Trazer bolhas para frente do gradiente (se já existirem)
         for b in self.bolhas:
             self.canvas.tag_raise(b["id"])
-            if "text_id" in b:
+            if b.get("text_id") is not None:
                 self.canvas.tag_raise(b["text_id"])
+
 
     # ================= BOLHAS FLUTUANTES (BUBBLES) =================
     def criar_bolhas(self):
