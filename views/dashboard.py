@@ -419,9 +419,6 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         ctk.CTkLabel(f, text=label, font=ctk.CTkFont(family="Segoe UI", size=12, weight="bold"), text_color="#64748b").pack()
         ctk.CTkLabel(f, text=value, font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"), text_color="#1e293b").pack()
 
-
-
-
     def criar_visao_risco(self):
         wrapper = ctk.CTkFrame(self, fg_color="transparent")
         wrapper.pack(fill="x", padx=30, pady=10)
