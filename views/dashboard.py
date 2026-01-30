@@ -3,7 +3,7 @@ from datetime import datetime
 
 class DashboardFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color="#f4f6fb") # Background light gray/blue
+        super().__init__(parent, fg_color="#f8fafc") # slate-50
         self.controller = controller
 
         # Layout Configuration
@@ -56,7 +56,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         badge_1 = ctk.CTkLabel(
             helper_frame, 
-            text="1", 
+            text="9+", # Changed to 9+ like a realistic notification
             font=ctk.CTkFont(size=9, weight="bold"), 
             text_color="white", 
             fg_color="#ef4444", 
@@ -348,39 +348,67 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             anchor="w"
         ).pack(fill="x", padx=20, pady=20)
 
-        metrics = ["Acadêmico", "Emocional", "Social"]
-        for m in metrics:
-            row = ctk.CTkFrame(list_card, fg_color="transparent")
-            row.pack(fill="x", padx=20, pady=10)
-            
-            ctk.CTkLabel(row, text=f"📓 {m}" if m=="Acadêmico" else (f"❤ {m}" if m=="Emocional" else f"👥 {m}"), text_color="#374151", font=ctk.CTkFont(weight="bold")).pack(side="left")
-            ctk.CTkLabel(row, text="--", text_color="#9ca3af").pack(side="right")
+        metrics = [
+            ("📁 Acadêmico", "--"),
+            ("❤ Emocional", "--"),
+            ("👥 Social", "--")
+        ]
         
-        ctk.CTkLabel(list_card, text="Baseado em autoavaliações dos últimos 7 dias", text_color="#9ca3af", font=ctk.CTkFont(size=10)).pack(side="bottom", pady=20)
+        for name, value in metrics:
+            row = ctk.CTkFrame(list_card, fg_color="transparent")
+            row.pack(fill="x", padx=20, pady=8)
+            
+            ctk.CTkLabel(
+                row, 
+                text=name, 
+                text_color="#475569", 
+                font=ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
+            ).pack(side="left")
+            
+            # Separator dots (simulated)
+            ctk.CTkLabel(
+                row, 
+                text="." * 40, 
+                text_color="#f1f5f9",
+                font=("Segoe UI", 10)
+            ).pack(side="left", padx=10, expand=True)
+
+            ctk.CTkLabel(
+                row, 
+                text=value, 
+                text_color="#94a3b8",
+                font=("Segoe UI", 13)
+            ).pack(side="right")
+        
+        info_lbl = ctk.CTkLabel(
+            list_card, 
+            text="Baseado em autoavaliações dos últimos 7 dias", 
+            text_color="#94a3b8", 
+            font=ctk.CTkFont(family="Segoe UI", size=11)
+        )
+        info_lbl.pack(side="bottom", pady=25)
 
     def draw_chart(self, event=None):
         self.canvas.delete("all")
         w = self.canvas.winfo_width()
         h = self.canvas.winfo_height()
         
+        if w < 100: return 
+
         # Margins
-        pad_x = 40
+        pad_x = 50
         pad_y = 30
         
         # Mock Data (10 points)
-        data = [3.0, 3.1, 3.2, 3.4, 3.2, 3.3, 3.5, 3.4, 3.4, 4.0] 
+        data = [3.0, 2.8, 3.2, 3.5, 3.2, 3.3, 3.6, 3.4, 3.5, 4.2] 
         dates = ["09/01", "10/01", "11/01", "12/01", "13/01", "14/01", "15/01", "16/01", "17/01", "18/01"]
         
-        if w < 100: return # Too small
-
-        # Horizontal Grid Lines (1 to 5)
+        # Horizontal Grid Lines
         for i in range(1, 6):
             y = h - pad_y - (i * (h - 2*pad_y) / 5)
-            self.canvas.create_line(pad_x, y, w - pad_x, y, fill="#e5e7eb", width=1)
-            # Icons/Text for Y axis? Image shows icons on left (angry to happy)
-            # We skip icons for simplicity or draw simple circles
+            self.canvas.create_line(pad_x, y, w - pad_x, y, fill="#f1f5f9", width=1)
 
-        # Draw Line
+        # Calculate Points
         points = []
         for i, val in enumerate(data):
             x = pad_x + (i * (w - 2*pad_x) / (len(data) - 1))
@@ -388,17 +416,34 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             points.append((x, y))
             
             # Draw Date Labels
-            self.canvas.create_text(x, h - 10, text=dates[i], fill="#9ca3af", font=("Segoe UI", 8))
+            self.canvas.create_text(x, h - 15, text=dates[i], fill="#94a3b8", font=("Segoe UI", 8))
 
-        # Bezier or Straight lines
+        # 1. Draw "Filled" area (Polygon) - Semi-transparent look
+        poly_points = [pad_x, h - pad_y]
+        for x, y in points:
+            poly_points.extend([x, y])
+        poly_points.extend([w - pad_x, h - pad_y])
+        
+        # Simulating transparency with a very light indigo
+        self.canvas.create_polygon(poly_points, fill="#eef2ff", outline="")
+
+        # 2. Draw Smooth Line
         for i in range(len(points) - 1):
             x1, y1 = points[i]
             x2, y2 = points[i+1]
-            self.canvas.create_line(x1, y1, x2, y2, fill="#6366f1", width=2, capstyle="round", smooth=True)
+            # Custom Line
+            self.canvas.create_line(x1, y1, x2, y2, fill="#6366f1", width=3, capstyle="round", joinstyle="round")
 
-        # Draw Points
-        for x, y in points:
-            self.canvas.create_oval(x-3, y-3, x+3, y+3, fill="#fbbf24", outline="white", width=2)
+        # 3. Draw Points with Halo
+        for i, (x, y) in enumerate(points):
+            # Only draw points for some or all
+            color = "#6366f1"
+            if i == len(points) - 1: # Last point highlight
+                self.canvas.create_oval(x-5, y-5, x+5, y+5, fill="#6366f1", outline="white", width=2)
+            else:
+                # Color based on value alert
+                dot_color = "#ef4444" if data[i] < 3.0 else "#6366f1"
+                self.canvas.create_oval(x-3, y-3, x+3, y+3, fill=dot_color, outline="white", width=1)
 
 
     def criar_legenda_item(self, parent, text, color):

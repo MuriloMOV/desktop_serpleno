@@ -66,16 +66,16 @@ class App(ctk.CTk):
 
 
         # ===== MENU =====
-        self.botao_sidebar("🏠  Início", self.mostrar_dashboard, active=True)
-        self.botao_sidebar("👥  Estudantes", self.mostrar_estudantes)
-        self.botao_sidebar("📅  Agenda", self.mostrar_agenda)
-        self.botao_sidebar("📈  Análise de Triagem", self.mostrar_analise_triagem)
-
-        self.botao_sidebar("📋  Relatórios", self.mostrar_relatorio)
-        self.botao_sidebar("💬  Comunicação Interna", self.mostrar_comunicacao_interna)
-        self.botao_sidebar("🧡  Orientações", self.mostrar_orientacoes)
-        self.botao_sidebar("📢  Quadro de Avisos", self.mostrar_quadro_avisos)
-        self.botao_sidebar("⚙  Configurações", self.mostrar_configuracoes)
+        self.menu_buttons = {}
+        self.menu_buttons["dashboard"] = self.botao_sidebar("🏠  Início", self.mostrar_dashboard, active=True)
+        self.menu_buttons["estudantes"] = self.botao_sidebar("👥  Estudantes", self.mostrar_estudantes)
+        self.menu_buttons["agenda"] = self.botao_sidebar("📅  Agenda", self.mostrar_agenda)
+        self.menu_buttons["analise"] = self.botao_sidebar("📈  Análise de Triagem", self.mostrar_analise_triagem)
+        self.menu_buttons["relatorios"] = self.botao_sidebar("📋  Relatórios", self.mostrar_relatorio)
+        self.menu_buttons["comunicacao"] = self.botao_sidebar("💬  Comunicação Interna", self.mostrar_comunicacao_interna)
+        self.menu_buttons["orientacoes"] = self.botao_sidebar("🧡  Orientações", self.mostrar_orientacoes)
+        self.menu_buttons["avisos"] = self.botao_sidebar("📢  Quadro de Avisos", self.mostrar_quadro_avisos)
+        self.menu_buttons["configuracoes"] = self.botao_sidebar("⚙  Configurações", self.mostrar_configuracoes)
 
     def botao_sidebar(self, texto, comando=None, active=False):
         btn = ctk.CTkButton(
@@ -91,6 +91,7 @@ class App(ctk.CTk):
             command=comando
         )
         btn.pack(fill="x", padx=15, pady=4)
+        return btn
 
 
     def criar_area_conteudo(self):
@@ -98,31 +99,47 @@ class App(ctk.CTk):
         self.content.pack(side="left", fill="both", expand=True)
 
     # ================= NAVEGAÇÃO =================
+    def atualizar_menu(self, active_key):
+        for key, btn in self.menu_buttons.items():
+            if key == active_key:
+                btn.configure(fg_color="#4f46e5", text_color="white", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"))
+            else:
+                btn.configure(fg_color="transparent", text_color="#4b5563", font=ctk.CTkFont(family="Segoe UI", size=14, weight="normal"))
+
     def mostrar_dashboard(self):
+        self.atualizar_menu("dashboard")
         self.trocar_frame(DashboardFrame)
 
     def mostrar_estudantes(self):
+        self.atualizar_menu("estudantes")
         self.trocar_frame(EstudantesFrame)
 
     def mostrar_agenda(self):
+        self.atualizar_menu("agenda")
         self.trocar_frame(AgendaFrame)
 
     def mostrar_analise_triagem(self):
+        self.atualizar_menu("analise")
         self.trocar_frame(AnaliseTriagemFrame)
 
     def mostrar_comunicacao_interna(self):
+        self.atualizar_menu("comunicacao")
         self.trocar_frame(ComunicacaoInternaFrame)
 
     def mostrar_orientacoes(self):
+        self.atualizar_menu("orientacoes")
         self.trocar_frame(OrientacoesFrame)
 
     def mostrar_quadro_avisos(self):
+        self.atualizar_menu("avisos")
         self.trocar_frame(QuadroAvisosFrame)
 
     def mostrar_relatorio(self):
+        self.atualizar_menu("relatorios")
         self.trocar_frame(RelatorioFrame)
 
     def mostrar_configuracoes(self):
+        self.atualizar_menu("configuracoes")
         self.trocar_frame(ConfiguracoesFrame)
 
     def trocar_frame(self, FrameClasse):
