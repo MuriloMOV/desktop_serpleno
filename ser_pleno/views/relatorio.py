@@ -1,5 +1,7 @@
 import customtkinter as ctk
 from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class RelatorioFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -122,6 +124,8 @@ class RelatorioFrame(ctk.CTkFrame):
             chart_box, text="Atividades Nos Últimos 30 dias", 
             font=ctk.CTkFont(size=14, weight="bold")
         ).pack(anchor="nw", padx=20, pady=15)
+
+        self.desenhar_grafico(chart_box)
         
         ctk.CTkLabel(
             summary_box, text="Resumo", 
@@ -190,3 +194,40 @@ class RelatorioFrame(ctk.CTkFrame):
             fg_color="#5D5FEF", hover_color="#4A49D1",
             font=ctk.CTkFont(size=13, weight="bold"), height=38, corner_radius=8
         ).pack()
+
+    def desenhar_grafico(self, parent):
+
+        fig, ax = plt.subplots(figsize=(8, 2.5), dpi=100)
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+
+        # Configurações de escala
+        ax.set_ylim(0, 1.0)
+        ax.set_yticks([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+        
+        # Estilização das bordas (spines)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_color('#EAEAEA')
+        ax.spines['bottom'].set_color('#EAEAEA')
+
+        # Grade horizontal suave
+        ax.yaxis.grid(True, linestyle='-', linewidth=0.5, color='#EAEAEA')
+        ax.set_axisbelow(True)
+
+        # Labels e Ticks
+        ax.tick_params(axis='both', which='major', labelsize=8, colors='#6B7280')
+        ax.set_xticks([]) 
+
+
+        # Ajusta o gráfico para encostar nas bordas da figura
+        fig.tight_layout()
+        plt.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.1)
+
+        canvas = FigureCanvasTkAgg(fig, master=parent)
+        canvas_widget = canvas.get_tk_widget()
+        
+        # Usamos pack com fill="both" e expand=True
+        canvas_widget.pack(fill="both", expand=True, padx=5, pady=(0, 10))
+        canvas_widget.configure(background='white')
+        
