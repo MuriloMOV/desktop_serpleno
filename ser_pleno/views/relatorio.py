@@ -7,6 +7,23 @@ class RelatorioFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color="#F8F9FA") 
         self.controller = controller
 
+        # --- Configuração Dos ÍCONES ---
+
+        img_path = "ser_pleno/assets/icons/relatorio_geral_icon.png"
+        img_path2 = "ser_pleno/assets/icons/calendario_icon.png"
+        img_path3 = "ser_pleno/assets/icons/intervencao_icon.png"
+        img_path4 = "ser_pleno/assets/icons/triagem_icon.png"
+
+        img_data = Image.open(img_path)
+        img_data2 = Image.open(img_path2)
+        img_data3 = Image.open(img_path3)
+        img_data4 = Image.open(img_path4)
+
+        self.icon_geral = ctk.CTkImage(img_data, size=(22, 22))
+        self.icon_agenda = ctk.CTkImage(img_data2, size=(22, 22)) 
+        self.icon_interv = ctk.CTkImage(img_data3, size=(22, 22))
+        self.icon_triagem = ctk.CTkImage(img_data4, size=(22, 22))
+
         # --- CONFIGURAÇÃO DE RESPONSIVIDADE (GRID) ---
         self.grid_columnconfigure(0, weight=1) # Coluna principal expande
         
@@ -33,8 +50,8 @@ class RelatorioFrame(ctk.CTkFrame):
         ctk.CTkButton(
             header,
             text="Gerar Relatório",
-            fg_color="#5D5FEF",
-            hover_color="#4A49D1",
+            fg_color="#4f46e5",
+            hover_color="#2E2EA7",
             font=ctk.CTkFont(size=12, weight="bold"),
             height=35
         ).pack(side="right")
@@ -53,18 +70,21 @@ class RelatorioFrame(ctk.CTkFrame):
             container_cards.grid_columnconfigure(i, weight=1)
 
         # sticky="ew" garante que o card preencha a largura da sua coluna
-        self.card(container_cards, "Relatório Geral", "Visão completa", "Geral", "#D0E1FD").grid(row=0, column=0, padx=8, sticky="ew")
-        self.card(container_cards, "Agendamentos", "Análise de consultas", "Agendamentos", "#D1FADF").grid(row=0, column=1, padx=8, sticky="ew")
-        self.card(container_cards, "Intervenções", "Acompanhamentos", "Intervenções", "#EBE9FE").grid(row=0, column=2, padx=8, sticky="ew")
-        self.card(container_cards, "Triagens", "Análise de triagens", "Triagens", "#FEF0C7").grid(row=0, column=3, padx=8, sticky="ew")
+        self.card(container_cards, "Relatório Geral", "Visão completa", "Geral", "#D0E1FD", self.icon_geral).grid(row=0, column=0, padx=8, sticky="ew")
+        self.card(container_cards, "Agendamentos", "Análise de consultas", "Agendamentos", "#D1FADF",self.icon_agenda).grid(row=0, column=1, padx=8, sticky="ew")
+        self.card(container_cards, "Intervenções", "Acompanhamentos", "Intervenções", "#EBE9FE",self.icon_interv).grid(row=0, column=2, padx=8, sticky="ew")
+        self.card(container_cards, "Triagens", "Análise de triagens", "Triagens", "#FEF0C7",self.icon_triagem).grid(row=0, column=3, padx=8, sticky="ew")
 
-    def card(self, parent, titulo, subtitulo, categoria, cor_fundo_icone):
+    def card(self, parent, titulo, subtitulo, categoria, cor_fundo_icone, imagem_icone):
         frame = ctk.CTkFrame(parent, fg_color="white", corner_radius=12, border_width=1, border_color="#EAEAEA")
         frame.grid_columnconfigure(1, weight=1)
 
         icon_box = ctk.CTkFrame(frame, width=42, height=42, fg_color=cor_fundo_icone, corner_radius=8)
         icon_box.grid(row=0, column=0, rowspan=3, padx=(15, 12), pady=15)
         icon_box.grid_propagate(False)
+
+        label_foto = ctk.CTkLabel(icon_box, text="", image=imagem_icone)
+        label_foto.place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
             frame, text=categoria, text_color="#9DA1A7",
@@ -110,10 +130,10 @@ class RelatorioFrame(ctk.CTkFrame):
         ).pack(anchor="nw", padx=25, pady=(20, 10))
 
         itens = [
-            ("Total de Estudantes", "-"),
-            ("Consultas (30d)", "-"),
-            ("Intervenções (30d)", "-"),
-            ("Triagens (30d)", "-"),
+            ("Total de Estudantes", "0"),
+            ("Consultas (30d)", "0"),
+            ("Intervenções (30d)", "0"),
+            ("Triagens (30d)", "0"),
         ]
 
         for texto, valor in itens:
@@ -122,7 +142,7 @@ class RelatorioFrame(ctk.CTkFrame):
         divisor = ctk.CTkFrame(summary_box, fg_color="#EAEAEA", height=1)
         divisor.pack(fill="x", padx=25, pady=15)
 
-        self.item_resumo(summary_box, "Taxa de Comparecimento", "-", cor_valor="#10B981")
+        self.item_resumo(summary_box, "Taxa de Comparecimento", "0%", cor_valor="#10B981")
 
     def item_resumo(self, parent, texto, valor, cor_valor="#1A1C1E"):
         f = ctk.CTkFrame(parent, fg_color="transparent")
