@@ -1,113 +1,88 @@
 import customtkinter as ctk
 import random
 import math
+from services.autenticacao import ServicoAutenticacao
+import threading
+
+from ui_theme import THEME, RADIUS, font
+
 
 class LoginFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color="black")  # Base color until gradient draws
+        super().__init__(parent, fg_color=THEME["brand_accent"])
 
         self.controller = controller
+        self.servico_autenticacao = ServicoAutenticacao()
 
-        # Cores do tema baseadas no CSS da web (theme-dark-blue)
-        # Senac Blue Dark: #003366 -> Senac Blue Light: #4F7CAC
-        # Vamos criar um gradiente vibrante de azul
-        self.gradient_colors = ["#003366", "#004A8D", "#4F7CAC", "#8ec5fc"]
-        
         self.bolhas = []
         self.background_drawn = False
-        
-        # Canvas ocupa toda a tela
+
         self.canvas = ctk.CTkCanvas(self, highlightthickness=0)
         self.canvas.place(relwidth=1, relheight=1)
-        
-        # Inicializa UI
+
         self.criar_bolhas()
         self.criar_card_login()
         self.criar_music_toggle()
-        
-        # Eventos
+
         self.bind("<Configure>", self.desenhar_gradiente)
         self.animar_bolhas()
 
     # ================= FUNDO GRADIENTE =================
     def desenhar_gradiente(self, event=None):
-        if self.background_drawn: 
-            return
-            
         width = self.winfo_width()
         height = self.winfo_height()
         
         if width <= 1: 
             return
 
-        # Desenhar gradiente vertical
-        # Interpolando entre as cores definidas
-        limit = height
-        # Simplificação para performance: faixas de 2 pixels
-        step = 2
+        cor_fundo_solida = THEME["brand_accent"]
+        self.configure(fg_color=cor_fundo_solida)
+        if hasattr(self, 'card'):
+            self.card.configure(bg_color=cor_fundo_solida)
+        if hasattr(self, 'music_frame'):
+            self.music_frame.configure(bg_color=cor_fundo_solida)
         
-        # Cor inicial e final principal
-        c1 = (0, 51, 102)   # #003366
-        c2 = (79, 124, 172) # #4F7CAC
+        if not self.background_drawn:
+            # Preenche o canvas com a cor sólida UMA VEZ
+            # Mas na verdade nem precisa do retângulo se o self.bg já for azul e canvas transparente.
+            # Como segurança, desenhamos um retângulo que cobre tudo
+            self.canvas.delete("bg_rect")
+            self.canvas.create_rectangle(0, 0, width, height, fill=cor_fundo_solida, outline="", tags="bg_rect")
+            self.background_drawn = True
+        else:
+            # Se redimensionar, atualiza o retângulo
+            self.canvas.coords("bg_rect", 0, 0, width, height)
         
-        for y in range(0, limit, step):
-            ratio = y / limit
-            r = int(c1[0] + (c2[0] - c1[0]) * ratio)
-            g = int(c1[1] + (c2[1] - c1[1]) * ratio)
-            b = int(c1[2] + (c2[2] - c1[2]) * ratio)
-            color = f"#{r:02x}{g:02x}{b:02x}"
-            self.canvas.create_line(0, y, width, y, fill=color, width=step)
-            
-        self.background_drawn = True
-        
-        # Trazer bolhas para frente do gradiente (se já existirem)
+        # Trazer bolhas para frente do gradiente
         for b in self.bolhas:
             self.canvas.tag_raise(b["id"])
             if b.get("text_id") is not None:
                 self.canvas.tag_raise(b["text_id"])
-
+        
 
     # ================= BOLHAS FLUTUANTES (BUBBLES) =================
     def criar_bolhas(self):
-        # Baseado nas bolhas do CSS (x1 a x25)
-        # Algumas com texto, outras vazias (ou com caracteres abstratos do HTML original)
         chars = ['a', 'b', 'c'] + [''] * 22
-        
         for i in range(25):
             x = random.randint(0, 1200)
             y = random.randint(100, 800)
-            size = random.randint(40, 130) # Tamanhos variados como no CSS (60px a 130px)
-            
-            # Efeito de bolha de sabão: contorno branco semitransparente, fill muito leve
-            bolha_id = self.canvas.create_oval(
-                x, y, x + size, y + size,
-                outline="#ffffff",
-                width=1,
-                tags="bubble"
-            )
-            # CustomTkinter Canvas não suporta alpha no fill diretamente de forma simples,
-            # mas podemos simular com stipple se necessário, ou apenas deixar outline para "glass"
-            # O Canvas padrão do Tkinter suporta transparência apenas via imagens ou hacks.
-            # Vamos manter apenas o outline e desenhar o texto.
+            size = random.randint(40, 130)
+
+            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="#ffffff", width=1, tags="bubble")
 
             char = chars[i] if i < len(chars) else ""
             text_id = None
             if char:
-                text_id = self.canvas.create_text(
-                    x + size/2, y + size/2,
-                    text=char,
-                    fill="white",
-                    font=("Segoe UI", int(size/3), "bold")
-                )
-            
+                text_id = self.canvas.create_text(x + size / 2, y + size / 2, text=char, fill="white", font=("Segoe UI", int(size / 3), "bold"))
+
             self.bolhas.append({
                 "id": bolha_id,
                 "text_id": text_id,
                 "x": x,
                 "y": y,
                 "size": size,
-                "speed": random.uniform(0.5, 2.0), # Velocidade de subida
-                "wobble": random.uniform(0, 2 * math.pi) # Para movimento lateral
+                "speed": random.uniform(0.3, 1.2),
+                "wobble": random.uniform(0, 2 * math.pi),
             })
 
     def animar_bolhas(self):
@@ -134,158 +109,131 @@ class LoginFrame(ctk.CTkFrame):
                 if b["text_id"]:
                     self.canvas.coords(b["text_id"], b["x"] + b["size"]/2, b["y"] + b["size"]/2)
 
-        self.after(20, self.animar_bolhas)
+        self.after(25, self.animar_bolhas)
+
+    def criar_rounded_rect(self, x1, y1, x2, y2, r, **kwargs):
+        return None
+
+    def desenhar_elementos_bg(self):
+        self.canvas.delete("card_bg")
+        self.canvas.delete("toggle_bg")
 
     # ================= CARD CENTRAL DE LOGIN =================
     def criar_card_login(self):
-        # Card branco central
         self.card = ctk.CTkFrame(
             self,
-            width=380,
-            height=500,
-            corner_radius=20,
-            fg_color="white",
-            bg_color="transparent" # Importante para cantos arredondados sobre o canvas
+            width=420,
+            height=520,
+            corner_radius=24,
+            fg_color=THEME["card"],
+            border_width=1,
+            border_color=THEME["border"],
+            bg_color=THEME["brand_accent"],
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
 
+        inner = ctk.CTkFrame(self.card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=28, pady=22)
+
         # 1. Ícone Coração (Gradient Circle)
         # Simulando o gradiente com uma cor sólida azul vibrante por limitação do CTK
-        icon_bg = ctk.CTkFrame(
-            self.card,
-            width=80,
-            height=80,
-            corner_radius=40,
-            fg_color="#3b82f6" # blue-500
-        )
+        icon_bg = ctk.CTkFrame(inner, width=80, height=80, corner_radius=40, fg_color=THEME["primary"])
         icon_bg.pack(pady=(40, 15))
         icon_bg.pack_propagate(False)
         
         # Coração (Usando emoji ou texto, já que não temos o SVG 'heart' do lucide facilmente renderizável aqui)
-        heart_label = ctk.CTkLabel(
-            icon_bg,
-            text="🤍", # Coração branco
-            font=("Arial", 40),
-            text_color="white"
-        )
+        heart_label = ctk.CTkLabel(icon_bg, text="🤍", font=font(40), text_color="white")
         heart_label.place(relx=0.5, rely=0.5, anchor="center")
 
         # 2. Título "Ser Pleno"
         title_label = ctk.CTkLabel(
-            self.card,
+            inner,
             text="Ser Pleno",
-            font=("Segoe UI", 28, "bold"),
-            text_color="#1e40af" # blue-800
+            font=font(28, "bold"),
+            text_color=THEME["text"]
         )
         title_label.pack(pady=(0, 5))
 
         # 3. Subtítulo
-        subtitle_label = ctk.CTkLabel(
-            self.card,
-            text="Sua jornada de bem-estar começa aqui",
-            font=("Segoe UI", 12),
-            text_color="#64748b" # gray-500
-        )
+        subtitle_label = ctk.CTkLabel(inner, text="Sua jornada de bem-estar começa aqui", font=font(12), text_color=THEME["text_muted"])
         subtitle_label.pack(pady=(0, 25))
 
         # 4. Formulário
         # Usuario
-        self.user_frame = ctk.CTkFrame(self.card, fg_color="transparent")
-        self.user_frame.pack(fill="x", padx=40, pady=8)
-        
+        self.user_frame = ctk.CTkFrame(inner, fg_color=THEME["bg_alt"], corner_radius=RADIUS["input"], border_width=1, border_color=THEME["border"], height=40)
+        self.user_frame.pack(fill="x", pady=8)
+        self.user_frame.pack_propagate(False)
+
+        ctk.CTkLabel(self.user_frame, text="👤", font=font(14), text_color=THEME["text_muted"]).pack(side="left", padx=12)
+
         self.entry_user = ctk.CTkEntry(
             self.user_frame,
             placeholder_text="Seu nome",
-            height=45,
-            corner_radius=12,
-            border_width=1,
-            border_color="#e2e8f0",
-            fg_color="#f8fafc",
-            text_color="#334155"
+            height=34,
+            border_width=0,
+            fg_color="transparent",
+            text_color=THEME["text"],
+            justify="center",
+            font=font(13)
         )
-        self.entry_user.pack(fill="x")
-        # Nota: Ícones dentro do entry são complexos em CTK puro. 
-        # Poderíamos colocar um Label com imagem sobre o entry, mas pode quebrar layout.
+        self.entry_user.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        
         
         # Senha
-        self.pass_frame = ctk.CTkFrame(self.card, fg_color="transparent")
-        self.pass_frame.pack(fill="x", padx=40, pady=8)
+        self.pass_frame = ctk.CTkFrame(inner, fg_color=THEME["bg_alt"], corner_radius=RADIUS["input"], border_width=1, border_color=THEME["border"], height=40)
+        self.pass_frame.pack(fill="x", pady=8)
+        self.pass_frame.pack_propagate(False)
+
+        ctk.CTkLabel(self.pass_frame, text="🔒", font=font(14), text_color=THEME["text_muted"]).pack(side="left", padx=12)
 
         self.entry_pass = ctk.CTkEntry(
             self.pass_frame,
             placeholder_text="Sua senha",
             show="•",
-            height=45,
-            corner_radius=12,
-            border_width=1,
-            border_color="#e2e8f0",
-            fg_color="#f8fafc",
-            text_color="#334155"
+            height=34,
+            border_width=0,
+            fg_color="transparent",
+            text_color=THEME["text"],
+            justify="center",
+            font=font(13)
         )
-        self.entry_pass.pack(fill="x")
+        self.entry_pass.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
         # Mensagem de erro
-        self.lbl_erro = ctk.CTkLabel(
-            self.card,
-            text="",
-            text_color="#ef4444",
-            font=("Segoe UI", 11)
-        )
+        self.lbl_erro = ctk.CTkLabel(inner, text="", text_color="#ef4444", font=font(11))
         self.lbl_erro.pack(pady=2)
 
         # Botão Entrar
-        self.btn_entrar = ctk.CTkButton(
-            self.card,
-            text="Entrar",
-            height=45,
-            corner_radius=12,
-            fg_color="#2563eb", # blue-600
-            hover_color="#1d4ed8", # blue-700
-            font=("Segoe UI", 14, "bold"),
-            command=self.fazer_login
-        )
-        self.btn_entrar.pack(fill="x", padx=40, pady=(10, 15))
+        self.btn_entrar = ctk.CTkButton(inner, text="Entrar", height=46, corner_radius=RADIUS["button"], fg_color=THEME["primary"], hover_color=THEME["primary_hover"], font=font(14, "bold"), command=self.fazer_login)
+        self.btn_entrar.pack(fill="x", pady=(12, 10))
 
         # Link Política
-        self.btn_politica = ctk.CTkButton(
-            self.card,
-            text="🛡️ Política de Privacidade",
-            fg_color="transparent",
-            text_color="#3b82f6",
-            hover_color="#eff6ff",
-            font=("Segoe UI", 12),
-            height=30,
-            command=self.abrir_politica
-        )
+        self.btn_politica = ctk.CTkButton(inner, text="🛡️ Política de Privacidade", fg_color="transparent", text_color=THEME["primary"], hover_color=THEME["primary_light"], font=font(12), height=30, command=self.abrir_politica)
         self.btn_politica.pack(pady=10)
 
     # ================= TOGGLE DE MÚSICA =================
     def criar_music_toggle(self):
-        # Container no canto inferior direito
-        self.music_frame = ctk.CTkFrame(
-            self, 
-            fg_color="transparent",
-            bg_color="transparent" # Sobre o canvas
-        )
+        # Container menor no canto inferior direito
+        self.music_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=20, border_width=1, border_color=THEME["border"], bg_color=THEME["brand_accent"])
         self.music_frame.place(relx=0.98, rely=0.98, anchor="se")
-
-        # Vamos usar um Switch para simular o toggle
-        self.music_var = ctk.StringVar(value="off")
         
+        self.music_var = ctk.StringVar(value="off")
         self.music_switch = ctk.CTkSwitch(
             self.music_frame,
-            text="Música",
+            text="",
+            width=50,
+            height=26,
             command=self.toggle_music,
             variable=self.music_var,
             onvalue="on",
             offvalue="off",
-            progress_color="#4ade80", # green-400 (cor do check no css visual)
-            button_color="white",
-            button_hover_color="#f1f5f9",
-            text_color="white" # Texto sobre o fundo azul escuro
+            progress_color=THEME["primary"],
+            button_color=THEME["bg_alt"],
+            button_hover_color=THEME["border"],
+            fg_color=THEME["bg_alt"]
         )
-        self.music_switch.pack(padx=20, pady=20)
+        self.music_switch.pack(padx=12, pady=12)
 
     # ================= AÇÕES =================
     def fazer_login(self):
@@ -293,17 +241,29 @@ class LoginFrame(ctk.CTkFrame):
         password = self.entry_pass.get()
         
         if username and password:
-            # Login bem sucedido
-            self.controller.iniciar_sistema()
+            self.lbl_erro.configure(text="Autenticando...", text_color="white")
+            self.update_idletasks()
+            
+            # Simple threading to prevent UI freeze
+            def run_login():
+                result = self.servico_autenticacao.login(username, password)
+                if result['success']:
+                    self.lbl_erro.configure(text="")
+                    # Must schedule UI update on main thread
+                    self.after(0, self.controller.iniciar_sistema)
+                else:
+                    msg = result.get('message', 'Erro ao fazer login')
+                    self.after(0, lambda: self.lbl_erro.configure(text=msg, text_color="red"))
+
+            threading.Thread(target=run_login, daemon=True).start()
         else:
             self.lbl_erro.configure(text="Preencha usuário e senha")
 
     def abrir_politica(self):
-        # Aqui seria aberta a modal. Como é desktop, podemos abrir uma nova janela ou Toplevel
         top = ctk.CTkToplevel(self)
         top.title("Política de Privacidade")
         top.geometry("400x300")
-        lb = ctk.CTkLabel(top, text="Política de Privacidade\n\n(Texto Simulado)", font=("Segoe UI", 14))
+        lb = ctk.CTkLabel(top, text="Política de Privacidade\n\n(Texto Simulado)", font=font(14))
         lb.pack(expand=True)
 
     def toggle_music(self):
