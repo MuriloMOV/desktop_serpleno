@@ -13,7 +13,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # Caminhos de imagens
         self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.img_path = os.path.join(self.base_path, "..", "serpleno_web", "staticfiles", "desktop", "img")
+        self.img_path = os.path.join(self.base_path, "..", "imagens")
 
         # Grid layout principal (Sidebar + Chat Area)
         self.grid_columnconfigure(1, weight=1)
@@ -27,11 +27,24 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
     def load_image(self, name, size):
         try:
-            path = os.path.join(self.img_path, name)
-            if os.path.exists(path):
-                return ctk.CTkImage(light_image=Image.open(path), size=size)
-        except Exception:
-            return None
+            if not hasattr(self, "_images"):
+                self._images = {}
+            cache_key = f"{name}:{size}"
+            if cache_key in self._images:
+                return self._images[cache_key]
+
+            candidates = [
+                os.path.join(self.img_path, name),
+                os.path.join(self.base_path, "assets", "avatars", name),
+                os.path.join(self.base_path, "..", "imagens", name),
+            ]
+            for path in candidates:
+                if path and os.path.exists(path):
+                    img = ctk.CTkImage(light_image=Image.open(path), size=size)
+                    self._images[cache_key] = img
+                    return img
+        except Exception as e:
+            print(f"Erro ao carregar imagem {name}: {e}")
         return None
 
     def criar_sidebar(self):

@@ -13,7 +13,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         # Caminhos de imagens
         self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.img_path = os.path.join(self.base_path, "..", "serpleno_web", "staticfiles", "desktop", "img")
+        self.img_path = os.path.join(self.base_path, "..", "imagens")
 
         # Layout principal em grid
         self.grid_columnconfigure(0, weight=2) # Coluna esquerda (Informações Pessoais)
@@ -31,13 +31,22 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     def load_image(self, name, size):
         try:
-            path = os.path.join(self.img_path, name)
-            if not os.path.exists(path):
-                # Fallback para o diretório de imagens padrão se existir
-                path = os.path.join(self.base_path, "..", "imagens", name)
-            
-            if os.path.exists(path):
-                return ctk.CTkImage(light_image=Image.open(path), size=size)
+            if not hasattr(self, "_images"):
+                self._images = {}
+            cache_key = f"{name}:{size}"
+            if cache_key in self._images:
+                return self._images[cache_key]
+
+            candidates = [
+                os.path.join(self.img_path, name),
+                os.path.join(self.base_path, "assets", "avatars", name),
+                os.path.join(self.base_path, "..", "imagens", name),
+            ]
+            for path in candidates:
+                if path and os.path.exists(path):
+                    img = ctk.CTkImage(light_image=Image.open(path), size=size)
+                    self._images[cache_key] = img
+                    return img
         except Exception as e:
             print(f"Erro ao carregar imagem {name}: {e}")
         return None
@@ -207,10 +216,41 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 border_color=self.colors["border"],
                 corner_radius=RADIUS["input"],
                 width=64,
-                height=64
+                height=64,
+                command=lambda i=idx: self.select_avatar(i)
             )
             r, c = divmod(idx - 1, 3)
             btn.grid(row=r, column=c, padx=6, pady=6, sticky="nsew")
+
+    def select_avatar(self, avatar_id):
+        # Salva seleção localmente (arquivo simples) e atualiza a UI
+        try:
+            import json
+            profile_path = os.path.join(self.base_path, "user_profile.json")
+            profile = {}
+            if os.path.exists(profile_path):
+                with open(profile_path, "r", encoding="utf-8") as f:
+                    profile = json.load(f)
+            profile["avatar"] = f"avatar-{avatar_id}.jpg"
+            with open(profile_path, "w", encoding="utf-8") as f:
+                json.dump(profile, f)
+
+            # Atualiza imagem central
+            img = self.load_image(f"avatar-{avatar_id}.jpg", (180, 180))
+            # find avatar_center and update
+            for child in self.winfo_children():
+                # busca pelo widget que contém a label com tamanho 180 (heurística)
+                for sub in child.winfo_children():
+                    if hasattr(sub, 'winfo_children'):
+                        for sub2 in sub.winfo_children():
+                            try:
+                                if getattr(sub2, 'cget', lambda x: None)('width') == 180:
+                                    sub2.configure(image=img, text="" if img else sub2.cget('text'))
+                                    return
+                            except Exception:
+                                continue
+        except Exception as e:
+            print("Erro ao salvar avatar:", e)
         
         # Campos de Input
         self.criar_input_field(card, "Nome de exibição", "Admin SerPleno", "👤")

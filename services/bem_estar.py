@@ -1,21 +1,74 @@
-from .api import api
+from config.db_config import get_db_connection
 
 class ServicoBemEstar:
     def obter_dashboard(self):
-        return api.get("wellness/dashboard/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        # Últimos registros de humor e checkins
+        cursor.execute("SELECT * FROM desktop_moodentry ORDER BY entry_date DESC LIMIT 10")
+        moods = cursor.fetchall()
+        cursor.execute("SELECT * FROM desktop_wellnesscheckin ORDER BY check_in_date DESC LIMIT 10")
+        checkins = cursor.fetchall()
+        # Média geral do humor
+        cursor.execute("SELECT AVG(mood_level) as average_mood FROM desktop_moodentry")
+        avg = cursor.fetchone()
+        connection.close()
+        data = {
+            'summary': {'average_mood': avg.get('average_mood') if avg else None},
+            'moods': moods,
+            'checkins': checkins
+        }
+        return {"success": True, "data": data}
 
     def listar_entradas_humor(self):
-        return api.get("wellness/mood/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM desktop_moodentry")
+        result = cursor.fetchall()
+        connection.close()
+        return {"success": True, "data": result}
 
     def obter_medias_humor(self):
-        return api.get("wellness/mood/averages/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT AVG(mood_level) as average_mood FROM desktop_moodentry")
+        result = cursor.fetchone()
+        connection.close()
+        return {"success": True, "data": result}
 
     def obter_humor_estudante(self, id_estudante):
-        return api.get(f"wellness/mood/student/{id_estudante}/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM desktop_moodentry WHERE student_id = %s", (id_estudante,))
+        result = cursor.fetchall()
+        connection.close()
+        return {"success": True, "data": result}
 
     def listar_checkins(self):
-        return api.get("wellness/checkins/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT * FROM desktop_wellnesscheckin ORDER BY check_in_date DESC LIMIT 20")
+        result = cursor.fetchall()
+        connection.close()
+        return {"success": True, "data": {"checkins": result}}
 
     def listar_estudantes_risco(self):
-        """Retorna estudantes em zona de risco emocional/comportamental"""
-        return api.get("wellness/risk-students/")
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        # Buscar alunos com marcação de atenção e agrupar por prioridade
+        cursor.execute("SELECT id_aluno, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
+        rows = cursor.fetchall()
+        groups = {'critical': [], 'high': [], 'medium': [], 'low': []}
+        for r in rows:
+            priority = r.get('priority_level') or 0
+            student = {'id': r.get('id_aluno'), 'name': r.get('nome'), 'reasons': [r.get('attention_reason') or 'Requer atenção']}
+            if priority >= 4:
+                groups['critical'].append(student)
+            elif priority == 3:
+                groups['high'].append(student)
+            elif priority == 2:
+                groups['medium'].append(student)
+            else:
+                groups['low'].append(student)
+        connection.close()
+        return {"success": True, "data": {"groups": groups}}

@@ -2,6 +2,8 @@ import customtkinter as ctk
 from datetime import datetime
 import threading
 from services.estudantes import ServicoEstudante
+# Compat alias para testes
+StudentService = ServicoEstudante
 
 from ui_theme import THEME, SPACING, RADIUS, font
 # from services.orientacoes import ServicoOrientacoes # Se existir

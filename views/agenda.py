@@ -1,7 +1,10 @@
 import customtkinter as ctk
 from datetime import datetime, timedelta
 from services.agendamentos import ServicoAgendamento
+# Compat alias para tests
+AppointmentService = ServicoAgendamento
 import threading
+from tkinter import messagebox
 
 from ui_theme import THEME, SPACING, RADIUS, font
 
@@ -262,6 +265,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             # Ícone de edição pequeno e discreto
             edit_lbl = ctk.CTkLabel(slot, text="✎", font=font(14), text_color=text_color, cursor="hand2")
             edit_lbl.place(relx=0.5, rely=0.82, anchor="center")
+            edit_lbl.bind("<Button-1>", lambda e, h=hora: self.abrir_gerenciar_agendamento(h))
 
         # Efeito de Hover simples
         def on_enter(e):
@@ -273,3 +277,249 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         slot.bind("<Leave>", on_leave)
 
         return slot
+
+    def abrir_novo_agendamento(self, hora=None):
+        """Abre modal para criar um novo agendamento (ou editar se hora existir)."""
+        modal = ctk.CTkToplevel(self)
+        modal.title("Agendar Atendimento")
+        modal.geometry("520x380")
+        modal.transient(self)
+
+        content = ctk.CTkFrame(modal, fg_color=self.colors["card"], corner_radius=12)
+        content.pack(fill="both", expand=True, padx=12, pady=12)
+
+        # Date
+        ctk.CTkLabel(content, text="Data (YYYY-MM-DD)", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        date_entry = ctk.CTkEntry(content, fg_color=self.colors["bg_alt"], placeholder_text=self.data_atual.strftime('%Y-%m-%d'))
+        date_entry.pack(fill="x", pady=(4, 8))
+
+        # Time selection
+        ctk.CTkLabel(content, text="Horário", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        time_var = ctk.StringVar()
+        time_menu = ctk.CTkOptionMenu(content, values=["Carregando..."], variable=time_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        time_menu.pack(fill="x", pady=(4, 8))
+
+        # Student selection
+        ctk.CTkLabel(content, text="Estudante", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        student_var = ctk.StringVar()
+        student_menu = ctk.CTkOptionMenu(content, values=["Carregando..."], variable=student_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        student_menu.pack(fill="x", pady=(4, 8))
+
+        # Notes
+        ctk.CTkLabel(content, text="Observações", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        notes = ctk.CTkTextbox(content, height=80, fg_color=self.colors["bg_alt"], corner_radius=8)
+        notes.pack(fill="both", pady=(6, 8))
+
+        # Actions
+        actions = ctk.CTkFrame(content, fg_color="transparent")
+        actions.pack(fill="x")
+        ctk.CTkButton(actions, text="Cancelar", fg_color=self.colors["bg_alt"], command=modal.destroy).pack(side="right", padx=8)
+
+        def submit():
+            payload = {
+                'date': date_entry.get().strip() or self.data_atual.strftime('%Y-%m-%d'),
+                'time': time_var.get(),
+                'student_id': getattr(modal, '_students_map', {}).get(student_var.get()),
+                'notes': notes.get('1.0', 'end').strip()
+            }
+            self.criar_agendamento(payload)
+            modal.destroy()
+
+        ctk.CTkButton(actions, text="Agendar", fg_color=self.colors["primary"], text_color="white", command=submit).pack(side="right")
+
+        # Load lookups async
+        def load_lookups():
+            times_resp = self.servico_agendamento.listar_horarios_disponiveis(data=self.data_atual.strftime('%Y-%m-%d'))
+            t_list = []
+            if isinstance(times_resp, dict):
+                t_list = times_resp.get('data', [])
+            # Students
+            from services.estudantes import ServicoEstudante
+            ss = ServicoEstudante()
+            students_resp = ss.listar_estudantes()
+            s_list = []
+            s_map = {}
+            if students_resp:
+                for s in students_resp.get('data', []):
+                    label = f"{s.get('name')} ({s.get('id')})"
+                    s_list.append(label)
+                    s_map[label] = s.get('id')
+
+            def apply():
+                if t_list:
+                    time_menu.configure(values=[t for t in t_list])
+                    time_var.set(t_list[0])
+                else:
+                    time_menu.configure(values=["08:00", "09:00", "10:00"])
+                    time_var.set("08:00")
+
+                if s_list:
+                    student_menu.configure(values=s_list)
+                    student_var.set(s_list[0])
+                else:
+                    student_menu.configure(values=["Nenhum estudante disponível"])
+                    student_var.set("Nenhum estudante disponível")
+
+                modal._students_map = s_map
+
+            self.after(0, apply)
+
+        threading.Thread(target=load_lookups, daemon=True).start()
+
+    def abrir_gerenciar_agendamento(self, hora):
+        """Abre modal para gerenciar um agendamento existente (editar / cancelar)."""
+        appt = self.appointments.get(hora)
+        if not appt:
+            print("Agendamento não encontrado para", hora)
+            return
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Gerenciar Agendamento")
+        modal.geometry("520x380")
+        modal.transient(self)
+
+        content = ctk.CTkFrame(modal, fg_color=self.colors["card"], corner_radius=12)
+        content.pack(fill="both", expand=True, padx=12, pady=12)
+
+        # Data (read-only)
+        ctk.CTkLabel(content, text="Data (YYYY-MM-DD)", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        date_entry = ctk.CTkEntry(content, fg_color=self.colors["bg_alt"], placeholder_text=appt.get('date', self.data_atual.strftime('%Y-%m-%d')))
+        date_entry.insert(0, appt.get('date', self.data_atual.strftime('%Y-%m-%d')))
+        date_entry.pack(fill="x", pady=(4, 8))
+
+        # Time (read-only)
+        ctk.CTkLabel(content, text="Horário", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        time_var = ctk.StringVar(value=hora)
+        time_menu = ctk.CTkOptionMenu(content, values=[hora], variable=time_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        time_menu.pack(fill="x", pady=(4, 8))
+
+        # Student (selectable)
+        ctk.CTkLabel(content, text="Estudante", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        student_var = ctk.StringVar()
+        student_menu = ctk.CTkOptionMenu(content, values=["Carregando..."], variable=student_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        student_menu.pack(fill="x", pady=(4, 8))
+
+        # Notes
+        ctk.CTkLabel(content, text="Observações", font=font(11, "bold"), text_color=self.colors["text"]).pack(anchor="w")
+        notes = ctk.CTkTextbox(content, height=80, fg_color=self.colors["bg_alt"], corner_radius=8)
+        notes.pack(fill="both", pady=(6, 8))
+        notes.insert("1.0", appt.get('notes', ""))
+
+        # Actions
+        actions = ctk.CTkFrame(content, fg_color="transparent")
+        actions.pack(fill="x")
+        ctk.CTkButton(actions, text="Cancelar", fg_color=self.colors["bg_alt"], command=modal.destroy).pack(side="right", padx=8)
+
+        def do_update():
+            payload = {
+                'date': date_entry.get().strip() or appt.get('date'),
+                'time': time_var.get(),
+                'student_id': getattr(modal, '_students_map', {}).get(student_var.get()),
+                'notes': notes.get('1.0', 'end').strip()
+            }
+            self.atualizar_agendamento(appt.get('id'), payload)
+            modal.destroy()
+
+        def do_delete():
+            if messagebox.askyesno("Confirmar", "Deseja realmente cancelar este agendamento?"):
+                self.deletar_agendamento(appt.get('id'))
+                modal.destroy()
+
+        ctk.CTkButton(actions, text="Excluir", fg_color="#ef4444", text_color="white", command=do_delete).pack(side="right", padx=8)
+        ctk.CTkButton(actions, text="Salvar", fg_color=self.colors["primary"], text_color="white", command=do_update).pack(side="right")
+
+        # Load students async and preselect the current one
+        def load_students():
+            from services.estudantes import ServicoEstudante
+            ss = ServicoEstudante()
+            students_resp = ss.listar_estudantes()
+            s_list = []
+            s_map = {}
+            current_label = None
+            if students_resp:
+                for s in students_resp.get('data', []):
+                    label = f"{s.get('name')} ({s.get('id')})"
+                    s_list.append(label)
+                    s_map[label] = s.get('id')
+                    if s.get('name') == appt.get('student', {}).get('name'):
+                        current_label = label
+
+            def apply():
+                if s_list:
+                    student_menu.configure(values=s_list)
+                    student_var.set(current_label or s_list[0])
+                else:
+                    student_menu.configure(values=["Nenhum estudante disponível"])
+                    student_var.set("Nenhum estudante disponível")
+                modal._students_map = s_map
+
+            self.after(0, apply)
+
+        threading.Thread(target=load_students, daemon=True).start()
+
+    def atualizar_agendamento(self, id_agendamento, dados):
+        """Wrapper to update appointment via service and reload data."""
+        res = self.servico_agendamento.atualizar_agendamento(id_agendamento, dados)
+        ok = False
+        if isinstance(res, dict):
+            ok = res.get('success', False)
+        else:
+            ok = getattr(res, 'status_code', 200) in (200, 201)
+
+        if ok:
+            try:
+                self.load_data()
+            except Exception:
+                pass
+        else:
+            print('Erro ao atualizar agendamento:', res)
+
+    def deletar_agendamento(self, id_agendamento):
+        """Wrapper to delete appointment via service and reload data."""
+        res = self.servico_agendamento.deletar_agendamento(id_agendamento)
+        ok = False
+        if isinstance(res, dict):
+            ok = res.get('success', False)
+        else:
+            ok = getattr(res, 'status_code', 200) in (200, 204)
+
+        if ok:
+            try:
+                self.load_data()
+            except Exception:
+                pass
+        else:
+            print('Erro ao deletar agendamento:', res)
+
+    def criar_agendamento(self, dados):
+        """Cria um agendamento via serviço e recarrega os dados da agenda."""
+        if not dados.get('time') or not dados.get('student_id'):
+            print("Dados incompletos para agendamento")
+            return
+        res = self.servico_agendamento.criar_agendamento(dados)
+        ok = False
+        if isinstance(res, dict):
+            ok = res.get('success', False)
+        else:
+            ok = getattr(res, 'status_code', 200) in (200, 201)
+
+        if ok:
+            try:
+                self.load_data()
+            except Exception:
+                pass
+        else:
+            print('Erro ao criar agendamento:', res)
+
+    def gerar_ics(self, dados):
+        """Gera um conteúdo ICS simples para o agendamento (retorna string)."""
+        dt = f"{dados.get('date')}T{dados.get('time').replace(':', '')}00"
+        ics = (
+            "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//SerPleno//EN\nBEGIN:VEVENT\n"
+            f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}\n"
+            f"DTSTART:{dt}\n"
+            f"SUMMARY:Atendimento - {dados.get('student_name', 'Estudante')}\n"
+            f"DESCRIPTION:{dados.get('notes', '')}\n"
+            "END:VEVENT\nEND:VCALENDAR"
+        )
+        return ics

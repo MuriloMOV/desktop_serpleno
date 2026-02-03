@@ -1,5 +1,7 @@
 import customtkinter as ctk
 from services.triagem import ServicoTriagem
+# Compat alias para testes
+ScreeningService = ServicoTriagem
 import threading
 from datetime import datetime
 
@@ -234,6 +236,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             else:
                 btn.configure(fg_color="transparent", text_color=self.colors["text_muted"], border_width=0)
         
+        # Track active tab for refreshes
+        self.current_tab = active_name
         self.renderizar_lista(active_name)
 
     def renderizar_lista(self, tab_filtro):
@@ -307,4 +311,139 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         badge.pack(side="right")
 
     def abrir_nova_triagem(self):
-        print("Modal Nova Triagem")
+        """Abre um modal para criar uma nova triagem."""
+        # Build modal window
+        modal = ctk.CTkToplevel(self)
+        modal.title("Nova Triagem")
+        modal.geometry("560x420")
+        modal.transient(self)
+
+        content = ctk.CTkFrame(modal, fg_color=self.colors["card"], corner_radius=12)
+        content.pack(fill="both", expand=True, padx=12, pady=12)
+
+        # Student select
+        ctk.CTkLabel(content, text="Estudante", font=font(12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(6, 0))
+        students_var = ctk.StringVar()
+        students_menu = ctk.CTkOptionMenu(content, values=["Carregando..."], variable=students_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        students_menu.pack(fill="x", pady=(4, 8))
+
+        # Form select
+        ctk.CTkLabel(content, text="Formulário", font=font(12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(6, 0))
+        forms_var = ctk.StringVar()
+        forms_menu = ctk.CTkOptionMenu(content, values=["Carregando..."], variable=forms_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        forms_menu.pack(fill="x", pady=(4, 8))
+
+        # Priority + scheduled date
+        row = ctk.CTkFrame(content, fg_color="transparent")
+        row.pack(fill="x", pady=(6, 8))
+        ctk.CTkLabel(row, text="Prioridade", font=font(11, "bold"), text_color=self.colors["text"]).grid(row=0, column=0, sticky="w")
+        prioridade_var = ctk.StringVar(value="medium")
+        prioridade_menu = ctk.CTkOptionMenu(row, values=["low", "medium", "high", "urgent"], variable=prioridade_var, fg_color=self.colors["bg_alt"], button_color=self.colors["bg_alt"], corner_radius=RADIUS["input"]) 
+        prioridade_menu.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+
+        ctk.CTkLabel(row, text="Data Agendada (YYYY-MM-DD)", font=font(11, "bold"), text_color=self.colors["text"]).grid(row=0, column=1, sticky="w")
+        date_entry = ctk.CTkEntry(row, placeholder_text="YYYY-MM-DD", fg_color=self.colors["bg_alt"], border_width=1, corner_radius=RADIUS["input"]) 
+        date_entry.grid(row=1, column=1, sticky="ew")
+        row.grid_columnconfigure(0, weight=1)
+        row.grid_columnconfigure(1, weight=1)
+
+        # Observações
+        ctk.CTkLabel(content, text="Observações", font=font(12, "bold"), text_color=self.colors["text"]).pack(anchor="w", pady=(6, 0))
+        observations = ctk.CTkTextbox(content, height=100, fg_color=self.colors["bg_alt"], corner_radius=8)
+        observations.pack(fill="both", pady=(6, 8))
+
+        # Actions
+        actions = ctk.CTkFrame(content, fg_color="transparent")
+        actions.pack(fill="x", pady=(8, 0))
+        btn_cancel = ctk.CTkButton(actions, text="Cancelar", command=modal.destroy, fg_color=self.colors["bg_alt"], text_color=self.colors["text_muted"]) 
+        btn_cancel.pack(side="right", padx=6)
+
+        def submit():
+            # Find selected student id and form id from the mapped lookups
+            student_label = students_var.get()
+            form_label = forms_var.get()
+            student_id = getattr(modal, "_students_map", {}).get(student_label)
+            form_id = getattr(modal, "_forms_map", {}).get(form_label)
+            payload = {
+                'student_id': student_id,
+                'form_id': form_id,
+                'priority': prioridade_var.get(),
+                'scheduled_date': date_entry.get().strip() or None,
+                'observations': observations.get("1.0", "end").strip()
+            }
+            self.criar_triagem(payload)
+            modal.destroy()
+
+        btn_save = ctk.CTkButton(actions, text="Criar Triagem", command=submit, fg_color=self.colors["primary"], text_color="white")
+        btn_save.pack(side="right")
+
+        # Load students and forms async to avoid blocking UI
+        def load_lookups():
+            # Students
+            from services.estudantes import ServicoEstudante
+            ss = ServicoEstudante()
+            students_resp = ss.listar_estudantes()
+            s_list = []
+            s_map = {}
+            if students_resp:
+                for s in students_resp.get('data', []):
+                    label = f"{s.get('name')} ({s.get('id')})"
+                    s_list.append(label)
+                    s_map[label] = s.get('id')
+
+            # Forms
+            forms_resp = self.servico_triagem.listar_formularios() if hasattr(self.servico_triagem, 'listar_formularios') else None
+            f_list = []
+            f_map = {}
+            if forms_resp and isinstance(forms_resp, dict):
+                for f in forms_resp.get('data', []):
+                    label = f.get('name') or str(f.get('id'))
+                    f_list.append(label)
+                    f_map[label] = f.get('id')
+
+            # Apply to widgets in main thread
+            def apply():
+                if s_list:
+                    students_menu.configure(values=s_list)
+                    students_var.set(s_list[0])
+                else:
+                    students_menu.configure(values=["Nenhum estudante disponível"])
+                    students_var.set("Nenhum estudante disponível")
+
+                if f_list:
+                    forms_menu.configure(values=f_list)
+                    forms_var.set(f_list[0])
+                else:
+                    forms_menu.configure(values=["Padrão"])
+                    forms_var.set("Padrão")
+
+                modal._students_map = s_map
+                modal._forms_map = f_map
+
+            self.after(0, apply)
+
+        threading.Thread(target=load_lookups, daemon=True).start()
+
+    def criar_triagem(self, dados):
+        """Cria uma triagem via serviço e atualiza a lista em seguida."""
+        # Defensive: ensure required fields
+        if not dados.get('student_id'):
+            print("Erro: estudante não selecionado")
+            return
+
+        res = self.servico_triagem.criar_triagem(dados)
+        # Accept dict-like or response-like
+        ok = False
+        if isinstance(res, dict):
+            ok = res.get('success', False)
+        else:
+            ok = getattr(res, 'status_code', 200) in (200, 201)
+
+        if ok:
+            # Refresh current tab list
+            try:
+                self.renderizar_lista(getattr(self, 'current_tab', 'Pendentes'))
+            except Exception:
+                pass
+        else:
+            print('Erro ao criar triagem:', res)

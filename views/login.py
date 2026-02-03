@@ -2,6 +2,8 @@ import customtkinter as ctk
 import random
 import math
 from services.autenticacao import ServicoAutenticacao
+# Compat alias para testes que esperam o nome em inglês
+AuthService = ServicoAutenticacao
 import threading
 
 from ui_theme import THEME, RADIUS, font
@@ -12,7 +14,8 @@ class LoginFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=THEME["brand_accent"])
 
         self.controller = controller
-        self.servico_autenticacao = ServicoAutenticacao()
+        # Use the compatível AuthService alias aqui para facilitar testes (e permitir mock)
+        self.servico_autenticacao = AuthService()
 
         self.bolhas = []
         self.background_drawn = False

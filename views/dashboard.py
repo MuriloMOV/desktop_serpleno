@@ -2,6 +2,8 @@ import customtkinter as ctk
 from datetime import datetime
 import threading
 from services.dashboard import ServicoDashboard
+# Compat alias para testes
+DashboardService = ServicoDashboard
 
 from ui_theme import THEME, SPACING, RADIUS, font
 

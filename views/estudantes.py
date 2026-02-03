@@ -4,6 +4,8 @@ import os
 import threading
 from datetime import datetime
 from services.estudantes import ServicoEstudante
+# Compat alias para testes
+StudentService = ServicoEstudante
 
 from ui_theme import THEME, SPACING, RADIUS, font
 
@@ -17,7 +19,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
         
         self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.img_path = os.path.join(self.base_path, "..", "serpleno_web", "staticfiles", "desktop", "img")
+        self.img_path = os.path.join(self.base_path, "..", "imagens")
 
         
         self.grid_columnconfigure(0, weight=1)
@@ -85,11 +87,26 @@ class EstudantesFrame(ctk.CTkFrame):
 
     def load_image(self, name, size):
         try:
-            path = os.path.join(self.img_path, name)
-            if os.path.exists(path):
-                return ctk.CTkImage(light_image=Image.open(path), size=size)
-        except Exception:
-            return None
+            # Simple cache to avoid garbage collection and repeated opens
+            if not hasattr(self, "_images"):
+                self._images = {}
+            cache_key = f"{name}:{size}"
+            if cache_key in self._images:
+                return self._images[cache_key]
+
+            # Candidate paths: project imagens, bundled assets, fallback
+            candidates = [
+                os.path.join(self.img_path, name),
+                os.path.join(self.base_path, "assets", "avatars", name),
+                os.path.join(self.base_path, "..", "imagens", name),
+            ]
+            for path in candidates:
+                if path and os.path.exists(path):
+                    img = ctk.CTkImage(light_image=Image.open(path), size=size)
+                    self._images[cache_key] = img
+                    return img
+        except Exception as e:
+            print(f"Erro ao carregar imagem {name}: {e}")
         return None
 
     def criar_header(self):
@@ -118,7 +135,55 @@ class EstudantesFrame(ctk.CTkFrame):
         ).pack(side="right")
     
     def novo_estudante_click(self):
-        print("Abrir Modal Novo Estudante")
+        # Abre modal simples para criar estudante
+        import tkinter as tk
+        from tkinter import messagebox
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Novo Estudante")
+        modal.geometry("480x320")
+        modal.transient(self)
+        modal.grab_set()
+
+        frm = ctk.CTkFrame(modal, fg_color="transparent")
+        frm.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(frm, text="Nome", font=font(11, "bold")).pack(anchor="w")
+        entry_name = ctk.CTkEntry(frm, width=420)
+        entry_name.pack(fill="x", pady=(4, 10))
+
+        ctk.CTkLabel(frm, text="Curso", font=font(11, "bold")).pack(anchor="w")
+        entry_course = ctk.CTkEntry(frm, width=420)
+        entry_course.pack(fill="x", pady=(4, 10))
+
+        ctk.CTkLabel(frm, text="E-mail de contato", font=font(11, "bold")).pack(anchor="w")
+        entry_email = ctk.CTkEntry(frm, width=420)
+        entry_email.pack(fill="x", pady=(4, 16))
+
+        btns = ctk.CTkFrame(frm, fg_color="transparent")
+        btns.pack(anchor="e")
+
+        def salvar():
+            nome = entry_name.get().strip()
+            if not nome:
+                messagebox.showerror("Erro", "Informe o nome do estudante")
+                return
+            dados = {
+                'nome': nome,
+                'email': entry_email.get().strip(),
+                'has_medical_report': False,
+                'requires_attention': False,
+            }
+            res = self.servico_estudante.criar_estudante(dados)
+            if res.get('success'):
+                messagebox.showinfo("Sucesso", res.get('message', 'Estudante criado com sucesso'))
+                modal.destroy()
+                self.load_data()
+            else:
+                messagebox.showerror("Erro", res.get('message', 'Erro ao criar estudante'))
+
+        ctk.CTkButton(btns, text="Cancelar", width=120, command=modal.destroy, fg_color="transparent").pack(side="right", padx=8)
+        ctk.CTkButton(btns, text="Salvar", width=120, command=salvar, fg_color=self.colors['primary'], text_color='white').pack(side="right")
 
     def criar_sidebar(self):
         sidebar = ctk.CTkFrame(self.content_container, fg_color=self.colors["card"], width=320, corner_radius=RADIUS["card"], border_width=1, border_color=self.colors["border"])
