@@ -1,14 +1,6 @@
 import customtkinter as ctk
-from services.mural import ServicoMural
-# Compat alias para testes
-BoardService = ServicoMural
-import threading
-from datetime import datetime
-import webbrowser
-import os
 from datetime import datetime
 
-from ui_theme import THEME, SPACING, RADIUS, font
 
 class QuadroAvisosFrame(ctk.CTkFrame):
     def __init__(self, master, app):
@@ -81,10 +73,6 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         topo = ctk.CTkFrame(card, fg_color="transparent")
         topo.pack(fill="x", padx=20, pady=(15, 5))
 
-    def criar_header(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 8))
-        
         ctk.CTkLabel(
             topo,
             text=pub["titulo"],
