@@ -64,7 +64,6 @@ class App(ctk.CTk):
             text_color="#1e1b4b" # Dark Indigo
         ).pack(side="left")
 
-
         # ===== MENU =====
         self.menu_buttons = {}
         self.menu_buttons["dashboard"] = self.botao_sidebar("🏠  Início", self.mostrar_dashboard, active=True)
@@ -77,18 +76,8 @@ class App(ctk.CTk):
         self.menu_buttons["avisos"] = self.botao_sidebar("📢  Quadro de Avisos", self.mostrar_quadro_avisos)
         self.menu_buttons["configuracoes"] = self.botao_sidebar("⚙  Configurações", self.mostrar_configuracoes)
 
-<<<<<<< HEAD:ser_pleno/app.py
-        self.botao_sidebar("Relatórios", self.mostrar_relatorio)
-        self.botao_sidebar("Comunicação Interna", self.mostrar_comunicacao_interna)
-        self.botao_sidebar("Orientações", self.mostrar_orientacoes)
-        self.botao_sidebar("Quadro de Avisos", self.mostrar_quadro_avisos)
-        self.botao_sidebar("Configurações", self.mostrar_configuracoes)
-    def botao_sidebar(self, texto, comando=None):
-        ctk.CTkButton(
-=======
     def botao_sidebar(self, texto, comando=None, active=False):
         btn = ctk.CTkButton(
->>>>>>> origin/Melhoria-Design:app.py
             self.sidebar,
             text=texto,
             height=45,
