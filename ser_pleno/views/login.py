@@ -1,3 +1,4 @@
+import os
 import customtkinter as ctk
 import random
 import math
@@ -5,6 +6,7 @@ from services.autenticacao import ServicoAutenticacao
 # Compat alias para testes que esperam o nome em inglês
 AuthService = ServicoAutenticacao
 import threading
+from pygame import mixer
 
 from ui_theme import THEME, RADIUS, font
 
@@ -19,6 +21,9 @@ class LoginFrame(ctk.CTkFrame):
 
         self.bolhas = []
         self.background_drawn = False
+
+        os.environ['SDL_AUDIODRIVER'] = 'directsound'
+        mixer.init()
 
         self.canvas = ctk.CTkCanvas(self, highlightthickness=0)
         self.canvas.place(relwidth=1, relheight=1)
@@ -65,13 +70,13 @@ class LoginFrame(ctk.CTkFrame):
 
     # ================= BOLHAS FLUTUANTES (BUBBLES) =================
     def criar_bolhas(self):
-        chars = ['a', 'b', 'c'] + [''] * 22
+        chars = [''] * 22
         for i in range(25):
             x = random.randint(0, 1200)
             y = random.randint(100, 800)
             size = random.randint(40, 130)
 
-            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="#ffffff", width=1, tags="bubble")
+            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="#dfdada", width=1, tags="bubble")
 
             char = chars[i] if i < len(chars) else ""
             text_id = None
@@ -218,7 +223,7 @@ class LoginFrame(ctk.CTkFrame):
     # ================= TOGGLE DE MÚSICA =================
     def criar_music_toggle(self):
         # Container menor no canto inferior direito
-        self.music_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=20, border_width=1, border_color=THEME["border"], bg_color=THEME["brand_accent"])
+        self.music_frame = ctk.CTkFrame(self, fg_color=THEME["card_music"], corner_radius=20, border_width=2, border_color=THEME["border_music"], bg_color=THEME["brand_accent"])
         self.music_frame.place(relx=0.98, rely=0.98, anchor="se")
         
         self.music_var = ctk.StringVar(value="off")
@@ -234,7 +239,7 @@ class LoginFrame(ctk.CTkFrame):
             progress_color=THEME["primary"],
             button_color=THEME["bg_alt"],
             button_hover_color=THEME["border"],
-            fg_color=THEME["bg_alt"]
+            fg_color=THEME["info"]
         )
         self.music_switch.pack(padx=12, pady=12)
 
@@ -269,12 +274,14 @@ class LoginFrame(ctk.CTkFrame):
         lb = ctk.CTkLabel(top, text="Política de Privacidade\n\n(Texto Simulado)", font=font(14))
         lb.pack(expand=True)
 
+    # Lógica de tocar música 
     def toggle_music(self):
-        # Lógica de tocar música (Placeholder)
+
         status = self.music_var.get()
         if status == "on":
             print("Music Playing...")
-            # Implementação real necessitaria de pygame ou similar
+            mixer.music.load("assets/Music/background_music.mp3") 
+          # Loop infinito
         else:
             print("Music Paused...")
-
+            mixer.music.stop()
