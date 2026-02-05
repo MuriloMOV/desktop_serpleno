@@ -28,7 +28,7 @@ class ServicoAgendamento:
         if data:
             params['date'] = data
         return api.get('schedule/times/', params=params)
-        params = {}
-        if date:
-            params['date'] = date
-        return api.get('schedule/times/', params=params)
+    
+    def gerenciar_horario(self, dados):
+        """Gerencia horários disponíveis (adicionar ou remover)"""
+        return api.post('schedule/times/manage/', json=dados)
