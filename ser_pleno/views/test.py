@@ -1,400 +1,228 @@
-# agenda_desktop.py
 import customtkinter as ctk
-import tkinter as tk
-from tkinter import messagebox
-import threading
-import requests
 from datetime import datetime, timedelta
-import locale
+from tkinter import messagebox
+from services.agendamentos import ServicoAgendamento
+from config.db_config import get_db_connection
+from ui_theme import THEME, SPACING, RADIUS, font
 
+class AgendaFrame(ctk.CTkScrollableFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, fg_color=THEME.get("bg", "#F1F5F9"))
+        self.controller = controller
+        self.servico_agendamento = ServicoAgendamento()
+        
+        # Estado da Data Selecionada
+        self.data_selecionada = datetime.now()
+        
+        self.horarios_base = []
+        self.mapa_estudantes = {} # Para vincular Nome -> ID no Modal
+        
+        self.columnconfigure(0, weight=1)
 
-# --- CONFIGURAÇÕES ---
-API_BASE = "http://127.0.0.1:8000"  # ajuste para seu backend Django
-LOCALE = "pt_BR.UTF-8"  # para formatação de datas (ajuste conforme sistema)
-try:
-    locale.setlocale(locale.LC_TIME, LOCALE)
-except Exception:
-    pass
-
-# Design tokens
-TOKENS = {
-    "color_primary": "#0B5FFF",
-    "accent": "#00B37E",
-    "bg": "#F6F7FB",
-    "text": "#0F1724",
-    "muted": "#6B7280",
-    "border": "#E6E9F2",
-    "error": "#E02424",
-    "radius": 8,
-    "padding": 16
-}
-
-# --- API CLIENT (simples) ---
-class ApiClient:
-    def __init__(self, base_url):
-        self.base = base_url.rstrip("/")
-
-    def _get(self, path, params=None):
-        url = f"{self.base}{path}"
-        r = requests.get(url, params=params, timeout=8)
-        r.raise_for_status()
-        return r.json()
-
-    def _post(self, path, json):
-        url = f"{self.base}{path}"
-        r = requests.post(url, json=json, timeout=8)
-        r.raise_for_status()
-        return r.json()
-
-    def _delete(self, path, params=None):
-        url = f"{self.base}{path}"
-        r = requests.delete(url, params=params, timeout=8)
-        r.raise_for_status()
-        return r
-
-    # endpoints esperados
-    def get_timeslots(self, weekday):
-        return self._get(f"/api/timeslots/{weekday}")
-
-    def get_bookings(self, date_str):
-        return self._get(f"/api/bookings/{date_str}")
-
-    def get_students(self):
-        return self._get("/api/students")
-
-    def create_timeslot(self, start, end, weekday):
-        return self._post("/api/timeslot", {"start": start, "end": end, "weekday": weekday})
-
-    def delete_timeslot(self, id_):
-        return self._delete("/api/timeslot", params={"id": id_})
-
-    def create_booking(self, date, timeslot_id, student_id, notes):
-        return self._post("/api/booking", {"date": date, "timeslot_id": timeslot_id, "student_id": student_id, "notes": notes})
-
-    def delete_booking(self, id_):
-        return self._delete("/api/booking", params={"id": id_})
-
-# --- UTILITÁRIOS ---
-def run_in_thread(fn):
-    def wrapper(*args, **kwargs):
-        threading.Thread(target=lambda: fn(*args, **kwargs), daemon=True).start()
-    return wrapper
-
-def format_date_label(d: datetime):
-    # ex: quinta-feira, 05 de fevereiro
-    try:
-        return d.strftime("%A, %d de %B").capitalize()
-    except Exception:
-        return d.strftime("%d/%m/%Y")
-
-# --- MODAIS ---
-class ManageTimesModal(ctk.CTkToplevel):
-    def __init__(self, parent, api: ApiClient, on_change=None):
-        super().__init__(parent)
-        self.title("Gerir horários")
-        self.geometry("520x420")
-        self.api = api
-        self.on_change = on_change
-        self.configure(padx=16, pady=16)
-        self.build_ui()
-        self.load_weekday( (datetime.now().weekday()) )
-
-    def build_ui(self):
-        header = ctk.CTkLabel(self, text="Gerir horários", font=ctk.CTkFont(size=16, weight="bold"))
-        header.pack(anchor="w", pady=(0,12))
-
-        row = ctk.CTkFrame(self)
-        row.pack(fill="x", pady=(0,12))
-        self.weekday_var = ctk.StringVar(value=str(datetime.now().weekday()))
-        weekdays = [("Seg",0),("Ter",1),("Qua",2),("Qui",3),("Sex",4),("Sáb",5),("Dom",6)]
-        for name, val in weekdays:
-            rb = ctk.CTkRadioButton(row, text=name, variable=self.weekday_var, value=str(val), command=self._on_weekday_change)
-            rb.pack(side="left", padx=6)
-
-        # list of timeslots
-        self.list_frame = ctk.CTkFrame(self, fg_color="white", corner_radius=8)
-        self.list_frame.pack(fill="both", expand=True, pady=(0,12))
-        self.timeslot_listbox = tk.Listbox(self.list_frame, bd=0, highlightthickness=0)
-        self.timeslot_listbox.pack(fill="both", expand=True, padx=8, pady=8)
-
-        # add form
-        form = ctk.CTkFrame(self)
-        form.pack(fill="x", pady=(0,8))
-        self.start_entry = ctk.CTkEntry(form, placeholder_text="Início (HH:MM)")
-        self.start_entry.pack(side="left", padx=(0,8), expand=True, fill="x")
-        self.end_entry = ctk.CTkEntry(form, placeholder_text="Fim (HH:MM)")
-        self.end_entry.pack(side="left", padx=(0,8), expand=True, fill="x")
-        add_btn = ctk.CTkButton(form, text="Adicionar", command=self._add_timeslot, fg_color=TOKENS["accent"])
-        add_btn.pack(side="left")
-
-        del_btn = ctk.CTkButton(self, text="Remover selecionado", command=self._remove_selected, fg_color="#E02424")
-        del_btn.pack(fill="x")
-
-    def _on_weekday_change(self):
-        self.load_weekday(int(self.weekday_var.get()))
-
-    @run_in_thread
-    def load_weekday(self, weekday):
-        try:
-            slots = self.api.get_timeslots(weekday)
-            def ui_update():
-                self.timeslot_listbox.delete(0, tk.END)
-                for s in slots:
-                    label = f"{s['id']} — {s['start']} → {s['end']}"
-                    self.timeslot_listbox.insert(tk.END, label)
-            self.after(0, ui_update)
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Falha ao carregar horários:\n{e}"))
-
-    @run_in_thread
-    def _add_timeslot(self):
-        start = self.start_entry.get().strip()
-        end = self.end_entry.get().strip()
-        weekday = int(self.weekday_var.get())
-        if not start or not end:
-            messagebox.showwarning("Atenção", "Preencha início e fim.")
-            return
-        try:
-            self.api.create_timeslot(start, end, weekday)
-            self.load_weekday(weekday)
-            if self.on_change:
-                self.on_change()
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Não foi possível adicionar:\n{e}"))
-
-    @run_in_thread
-    def _remove_selected(self):
-        sel = self.timeslot_listbox.curselection()
-        if not sel:
-            messagebox.showinfo("Info", "Selecione um horário para remover.")
-            return
-        item = self.timeslot_listbox.get(sel[0])
-        id_ = item.split("—")[0].strip()
-        try:
-            self.api.delete_timeslot(id_)
-            self.load_weekday(int(self.weekday_var.get()))
-            if self.on_change:
-                self.on_change()
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Não foi possível remover:\n{e}"))
-
-class BookingModal(ctk.CTkToplevel):
-    def __init__(self, parent, api: ApiClient, date_str, timeslot, on_saved=None):
-        super().__init__(parent)
-        self.title("Agendar estudante")
-        self.geometry("420x300")
-        self.api = api
-        self.date_str = date_str
-        self.timeslot = timeslot
-        self.on_saved = on_saved
-        self.configure(padx=16, pady=16)
-        self.build_ui()
-        self.load_students()
-
-    def build_ui(self):
-        lbl = ctk.CTkLabel(self, text=f"Horário: {self.timeslot['start']} → {self.timeslot['end']}", font=ctk.CTkFont(size=14, weight="bold"))
-        lbl.pack(anchor="w", pady=(0,12))
-        self.student_cb = ctk.CTkComboBox(self, values=[], width=360)
-        self.student_cb.pack(fill="x", pady=(0,8))
-        self.notes = ctk.CTkTextbox(self, height=100)
-        self.notes.pack(fill="both", pady=(0,8))
-        btn_frame = ctk.CTkFrame(self)
-        btn_frame.pack(fill="x")
-        save_btn = ctk.CTkButton(btn_frame, text="Salvar", fg_color=TOKENS["color_primary"], command=self._save)
-        save_btn.pack(side="right", padx=(8,0))
-        cancel_btn = ctk.CTkButton(btn_frame, text="Cancelar", command=self.destroy, fg_color="gray20")
-        cancel_btn.pack(side="right")
-
-    @run_in_thread
-    def load_students(self):
-        try:
-            students = self.api.get_students()
-            names = [f"{s['id']} - {s['name']}" for s in students]
-            self.after(0, lambda: self.student_cb.configure(values=names))
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Falha ao carregar estudantes:\n{e}"))
-
-    @run_in_thread
-    def _save(self):
-        sel = self.student_cb.get()
-        if not sel:
-            messagebox.showwarning("Atenção", "Selecione um estudante.")
-            return
-        student_id = int(sel.split("-")[0].strip())
-        notes = self.notes.get("1.0", "end").strip()
-        try:
-            self.api.create_booking(self.date_str, self.timeslot['id'], student_id, notes)
-            if self.on_saved:
-                self.on_saved()
-            self.after(0, lambda: self.destroy())
-        except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Não foi possível salvar:\n{e}"))
-
-# --- APLICAÇÃO PRINCIPAL ---
-class AgendaApp(ctk.CTk):
-    def __init__(self, api: ApiClient):
-        super().__init__()
-        self.api = api
-        self.title("Agenda")
-        self.geometry("1100x760")
-        ctk.set_appearance_mode("Light")
-        ctk.set_default_color_theme("blue")
-        self.configure(padx=24, pady=24, fg_color=TOKENS["bg"])
-        self.selected_date = datetime.now().date()
-        self.build_ui()
+        self.criar_barra_global()
+        self.criar_header_secao()
+        self.criar_container_agenda_dia()
+        self.criar_container_proxima_semana()
+        
         self.refresh_all()
 
-    def build_ui(self):
-        # Header
-        header = ctk.CTkFrame(self, height=72, fg_color="white", corner_radius=TOKENS["radius"])
-        header.pack(fill="x", pady=(0,16))
-        header.grid_columnconfigure(0, weight=1)
-        title = ctk.CTkLabel(header, text="Agenda", font=ctk.CTkFont(size=20, weight="bold"))
-        title.place(relx=0.5, rely=0.5, anchor="center")
-        # icons right
-        icons_frame = ctk.CTkFrame(header, fg_color="transparent")
-        icons_frame.place(relx=0.98, rely=0.5, anchor="e")
-        for txt in ["🤝","🔔","👤","⏻"]:
-            b = ctk.CTkButton(icons_frame, text=txt, width=36, height=36, corner_radius=6, fg_color="transparent", hover_color=TOKENS["border"])
-            b.pack(side="left", padx=6)
-
-        # Top container with calendar icon, title/subtitle and day selector + manage button
-        top = ctk.CTkFrame(self, fg_color="white", corner_radius=TOKENS["radius"])
-        top.pack(fill="x", pady=(0,16))
-        top.grid_columnconfigure(1, weight=1)
-        # left: icon + texts
-        left = ctk.CTkFrame(top, fg_color="transparent")
-        left.grid(row=0, column=0, sticky="w", padx=16, pady=16)
-        icon_lbl = ctk.CTkLabel(left, text="📅", font=ctk.CTkFont(size=28))
-        icon_lbl.pack(side="left", padx=(0,12))
-        texts = ctk.CTkFrame(left, fg_color="transparent")
-        texts.pack(side="left")
-        t1 = ctk.CTkLabel(texts, text="Agenda de horários", font=ctk.CTkFont(size=14, weight="bold"))
-        t1.pack(anchor="w")
-        self.subtitle_lbl = ctk.CTkLabel(texts, text=format_date_label(datetime.now()), font=ctk.CTkFont(size=12), text_color=TOKENS["muted"])
-        self.subtitle_lbl.pack(anchor="w")
-
-        # center: day selector
-        center = ctk.CTkFrame(top, fg_color="transparent")
-        center.grid(row=0, column=1, sticky="ew")
-        self.date_entry = ctk.CTkEntry(center, width=260)
-        self.date_entry.pack(pady=18)
-        self.date_entry.insert(0, self.selected_date.isoformat())
-        go_btn = ctk.CTkButton(center, text="Ir", command=self._on_date_change)
-        go_btn.pack(pady=6)
-
-        # right: manage button
-        right = ctk.CTkFrame(top, fg_color="transparent")
-        right.grid(row=0, column=2, sticky="e", padx=16)
-        manage_btn = ctk.CTkButton(right, text="Gerir horários", fg_color=TOKENS["color_primary"], command=self._open_manage_modal)
-        manage_btn.pack(pady=18)
-
-        # Main panels: left details (not used heavily) and right lists
-        main = ctk.CTkFrame(self, fg_color="transparent")
-        main.pack(fill="both", expand=True)
-        main.grid_columnconfigure(0, weight=1)
-        main.grid_columnconfigure(1, weight=1)
-
-        # Agenda do dia
-        day_card = ctk.CTkFrame(main, fg_color="white", corner_radius=TOKENS["radius"])
-        day_card.grid(row=0, column=0, sticky="nsew", padx=(0,12), pady=8)
-        day_card.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(day_card, text="Agenda do dia", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(12,0))
-        self.grid_day_frame = ctk.CTkFrame(day_card, fg_color="transparent")
-        self.grid_day_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=12)
-
-        # Próxima semana
-        week_card = ctk.CTkFrame(main, fg_color="white", corner_radius=TOKENS["radius"])
-        week_card.grid(row=0, column=1, sticky="nsew", padx=(12,0), pady=8)
-        week_card.grid_rowconfigure(1, weight=1)
-        ctk.CTkLabel(week_card, text="Próxima semana", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=16, pady=(12,0))
-        self.grid_week_frame = ctk.CTkFrame(week_card, fg_color="transparent")
-        self.grid_week_frame.grid(row=1, column=0, sticky="nsew", padx=16, pady=12)
-
-        # floating new button
-        new_btn = ctk.CTkButton(self, text="+", width=56, height=56, corner_radius=28, fg_color=TOKENS["accent"], command=self._open_manage_modal)
-        new_btn.place(relx=0.95, rely=0.92, anchor="center")
-
-    def _on_date_change(self):
+    def fetch_estudantes(self):
+        """Busca estudantes do banco para o Dropdown."""
         try:
-            d = datetime.fromisoformat(self.date_entry.get()).date()
-            self.selected_date = d
-            self.subtitle_lbl.configure(text=format_date_label(datetime.combine(d, datetime.min.time())))
-            self.refresh_all()
-        except Exception:
-            messagebox.showerror("Erro", "Formato de data inválido. Use YYYY-MM-DD.")
-
-    def _open_manage_modal(self):
-        ManageTimesModal(self, self.api, on_change=self.refresh_all)
-
-    def _open_booking_modal(self, date_str, timeslot):
-        BookingModal(self, self.api, date_str, timeslot, on_saved=self.refresh_all)
-
-    @run_in_thread
-    def refresh_all(self):
-        # carrega timeslots do dia (weekday) e bookings do dia e da próxima semana
-        try:
-            weekday = self.selected_date.weekday()
-            timeslots = self.api.get_timeslots(weekday)
-            bookings = self.api.get_bookings(self.selected_date.isoformat())
-            # próxima semana: same weekday +7
-            next_date = self.selected_date + timedelta(days=7)
-            next_weekday = next_date.weekday()
-            timeslots_next = self.api.get_timeslots(next_weekday)
-            bookings_next = self.api.get_bookings(next_date.isoformat())
-
-            def ui_update():
-                self._render_grid(self.grid_day_frame, timeslots, bookings, self.selected_date)
-                self._render_grid(self.grid_week_frame, timeslots_next, bookings_next, next_date)
-            self.after(0, ui_update)
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT id_aluno, nome FROM estudantes ORDER BY nome ASC")
+            rows = cursor.fetchall()
+            # Criamos um dicionário para facilitar a busca do ID pelo Nome selecionado no ComboBox
+            self.mapa_estudantes = {r['nome']: r['id_aluno'] for r in rows}
+            cursor.close()
+            conn.close()
         except Exception as e:
-            self.after(0, lambda: messagebox.showerror("Erro", f"Falha ao atualizar:\n{e}"))
+            print(f"Erro ao buscar estudantes: {e}")
 
-    def _render_grid(self, container, timeslots, bookings, date_obj):
-        # limpa
-        for w in container.winfo_children():
-            w.destroy()
-        # map bookings por timeslot
-        booking_map = {b['timeslot_id']: b for b in bookings}
-        # grid: vertical list de timeslots (pode ser adaptado para grid visual)
-        for idx, ts in enumerate(timeslots):
-            frame = ctk.CTkFrame(container, fg_color="white", corner_radius=6, height=72)
-            frame.pack(fill="x", pady=6)
-            frame.grid_propagate(False)
-            left = ctk.CTkFrame(frame, width=8, fg_color=TOKENS["accent"])
-            left.pack(side="left", fill="y")
-            info = ctk.CTkLabel(frame, text=f"{ts['start']} → {ts['end']}", font=ctk.CTkFont(size=14, weight="bold"))
-            info.pack(anchor="w", padx=12, pady=8)
-            # booking info
-            b = booking_map.get(ts['id'])
-            if b:
-                student_name = b.get('student_name') or str(b.get('student_id'))
-                lbl = ctk.CTkLabel(frame, text=f"{student_name}", text_color=TOKENS["muted"])
-                lbl.pack(anchor="w", padx=12)
-                action = ctk.CTkButton(frame, text="Ver / Cancelar", width=120, command=lambda bid=b['id']: self._cancel_booking_confirm(bid))
-                action.pack(side="right", padx=12)
-            else:
-                book_btn = ctk.CTkButton(frame, text="Agendar", fg_color=TOKENS["color_primary"],
-                                         command=lambda ts=ts, d=date_obj: self._open_booking_modal(d.isoformat(), ts))
-                book_btn.pack(side="right", padx=12)
+    def fetch_horarios_base(self):
+        """Busca a grade de horários configurada no banco."""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT Horario FROM disponibilidade WHERE is_active = 1 ORDER BY Horario ASC")
+            self.horarios_base = [str(h[0])[:5] for h in cursor.fetchall()]
+            cursor.close()
+            conn.close()
+        except:
+            self.horarios_base = ["08:00", "09:00", "10:00"] # Fallback
 
-    @run_in_thread
-    def _cancel_booking_confirm(self, booking_id):
-        # confirmação em thread -> UI via after
-        def ask():
-            if messagebox.askyesno("Confirmar", "Deseja cancelar este agendamento?"):
-                try:
-                    self.api.delete_booking(booking_id)
-                    self.refresh_all()
-                except Exception as e:
-                    messagebox.showerror("Erro", f"Não foi possível cancelar:\n{e}")
-        self.after(0, ask)
+    def refresh_all(self):
+        """Recarrega dados e atualiza a UI."""
+        self.fetch_horarios_base()
+        self.fetch_estudantes()
+        self.atualizar_label_data()
+        self.load_grid_data()
 
-# --- EXECUÇÃO ---
-def main():
-    api = ApiClient(API_BASE)
-    app = AgendaApp(api)
-    app.mainloop()
+    def load_grid_data(self):
+        # Carrega dia atual selecionado
+        data_str = self.data_selecionada.strftime('%Y-%m-%d')
+        agendamentos_dia = self.servico_agendamento.listar_agendamentos(data=data_str)
+        mapa_dia = {agt['data_hora'].strftime('%H:%M'): agt for agt in agendamentos_dia}
+        self.renderizar_grid(self.container_grid, mapa_dia)
 
-if __name__ == "__main__":
-    main()
+        # Carrega "Próxima Semana" (Exemplo: Próximo dia útil ou amanhã)
+        amanha_str = (self.data_selecionada + timedelta(days=1)).strftime('%Y-%m-%d')
+        agendamentos_prox = self.servico_agendamento.listar_agendamentos(data=amanha_str)
+        mapa_prox = {agt['data_hora'].strftime('%H:%M'): agt for agt in agendamentos_prox}
+        self.renderizar_grid(self.container_semana, mapa_prox)
+
+    def criar_barra_global(self):
+        barra = ctk.CTkFrame(self, fg_color="transparent")
+        barra.pack(fill="x", padx=SPACING["page_x"], pady=(20, 10))
+        ctk.CTkLabel(barra, text="Agenda", font=font(22, "bold")).pack(side="left")
+        
+        f_icons = ctk.CTkFrame(barra, fg_color="transparent")
+        f_icons.pack(side="right")
+        for icon in [("🤝", "Ajuda"), ("🔔", "Notif"), ("👤", "Perfil"), ("🚪", "Sair")]:
+            ctk.CTkButton(f_icons, text=icon[0], width=40, height=40, fg_color="white", 
+                         text_color="black", hover_color="#E2E8F0", corner_radius=10).pack(side="left", padx=5)
+
+    def criar_header_secao(self):
+        header = ctk.CTkFrame(self, fg_color="white", corner_radius=12, border_width=1, border_color="#E2E8F0")
+        header.pack(fill="x", padx=SPACING["page_x"], pady=10)
+        
+        # Esquerda: Info
+        left = ctk.CTkFrame(header, fg_color="transparent")
+        left.pack(side="left", padx=20, pady=15)
+        ctk.CTkLabel(left, text="📅", font=font(28, "normal")).pack(side="left", padx=(0, 15))
+        
+        titles = ctk.CTkFrame(left, fg_color="transparent")
+        titles.pack(side="left")
+        ctk.CTkLabel(titles, text="Agenda de atendimentos", font=font(18, "bold")).pack(anchor="w")
+        ctk.CTkLabel(titles, text="Gerencie seus horários e atendimentos", font=font(13, "normal"), text_color="#64748B").pack(anchor="w")
+        
+        # Direita: Navegação de Data e Gestão
+        right = ctk.CTkFrame(header, fg_color="transparent")
+        right.pack(side="right", padx=20)
+
+        # Seletor de Data com Setas
+        ctk.CTkButton(right, text="<", width=30, height=30, fg_color="transparent", 
+                     text_color="black", hover_color="#F1F5F9", 
+                     command=lambda: self.alterar_data(-1)).pack(side="left")
+        
+        self.lbl_data_display = ctk.CTkLabel(right, text="", font=font(13, "bold"), width=180)
+        self.lbl_data_display.pack(side="left", padx=5)
+
+        ctk.CTkButton(right, text=">", width=30, height=30, fg_color="transparent", 
+                     text_color="black", hover_color="#F1F5F9", 
+                     command=lambda: self.alterar_data(1)).pack(side="left")
+        
+        # Botão Relógio
+        ctk.CTkButton(right, text="🕒", width=42, height=42, fg_color="#9333EA", 
+                     command=self.abrir_modal_gestao, corner_radius=10).pack(side="left", padx=(15, 0))
+
+    def atualizar_label_data(self):
+        dias_semana = ["Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado", "Domingo"]
+        dia_nome = dias_semana[self.data_selecionada.weekday()]
+        data_formatada = self.data_selecionada.strftime(f"{dia_nome}, %d de %B")
+        self.lbl_data_display.configure(text=data_formatada)
+
+    def alterar_data(self, dias):
+        self.data_selecionada += timedelta(days=dias)
+        self.refresh_all()
+
+    def renderizar_grid(self, container, mapa_dados):
+        for child in container.winfo_children(): child.destroy()
+
+        for idx, hora in enumerate(self.horarios_base):
+            info = mapa_dados.get(hora)
+            ocupado = info is not None
+            cor_destaque = "#7E22CE" if ocupado else "#16A34A"
+            
+            cell = ctk.CTkFrame(container, height=115, corner_radius=10, border_width=1,
+                               fg_color="#F3E8FF" if ocupado else "#F0FDF4",
+                               border_color="#D8B4FE" if ocupado else "#BBF7D0")
+            cell.grid(row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew")
+            cell.grid_propagate(False)
+
+            ctk.CTkLabel(cell, text=hora, font=font(14, "bold"), text_color=cor_destaque).pack(pady=(10, 0))
+            
+            # Nome do Aluno (do banco)
+            nome_display = info['nome'] if ocupado else "Disponível"
+            ctk.CTkLabel(cell, text=nome_display, font=font(11, "bold" if ocupado else "normal"), 
+                        text_color=cor_destaque, wraplength=100).pack()
+
+            btn_color = "#9333EA" if ocupado else "#22C55E"
+            ctk.CTkButton(cell, text="Detalhes" if ocupado else "Agendar", height=24, width=85, 
+                         fg_color=btn_color, font=font(10, "bold"),
+                         command=lambda h=hora, i=info: self.abrir_modal_agendamento(h, i)).pack(side="bottom", pady=10)
+
+    def abrir_modal_agendamento(self, hora, info=None):
+        modal = ctk.CTkToplevel(self)
+        modal.title("Agendamento")
+        modal.geometry("400x500")
+        modal.grab_set()
+
+        ctk.CTkLabel(modal, text=f"Horário: {hora}", font=font(18, "bold")).pack(pady=20)
+        
+        # Dropdown Estudantes
+        ctk.CTkLabel(modal, text="Estudante:", anchor="w").pack(fill="x", padx=40)
+        combo = ctk.CTkComboBox(modal, values=list(self.mapa_estudantes.keys()), width=300)
+        if info: combo.set(info['nome'])
+        combo.pack(padx=40, pady=(0, 20))
+
+        ctk.CTkLabel(modal, text="Motivo:", anchor="w").pack(fill="x", padx=40)
+        txt_motivo = ctk.CTkTextbox(modal, height=100)
+        if info: txt_motivo.insert("1.0", info.get('motivo', ''))
+        txt_motivo.pack(fill="x", padx=40, pady=(0, 20))
+
+        def salvar():
+            nome_sel = combo.get()
+            id_aluno = self.mapa_estudantes.get(nome_sel)
+            # Lógica para chamar self.servico_agendamento.criar_agendamento ou atualizar
+            modal.destroy()
+            self.refresh_all()
+
+        ctk.CTkButton(modal, text="Salvar Agendamento", fg_color="#22C55E", command=salvar).pack(pady=10)
+
+    # Containers de Base
+    def criar_container_agenda_dia(self):
+        self.card_dia = ctk.CTkFrame(self, fg_color="white", corner_radius=12, border_width=1, border_color="#E2E8F0")
+        self.card_dia.pack(fill="x", padx=SPACING["page_x"], pady=10)
+        ctk.CTkLabel(self.card_dia, text="Horários do Dia", font=font(15, "bold")).pack(anchor="w", padx=20, pady=15)
+        ctk.CTkFrame(self.card_dia, fg_color="#E2E8F0", height=1).pack(fill="x", padx=20)
+        self.container_grid = ctk.CTkFrame(self.card_dia, fg_color="transparent")
+        self.container_grid.pack(fill="x", padx=20, pady=20)
+        for i in range(4): self.container_grid.columnconfigure(i, weight=1, uniform="grid")
+
+    def criar_container_proxima_semana(self):
+        self.card_semana = ctk.CTkFrame(self, fg_color="white", corner_radius=12, border_width=1, border_color="#E2E8F0")
+        self.card_semana.pack(fill="x", padx=SPACING["page_x"], pady=10)
+        ctk.CTkLabel(self.card_semana, text="Próxima Sessão (Amanhã)", font=font(15, "bold")).pack(anchor="w", padx=20, pady=15)
+        self.container_semana = ctk.CTkFrame(self.card_semana, fg_color="transparent")
+        self.container_semana.pack(fill="x", padx=20, pady=20)
+        for i in range(4): self.container_semana.columnconfigure(i, weight=1, uniform="grid")
+
+    def abrir_modal_gestao(self):
+        modal = ctk.CTkToplevel(self)
+        modal.title("Gestão de Grade")
+        modal.geometry("350x500")
+        modal.grab_set()
+        ctk.CTkLabel(modal, text="Horários Ativos", font=font(16, "bold")).pack(pady=10)
+        
+                # Lista de horários com scroll
+        frame_lista = ctk.CTkScrollableFrame(modal, width=320, height=300)
+        frame_lista.pack(padx=20, pady=10)
+
+        def atualizar_lista_modal():
+            for child in frame_lista.winfo_children(): child.destroy()
+            for h in self.horarios_base:
+                row = ctk.CTkFrame(frame_lista, fg_color="#F8FAFC")
+                row.pack(fill="x", pady=2)
+                ctk.CTkLabel(row, text=h, font=font(13, "bold")).pack(side="left", padx=10)
+                ctk.CTkButton(row, text="Remover", width=70, height=22, fg_color="#EF4444", 
+                             command=lambda x=h: print(f"Remover {x}")).pack(side="right", padx=5)
+
+        atualizar_lista_modal()
+
+        # Adicionar novo
+        ctk.CTkLabel(modal, text="Novo Horário (HH:MM):").pack()
+        new_h = ctk.CTkEntry(modal, width=120)
+        new_h.pack(pady=5)
+        ctk.CTkButton(modal, text="Adicionar à Grade", command=lambda: modal.destroy()).pack(pady=10)

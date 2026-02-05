@@ -1,34 +1,59 @@
 from .api import api
+from config.db_config import get_db_connection
 
 class ServicoAgendamento:
-    def listar_agendamentos(self, data=None, id_estudante=None, status=None, pagina=1):
-        params = {'page': pagina}
-        if data:
-            params['date'] = data
-        if id_estudante:
-            params['student'] = id_estudante
-        if status:
-            params['status'] = status
-            
-        return api.get('schedule/appointments/', params=params)
+    def verificar_disponibilidade(self, data_hora):
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        query = "SELECT COUNT(*) FROM agendamentos WHERE data_hora = %s AND status != 'Cancelado'"
+        cursor.execute(query, (data_hora,))
+        existe = cursor.fetchone()[0] > 0
+        cursor.close()
+        conn.close()
+        return not existe
 
     def criar_agendamento(self, dados):
-        return api.post('schedule/appointments/add/', json=dados)
+        if not self.verificar_disponibilidade(dados['data_hora']):
+            return {"success": False, "message": "Horário indisponível"}
 
-    def atualizar_agendamento(self, id_agendamento, dados):
-        # A rota de edição no backend é 'schedule/appointments/edit/'
-        dados['id'] = id_agendamento
-        return api.post('schedule/appointments/edit/', json=dados)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            query = """
+                INSERT INTO agendamentos 
+                (nome, data_hora, motivo, status, laudo, Aluno_id_aluno, origem) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            valores = (
+                dados['nome_aluno'], 
+                dados['data_hora'], 
+                dados.get('motivo', ''), 
+                'Pendente', 
+                dados.get('laudo', ''), 
+                dados['id_aluno'], 
+                'Desktop'
+            )
+            cursor.execute(query, valores)
+            conn.commit()
+            return {"success": True, "id": cursor.lastrowid}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+        finally:
+            cursor.close()
+            conn.close()
 
-    def deletar_agendamento(self, id_agendamento):
-        return api.delete(f'schedule/appointments/delete/{id_agendamento}/')
-
-    def listar_horarios_disponiveis(self, data=None):
-        params = {}
+    def listar_agendamentos(self, data=None):
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        query = "SELECT * FROM agendamentos"
+        params = []
+        
         if data:
-            params['date'] = data
-        return api.get('schedule/times/', params=params)
-    
-    def gerenciar_horario(self, dados):
-        """Gerencia horários disponíveis (adicionar ou remover)"""
-        return api.post('schedule/times/manage/', json=dados)
+            query += " WHERE DATE(data_hora) = %s"
+            params.append(data)
+            
+        cursor.execute(query, params)
+        resultados = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return resultados
