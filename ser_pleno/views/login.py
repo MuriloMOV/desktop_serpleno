@@ -276,12 +276,23 @@ class LoginFrame(ctk.CTkFrame):
 
     # Lógica de tocar música 
     def toggle_music(self):
-
         status = self.music_var.get()
+        
         if status == "on":
-            print("Music Playing...")
-            mixer.music.load("assets/Music/background_music.mp3") 
-          # Loop infinito
+            try:
+                # 1. Verifica se o arquivo existe para não crashar o app
+                caminho_musica = "assets/Music/background_music.mp3"
+                
+                if os.path.exists(caminho_musica):
+                    print("Music Playing...")
+                    mixer.music.load(caminho_musica)
+                    # 2. O parâmetro loops=-1 faz a música repetir infinitamente
+                    mixer.music.play(loops=-1) 
+                else:
+                    print(f"Erro: Arquivo não encontrado em {caminho_musica}")
+                    self.music_var.set("off") # Volta o switch para desligado
+            except Exception as e:
+                print(f"Erro ao tocar música: {e}")
         else:
-            print("Music Paused...")
+            print("Music Stopped...")
             mixer.music.stop()
