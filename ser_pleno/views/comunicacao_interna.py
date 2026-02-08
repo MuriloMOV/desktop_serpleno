@@ -9,7 +9,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
 
-        # Inicializa o serviço de comunicação
+        # Inicializa o servicio de comunicação
         from services.comunicacao import ServicoComunicacao
         self.servico_comunicacao = ServicoComunicacao()
 
@@ -124,11 +124,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         item.pack(fill="x", padx=10, pady=2)
         item.bind("<Button-1>", lambda e: self.selecionar_conversa(data, item))
         item.configure(cursor="hand2")
-        item.contato_data = data  # Armazena os dados do contato no widget
+        item.contato_data = data  # Armazena os dados del contato no widget
         
         inner = ctk.CTkFrame(item, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=10, pady=10)
-        # Garante que o inner frame também responda ao clique
+        # Garante que o inner frame tambien responda ao clique
         inner.bind("<Button-1>", lambda e: self.selecionar_conversa(data, item))
         inner.configure(cursor="hand2")
 
@@ -252,39 +252,50 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         if self.modal_arquivos.winfo_manager():
             self.modal_arquivos.grid_remove()
         else:
-            # Posiciona o modal sobre o ícone de clip (garantindo padding positivo)
+            # Posiciona o modal diretamente sobre o ícone de clip, garantindo padding positivo
             btn_x = self.btn_clip.winfo_x()
-            btn_y = max(10, self.btn_clip.winfo_y() - 200)  # Garante que não fique negativo
+            btn_y = max(10, self.btn_clip.winfo_y() - 280)  # Garante que não fique negativo
             self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=(btn_x + 25, 0), pady=(btn_y, 0))
     
     def criar_modal_arquivos(self, parent):
-        """Cria o modal de seleção de arquivos por categoria"""
+        """Cria o modal de seleção de arquivos por categoria em grid 3x3 muito compacto"""
         self.modal_arquivos = ctk.CTkFrame(parent, fg_color=self.colors["card"], corner_radius=RADIUS["card"], border_width=1, border_color=self.colors["border"])
         self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=25, pady=0)
         self.modal_arquivos.grid_remove()  # Inicialmente oculta
         
-        # Categorias de arquivos
+        # Categorias de arquivos - grid 3x3 (9 categorias)
         categorias = [
             {"nome": "Documentos", "icone": "📄", "extensao": [".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx"]},
             {"nome": "Imagens", "icone": "🖼️", "extensao": [".jpg", ".jpeg", ".png", ".gif", ".bmp"]},
             {"nome": "Videos", "icone": "🎥", "extensao": [".mp4", ".avi", ".mov", ".wmv"]},
             {"nome": "Audio", "icone": "🎵", "extensao": [".mp3", ".wav", ".ogg"]},
+            {"nome": "Planilhas", "icone": "📊", "extensao": [".xls", ".xlsx", ".csv"]},
+            {"nome": "Presentações", "icone": "📽️", "extensao": [".ppt", ".pptx"]},
+            {"nome": "Arquivos Zip", "icone": "🗜️", "extensao": [".zip", ".rar", ".7z"]},
+            {"nome": "Code", "icone": "💻", "extensao": [".py", ".js", ".html", ".css"]},
             {"nome": "Todos", "icone": "📁", "extensao": []}
         ]
         
+        # Configura grid 3x3 muito compacto
+        for row in range(3):
+            self.modal_arquivos.grid_rowconfigure(row, minsize=60)
+        for col in range(3):
+            self.modal_arquivos.grid_columnconfigure(col, minsize=80)
+            
         for i, cat in enumerate(categorias):
+            row = i // 3
+            col = i % 3
+            
             card = ctk.CTkFrame(self.modal_arquivos, fg_color=self.colors["bg_alt"], corner_radius=RADIUS["input"], border_width=1, border_color=self.colors["border"])
-            card.grid(row=0, column=i, sticky="nsew", padx=10, pady=10)
+            card.grid(row=row, column=col, sticky="nsew", padx=3, pady=3)
             card.pack_propagate(False)
             card.configure(cursor="hand2")
             card.bind("<Button-1>", lambda e, c=cat: self.selecionar_categoria(c))
             
             # Icone da categoria
-            ctk.CTkLabel(card, text=cat["icone"], font=font(24)).pack(pady=(15, 5))
+            ctk.CTkLabel(card, text=cat["icone"], font=font(14)).pack(pady=(5, 1))
             # Nome da categoria
-            ctk.CTkLabel(card, text=cat["nome"], font=font(12, "bold"), text_color=self.colors["text"]).pack(pady=(0, 15))
-            
-            self.modal_arquivos.grid_columnconfigure(i, weight=1)
+            ctk.CTkLabel(card, text=cat["nome"], font=font(8, "bold"), text_color=self.colors["text"]).pack(pady=(0, 5))
 
     def atualizar_area_mensagens(self):
         """Atualiza a área de mensagens com as mensagens carregadas"""
@@ -370,6 +381,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             icone_arquivo = "🎥"
         elif msg["tipo_arquivo"] == "Audio":
             icone_arquivo = "🎵"
+        elif msg["tipo_arquivo"] == "Planilhas":
+            icone_arquivo = "📊"
+        elif msg["tipo_arquivo"] == "Presentações":
+            icone_arquivo = "📽️"
+        elif msg["tipo_arquivo"] == "Arquivos Zip":
+            icone_arquivo = "🗜️"
+        elif msg["tipo_arquivo"] == "Code":
+            icone_arquivo = "💻"
         
         ctk.CTkLabel(card_arquivo, text=icone_arquivo, font=font(20)).pack(side="left", padx=10, pady=10)
         
