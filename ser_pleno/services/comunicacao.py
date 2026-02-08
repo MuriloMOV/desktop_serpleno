@@ -139,14 +139,18 @@ class ServicoComunicacao:
         
         mensagens = []
         for r in rows:
-            mensagens.append({
+            mensagem = {
                 'id': r.get('id'),
                 'sender_id': r.get('sender_id'),
                 'recipient_id': r.get('recipient_id'),
                 'text': r.get('text'),
                 'timestamp': str(r.get('timestamp')),
                 'read': bool(r.get('read'))
-            })
+            }
+            if r.get('caminho_arquivo'):
+                mensagem['caminho_arquivo'] = r.get('caminho_arquivo')
+                mensagem['tipo_arquivo'] = r.get('tipo_arquivo')
+            mensagens.append(mensagem)
             
         # Marca mensagens recebidas como lidas
         if id_usuario_destinatario != id_usuario_logado:
@@ -160,39 +164,21 @@ class ServicoComunicacao:
         connection.close()
         return {"success": True, "data": mensagens}
 
-    def enviar_mensagem(self, id_usuario_logado, id_usuario_destinatario, conteudo):
+    def enviar_mensagem(self, id_usuario_logado, id_usuario_destinatario, conteudo, caminho_arquivo=None, tipo_arquivo=None):
         connection = get_db_connection()
         cursor = connection.cursor()
         
         cursor.execute("""
-            INSERT INTO desktop_message (sender_id, recipient_id, text, timestamp, `read`)
-            VALUES (%s, %s, %s, NOW(), 0)
-        """, (id_usuario_logado, id_usuario_destinatario, conteudo))
+            INSERT INTO desktop_message (sender_id, recipient_id, text, timestamp, `read`, caminho_arquivo, tipo_arquivo)
+            VALUES (%s, %s, %s, NOW(), 0, %s, %s)
+        """, (id_usuario_logado, id_usuario_destinatario, conteudo, caminho_arquivo, tipo_arquivo))
         connection.commit()
         mensagem_id = cursor.lastrowid
         connection.close()
         
         return {"success": True, "data": {"id": mensagem_id}}
 
-    def marcar_mensagem_lida(self, id_mensagem):
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute("UPDATE desktop_message SET read = 1 WHERE id = %s", (id_mensagem,))
-        connection.commit()
-        connection.close()
-        
-        return {"success": True, "message": "Mensagem marcada como lida"}
-
-    def deletar_mensagem(self, id_mensagem):
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute("DELETE FROM desktop_message WHERE id = %s", (id_mensagem,))
-        connection.commit()
-        connection.close()
-        
-        return {"success": True, "message": "Mensagem deletada com sucesso"}
-
-    def enviar_mensagem_grupo(self, id_usuario_logado, conteudo):
+    def enviar_mensagem_grupo(self, id_usuario_logado, conteudo, caminho_arquivo=None, tipo_arquivo=None):
         """
         Envia uma mensagem para o chat em grupo (todos os usuários autorizados)
         """
@@ -201,9 +187,9 @@ class ServicoComunicacao:
         
         # Para chat em grupo, usamos recipient_id NULL
         cursor.execute("""
-            INSERT INTO desktop_message (sender_id, recipient_id, text, timestamp, `read`)
-            VALUES (%s, NULL, %s, NOW(), 0)
-        """, (id_usuario_logado, conteudo))
+            INSERT INTO desktop_message (sender_id, recipient_id, text, timestamp, `read`, caminho_arquivo, tipo_arquivo)
+            VALUES (%s, NULL, %s, NOW(), 0, %s, %s)
+        """, (id_usuario_logado, conteudo, caminho_arquivo, tipo_arquivo))
         connection.commit()
         mensagem_id = cursor.lastrowid
         connection.close()
@@ -225,14 +211,36 @@ class ServicoComunicacao:
         
         mensagens = []
         for r in rows:
-            mensagens.append({
+            mensagem = {
                 'id': r.get('id'),
                 'sender_id': r.get('sender_id'),
                 'recipient_id': r.get('recipient_id'),
                 'text': r.get('text'),
                 'timestamp': str(r.get('timestamp')),
                 'read': bool(r.get('read'))
-            })
+            }
+            if r.get('caminho_arquivo'):
+                mensagem['caminho_arquivo'] = r.get('caminho_arquivo')
+                mensagem['tipo_arquivo'] = r.get('tipo_arquivo')
+            mensagens.append(mensagem)
             
         connection.close()
         return {"success": True, "data": mensagens}
+
+    def marcar_mensagem_lida(self, id_mensagem):
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        cursor.execute("UPDATE desktop_message SET read = 1 WHERE id = %s", (id_mensagem,))
+        connection.commit()
+        connection.close()
+        
+        return {"success": True, "message": "Mensagem marcada como lida"}
+
+    def deletar_mensagem(self, id_mensagem):
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM desktop_message WHERE id = %s", (id_mensagem,))
+        connection.commit()
+        connection.close()
+        
+        return {"success": True, "message": "Mensagem deletada com sucesso"}

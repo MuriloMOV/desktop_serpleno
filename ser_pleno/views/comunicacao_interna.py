@@ -500,28 +500,33 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             return
             
         try:
-            # Aqui você pode implementar a lógica para enviar o arquivo
-            # Por enquanto, vamos exibir um mock da mensagem de arquivo
             nome_arquivo = os.path.basename(caminho_arquivo)
-            tamanho_arquivo = os.path.getsize(caminho_arquivo)
-            tamanho_str = self.formatar_tamanho_arquivo(tamanho_arquivo)
             
-            # Cria mensagem de arquivo
-            mensagem_arquivo = {
-                "sender_id": self.usuario_logado_id,
-                "text": "",
-                "timestamp": "2024-05-20T10:45:00Z",
-                "read": False,
-                "recipient_id": None,
-                "tipo_arquivo": categoria,
-                "caminho_arquivo": caminho_arquivo
-            }
-            
-            self.criar_mensagem(mensagem_arquivo)
+            # Salva a mensagem de arquivo no banco de dados
+            if self.conversa_ativa["role"] == "group":
+                resultado = self.servico_comunicacao.enviar_mensagem_grupo(
+                    self.usuario_logado_id, 
+                    nome_arquivo,  # Usamos o nome do arquivo como texto da mensagem
+                    caminho_arquivo, 
+                    categoria
+                )
+            else:
+                resultado = self.servico_comunicacao.enviar_mensagem(
+                    self.usuario_logado_id, 
+                    self.conversa_ativa["id"], 
+                    nome_arquivo,  # Usamos o nome do arquivo como texto da mensagem
+                    caminho_arquivo, 
+                    categoria
+                )
+                
+            if resultado["success"]:
+                # Recarrega as mensagens para exibir a nova mensagem de arquivo
+                self.carregar_mensagens()
+                
             self.modal_arquivos.grid_remove()  # Oculta o modal após seleção
         except Exception as e:
             print(f"Erro ao enviar arquivo: {e}")
-    
+
     def formatar_tamanho_arquivo(self, bytes):
         """Formata o tamanho do arquivo em KB, MB ou GB"""
         if bytes < 1024:
