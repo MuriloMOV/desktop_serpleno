@@ -97,3 +97,35 @@ class ServicoAgendamento:
         finally:
             cursor.close()
             conn.close()
+            
+    def adicionar_horario_disponibilidade(self, horario):
+        """Adiciona um novo horário à tabela de disponibilidade"""
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            query = "INSERT INTO disponibilidade (Horario, is_active) VALUES (%s, 1)"
+            cursor.execute(query, (horario,))
+            conn.commit()
+            return {"success": True}
+        except Exception as e:
+            conn.rollback()
+            return {"success": False, "message": str(e)}
+        finally:
+            cursor.close()
+            conn.close()
+    
+    def remover_horario_disponibilidade(self, horario):
+        """Remove um horário da tabela de disponibilidade"""
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        try:
+            query = "DELETE FROM disponibilidade WHERE Horario = %s"
+            cursor.execute(query, (horario,))
+            conn.commit()
+            return {"success": True}
+        except Exception as e:
+            conn.rollback()
+            return {"success": False, "message": str(e)}
+        finally:
+            cursor.close()
+            conn.close()

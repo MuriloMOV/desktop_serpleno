@@ -25,7 +25,8 @@ class App(ctk.CTk):
         self.minsize(1200, 700)
         self.configure(fg_color=THEME["bg"])
 
-        self.usuario_logado = False
+        self.usuario_logado = None  # Armazena os dados do usuário logado
+        self.usuario_logado_id = None
 
         self.container = ctk.CTkFrame(self, fg_color=THEME["bg"])
         self.container.pack(fill="both", expand=True)
@@ -39,8 +40,9 @@ class App(ctk.CTk):
         frame.pack(fill="both", expand=True)
 
     # ================= SISTEMA =================
-    def iniciar_sistema(self):
-        self.usuario_logado = True
+    def iniciar_sistema(self, user_data):
+        self.usuario_logado = user_data
+        self.usuario_logado_id = user_data['id']
         self.limpar_tela()
 
         self.criar_sidebar()

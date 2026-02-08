@@ -327,12 +327,13 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
         def atualizar_lista_modal():
             for child in frame_lista.winfo_children(): child.destroy()
+            self.fetch_horarios_base()
             for h in self.horarios_base:
                 row = ctk.CTkFrame(frame_lista, fg_color="#F8FAFC")
                 row.pack(fill="x", pady=2)
                 ctk.CTkLabel(row, text=h, font=font(13, "bold")).pack(side="left", padx=10)
                 ctk.CTkButton(row, text="Remover", width=70, height=22, fg_color="#EF4444", 
-                             command=lambda x=h: print(f"Remover {x}")).pack(side="right", padx=5)
+                             command=lambda x=h: self.remover_horario_disponibilidade(x, atualizar_lista_modal)).pack(side="right", padx=5)
 
         atualizar_lista_modal()
 
@@ -340,4 +341,42 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         ctk.CTkLabel(modal, text="Novo Horário (HH:MM):").pack()
         new_h = ctk.CTkEntry(modal, width=120)
         new_h.pack(pady=5)
-        ctk.CTkButton(modal, text="Adicionar à Grade", command=lambda: modal.destroy()).pack(pady=10)
+        
+        # Formatação automática do horário (adiciona : após 2 dígitos)
+        def formatar_horario(event):
+            texto = new_h.get().replace(":", "")
+            if len(texto) >= 2:
+                new_h.delete(0, ctk.END)
+                new_h.insert(0, f"{texto[:2]}:{texto[2:4]}")
+        
+        new_h.bind("<KeyRelease>", formatar_horario)
+
+        ctk.CTkButton(modal, text="Adicionar à Grade", command=lambda: self.adicionar_horario_disponibilidade(new_h.get(), atualizar_lista_modal)).pack(pady=10)
+    
+    def adicionar_horario_disponibilidade(self, horario, atualizar_lista):
+        """Adiciona um horário à tabela de disponibilidade"""
+        # Validação básica do formato HH:MM
+        if len(horario) < 5 or horario[2] != ":":
+            messagebox.showerror("Erro", "Formato de horário inválido. Use HH:MM.")
+            return
+            
+        try:
+            res = self.servico_agendamento.adicionar_horario_disponibilidade(horario)
+            if res.get("success"):
+                atualizar_lista()
+            else:
+                messagebox.showerror("Erro", str(res.get("message", "Erro ao adicionar horário")))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro inesperado: {e}")
+    
+    def remover_horario_disponibilidade(self, horario, atualizar_lista):
+        """Remove um horário da tabela de disponibilidade"""
+        if messagebox.askyesno("Confirmar", f"Deseja realmente remover o horário {horario}?"):
+            try:
+                res = self.servico_agendamento.remover_horario_disponibilidade(horario)
+                if res.get("success"):
+                    atualizar_lista()
+                else:
+                    messagebox.showerror("Erro", str(res.get("message", "Erro ao remover horário")))
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro inesperado: {e}")
