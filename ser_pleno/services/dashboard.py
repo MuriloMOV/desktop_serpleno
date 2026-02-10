@@ -8,7 +8,7 @@ class ServicoDashboard:
         cursor = connection.cursor(dictionary=True)
 
         # Obter contadores
-        cursor.execute("SELECT COUNT(*) as total FROM desktop_appointment WHERE date = CURDATE()")
+        cursor.execute("SELECT COUNT(*) as total FROM agendamento WHERE DATE(data_hora) = CURDATE()")
         appointments_today = cursor.fetchone()['total']
 
         cursor.execute("SELECT COUNT(*) as total FROM desktop_screening WHERE status = 'pending'")
@@ -23,7 +23,7 @@ class ServicoDashboard:
 
         # Calcular taxa de presença (proporção de agendamentos realizados nos últimos 30 dias)
         try:
-            cursor.execute("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed FROM desktop_appointment WHERE date >= CURDATE() - INTERVAL 30 DAY")
+            cursor.execute("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed FROM agendamento WHERE DATE(data_hora) >= CURDATE() - INTERVAL 30 DAY")
             row = cursor.fetchone()
             total_appts = row.get('total') or 0
             completed = row.get('completed') or 0
@@ -43,30 +43,31 @@ class ServicoDashboard:
                 'priority_level': r.get('priority_level') or 0
             })
 
-        # Obter próximos agendamentos, juntando com aluno e disponibilidade para obter nome e horário
+        # Obter próximos agendamentos, juntando com aluno para obter nome
         cursor.execute("""
-            SELECT da.id, da.date, da.status, a.nome AS student_name, COALESCE(t.horario, '') AS time_horario
-            FROM desktop_appointment da
-            LEFT JOIN aluno a ON da.student_id = a.id_aluno
-            LEFT JOIN disponibilidade t ON da.time = t.id_disponibilidade
-            WHERE da.date > CURDATE()
-            ORDER BY da.date ASC
+            SELECT a.id, a.data_hora, a.status, al.nome AS student_name
+            FROM agendamento a
+            LEFT JOIN aluno al ON a.student_id = al.id_aluno
+            WHERE DATE(a.data_hora) > CURDATE()
+            ORDER BY a.data_hora ASC
             LIMIT 5
         """)
         rows = cursor.fetchall()
         upcoming_appointments = []
         for r in rows:
-            time_val = r.get('time_horario')
-            # Se for time object, formatar; caso contrário, deixar como string
+            data_hora = r.get('data_hora')
+            # Formatar data e horário
             try:
-                time_str = time_val.strftime('%H:%M') if hasattr(time_val, 'strftime') else (str(time_val) if time_val else '--:--')
+                date_str = data_hora.strftime('%Y-%m-%d') if hasattr(data_hora, 'strftime') else str(data_hora)
+                time_str = data_hora.strftime('%H:%M') if hasattr(data_hora, 'strftime') else '--:--'
             except Exception:
-                time_str = str(time_val) or '--:--'
+                date_str = str(data_hora) or ''
+                time_str = '--:--'
             upcoming_appointments.append({
                 'id': r.get('id'),
                 'student_name': r.get('student_name') or 'Estudante',
                 'time': time_str,
-                'date': str(r.get('date'))
+                'date': date_str
             })
 
         connection.close()

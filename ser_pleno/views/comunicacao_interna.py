@@ -33,6 +33,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.conversa_atual = None
         self.mensagens = []
         self.atualizando = False
+        self.contador_nao_lidas = {}
+        self.atualizacao_periodica = True
 
         # Grid layout principal (Sidebar + Chat Area)
         self.grid_columnconfigure(1, weight=1)
@@ -46,6 +48,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # Carrega contatos do banco de dados
         self.carregar_contatos()
+        # Inicia loop de atualização periódica
+        self.iniciar_atualizacao_periodica()
 
     def load_image(self, name, size):
         try:
@@ -76,6 +80,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 data = self.servico_comunicacao.listar_contatos(self.usuario_logado_id)
                 if data and 'success' in data and data['success']:
                     self.contatos = data['data']
+                    # Carrega contador de mensagens não lidas
+                    self.carregar_contador_nao_lidas()
                     self.atualizar_lista_contatos()
                     # Selecionar primeira conversa
                     if self.contatos:
@@ -84,6 +90,41 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 print(f"Erro ao carregar contatos: {e}")
         
         threading.Thread(target=task, daemon=True).start()
+    
+    def carregar_contador_nao_lidas(self):
+        """Carrega o contador de mensagens não lidas por contato"""
+        try:
+            data = self.servico_comunicacao.contar_mensagens_nao_lidas(self.usuario_logado_id)
+            if data and 'success' in data and data['success']:
+                self.contador_nao_lidas = data['data']
+        except Exception as e:
+            print(f"Erro ao carregar contador de não lidas: {e}")
+    
+    def iniciar_atualizacao_periodica(self):
+        """Inicia o loop de atualização periódica das mensagens"""
+        def task():
+            while self.atualizacao_periodica:
+                time.sleep(5)  # Atualiza a cada 5 segundos
+                if not self.atualizando:
+                    self.atualizar_dados_conversa()
+        
+        threading.Thread(target=task, daemon=True).start()
+    
+    def atualizar_dados_conversa(self):
+        """Atualiza os dados da conversa atual e o contador de não lidas"""
+        self.atualizando = True
+        try:
+            # Atualiza contador de mensagens não lidas
+            self.carregar_contador_nao_lidas()
+            # Atualiza a lista de contatos para exibir o badge
+            self.atualizar_lista_contatos()
+            # Se houver conversa ativa, atualiza as mensagens
+            if self.conversa_atual:
+                self.carregar_mensagens(self.conversa_atual.get("id"))
+        except Exception as e:
+            print(f"Erro na atualização periódica: {e}")
+        finally:
+            self.atualizando = False
 
     def atualizar_lista_contatos(self):
         """Atualiza a lista de contatos na sidebar"""
@@ -211,8 +252,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(txt_frame, text=data.get("msg", "Sem mensagens"), font=font(12), text_color=color_msg).pack(anchor="w")
 
         # Unread / Time
-        if data.get("unread", 0) > 0:
-            badge = ctk.CTkLabel(inner, text=str(data["unread"]), width=20, height=20, corner_radius=10, fg_color=self.colors["danger"], text_color="white", font=font(10, "bold"))
+        contato_id = data.get("id")
+        unread_count = self.contador_nao_lidas.get(contato_id, 0)
+        
+        if unread_count > 0:
+            badge = ctk.CTkLabel(inner, text=str(unread_count), width=20, height=20, corner_radius=10, fg_color=self.colors["danger"], text_color="white", font=font(10, "bold"))
             badge.pack(side="right")
         elif is_first and data.get("time"):
             ctk.CTkLabel(inner, text=data["time"], font=font(11), text_color=self.colors["primary"]).pack(side="right", anchor="n")
@@ -221,12 +265,13 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         """Carrega mensagens da conversa com um usuário"""
         def task():
             try:
-                data = self.servico.obter_mensagens(id_usuario)
-                if data and 'results' in data:
-                    self.mensagens = data['results']
+                data = self.servico_comunicacao.obter_mensagens(self.usuario_logado_id, id_usuario)
+                if data and 'success' in data and data['success']:
+                    self.mensagens = data['data']
                     self.atualizar_area_mensagens()
-                    # Marcar mensagens como lidas
-                    self.marcar_mensagens_lidas()
+                    # Atualiza o contador de mensagens não lidas (já que as mensagens foram lidas)
+                    self.carregar_contador_nao_lidas()
+                    self.atualizar_lista_contatos()
             except Exception as e:
                 print(f"Erro ao carregar mensagens: {e}")
         
@@ -667,6 +712,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                     # Recarrega as mensagens para exibir a nova mensagem
                     self.carregar_mensagens()
                     self.entry_mensagem.delete(0, 'end')
+                    # Atualiza o contador de mensagens não lidas
+                    self.carregar_contador_nao_lidas()
+                    self.atualizar_lista_contatos()
             except Exception as e:
                 print(f"Erro ao enviar mensagem: {e}")
 

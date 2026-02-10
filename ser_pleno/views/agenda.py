@@ -41,16 +41,37 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             print(f"Erro ao buscar estudantes: {e}")
 
     def fetch_horarios_base(self):
-        """Busca a grade de horários configurada no banco."""
+        """Busca a grade de horários configurada usando o banco de dados."""
         try:
+            from config.db_config import get_db_connection
+            
             conn = get_db_connection()
             cursor = conn.cursor()
-            cursor.execute("SELECT Horario FROM disponibilidade WHERE is_active = 1 ORDER BY Horario ASC")
-            self.horarios_base = [str(h[0])[:5] for h in cursor.fetchall()] # type: ignore
+            
+            cursor.execute("SELECT Horario FROM disponibilidade WHERE is_active = 1 ORDER BY Horario")
+            results = cursor.fetchall()
+            
+            # Formatar horários como HH:MM (remover segundos)
+            self.horarios_base = []
+            for row in results:
+                horario = row[0]
+                if hasattr(horario, 'strftime'):
+                    self.horarios_base.append(horario.strftime("%H:%M"))
+                else:
+                    # Se for string, extrair apenas HH:MM
+                    horario_str = str(horario)
+                    if len(horario_str) > 5:
+                        horario_str = horario_str[:5]
+                    self.horarios_base.append(horario_str)
+            
             cursor.close()
             conn.close()
-        except:
-            self.horarios_base = ["08:00", "09:00", "10:00"] # Fallback
+            
+            if not self.horarios_base:
+                self.horarios_base = [] # Não usar fallback, exibir lista vazia
+        except Exception as e:
+            print(f"Erro ao buscar horários base: {e}")
+            self.horarios_base = [] # Não usar fallback, exibir lista vazia
 
     def refresh_all(self):
         """Recarrega dados e atualiza a UI."""
@@ -158,7 +179,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     def abrir_modal_agendamento(self, hora, info=None):
         modal = ctk.CTkToplevel(self)
         modal.title("Editar Agendamento" if info else "Novo Agendamento")
-        modal.geometry("450x650")
+        modal.geometry("450x680")  # Aumentar altura para garantir espaço para botões
         modal.configure(fg_color="white")
         modal.grab_set()
 
@@ -170,10 +191,9 @@ class AgendaFrame(ctk.CTkScrollableFrame):
                     font=font(20, "bold"), text_color="#1E293B").pack(side="left", expand=True)
         
 
-
         # Container principal com scroll se necessário
-        container = ctk.CTkFrame(modal, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=40)
+        container = ctk.CTkScrollableFrame(modal, fg_color="transparent")  # Usar ScrollableFrame
+        container.pack(fill="both", expand=True, padx=40, pady=(0, 10))
 
         # Campo Horário
         ctk.CTkLabel(container, text="Horário:", font=font(13, "bold"), text_color="#1E293B", anchor="w").pack(fill="x", pady=(10, 5))
@@ -241,7 +261,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             messagebox.showerror("Erro", "Selecione um estudante válido.")
             return
 
-        data_hora_str = f"{self.data_selecionada.strftime('%Y-%m-%d')} {hora}:00"
+        data_hora_str = f"{self.data_selecionada.strftime('%Y-%m-%d')} {hora}"
         
         dados = {
             "nome_aluno": nome_estudante,
