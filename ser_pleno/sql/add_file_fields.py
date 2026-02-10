@@ -2,7 +2,7 @@ import sys
 import os
 
 # Adiciona o diretório raiz do projeto ao PATH para importações corretas
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'desktop_serpleno', 'ser_pleno')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from config.db_config import get_db_connection
 

@@ -12,10 +12,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico = ServicoComunicacao()
-
-        # Inicializa o servicio de comunicação
-        from services.comunicacao import ServicoComunicacao
+        # Inicializa o serviço de comunicação
         self.servico_comunicacao = ServicoComunicacao()
 
         self.colors = THEME
@@ -76,9 +73,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         """Carrega contatos da API em thread separada"""
         def task():
             try:
-                data = self.servico.listar_contatos()
-                if data and 'results' in data:
-                    self.contatos = data['results']
+                data = self.servico_comunicacao.listar_contatos(self.usuario_logado_id)
+                if data and 'success' in data and data['success']:
+                    self.contatos = data['data']
                     self.atualizar_lista_contatos()
                     # Selecionar primeira conversa
                     if self.contatos:
@@ -651,17 +648,27 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def enviar_mensagem(self):
         """Envia uma mensagem para a conversa ativa"""
         txt = self.entry_mensagem.get()
-        if txt:
-            self.criar_mensagem({
-                "sender_id": self.usuario_logado_id,
-                "text": txt,
-                "timestamp": "2024-05-20T10:45:00Z",
-                "read": False,
-                "recipient_id": None
-            })
-            self.entry_mensagem.delete(0, 'end')
-            # Scroll to bottom
-            self.msg_area._parent_canvas.yview_moveto(1.0)
+        if txt and self.conversa_ativa:
+            try:
+                # Envia a mensagem para o serviço de comunicação
+                if self.conversa_ativa["role"] == "group":
+                    resultado = self.servico_comunicacao.enviar_mensagem_grupo(
+                        self.usuario_logado_id, 
+                        txt
+                    )
+                else:
+                    resultado = self.servico_comunicacao.enviar_mensagem(
+                        self.usuario_logado_id, 
+                        self.conversa_ativa["id"], 
+                        txt
+                    )
+                
+                if resultado["success"]:
+                    # Recarrega as mensagens para exibir a nova mensagem
+                    self.carregar_mensagens()
+                    self.entry_mensagem.delete(0, 'end')
+            except Exception as e:
+                print(f"Erro ao enviar mensagem: {e}")
 
     def carregar_contatos(self):
         """Carrega contatos do serviço de comunicação (apenas admin, analista, coordenador, suporte) + chat em grupo"""
