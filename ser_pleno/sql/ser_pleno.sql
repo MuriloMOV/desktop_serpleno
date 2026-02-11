@@ -63,14 +63,14 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`aluno` (
   `phone` VARCHAR(20) NULL DEFAULT NULL,
   `priority_level` INT NOT NULL,
   `requires_attention` TINYINT(1) NOT NULL,
-  `tags` JSON NOT NULL DEFAULT _utf8mb4'[]',
+  `tags` JSON NOT NULL,
   `age` INT NULL DEFAULT NULL,
   `created_at` DATETIME(6) NULL DEFAULT NULL,
   `updated_at` DATETIME(6) NULL DEFAULT NULL,
   `status` VARCHAR(20) NOT NULL,
   PRIMARY KEY (`id_aluno`),
   UNIQUE INDEX `user_id` (`user_id` ASC) VISIBLE)
-ENGINE = MyISAM
+ENGINE = InnoDB
 AUTO_INCREMENT = 31
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
@@ -390,7 +390,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_intervention` (
   `is_confidential` TINYINT(1) NOT NULL,
   `outcome` VARCHAR(50) NOT NULL,
   `outcome_notes` LONGTEXT NOT NULL,
-  `tags` JSON NOT NULL DEFAULT _utf8mb4'[]',
+  `tags` JSON NOT NULL,
   PRIMARY KEY (`id`),
   INDEX `desktop_intervention_student_id_27ec8a66` (`student_id` ASC) VISIBLE,
   INDEX `desktop_int_student_202c5a_idx` (`student_id` ASC, `date` ASC) VISIBLE,
@@ -399,7 +399,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_intervention` (
   INDEX `desktop_int_follow__b9866e_idx` (`follow_up_required` ASC, `follow_up_date` ASC) VISIBLE,
   INDEX `desktop_int_outcome_5cc100_idx` (`outcome` ASC) VISIBLE,
   INDEX `desktop_intervention_conducted_by_id_1a18fe97` (`conducted_by_id` ASC) VISIBLE)
-ENGINE = MyISAM
+ENGINE = InnoDB
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -862,12 +862,12 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`mural_posts` (
   `categoria` VARCHAR(20) NOT NULL,
   `data_agendamento` DATETIME(6) NULL DEFAULT NULL,
   `link_externo` VARCHAR(200) NULL DEFAULT NULL,
-  `blocos` JSON NOT NULL DEFAULT _utf8mb4'[]',
+  `blocos` JSON NOT NULL,
   `layout` VARCHAR(20) NOT NULL,
   `horario_evento` DATETIME(6) NULL DEFAULT NULL,
   `local_fisico` VARCHAR(200) NULL DEFAULT NULL,
   PRIMARY KEY (`id`))
-ENGINE = MyISAM
+ENGINE = InnoDB
 AUTO_INCREMENT = 5
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
