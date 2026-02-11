@@ -19,13 +19,16 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def load_image(self, name, size):
         try:
             cache_key = f"{name}:{size}"
-            if cache_key in self._images: return self._images[cache_key]
-            path = os.path.join(self.base_path, "..", "imagens", name)
+            if cache_key in self._images:
+                return self._images[cache_key]
+            path = os.path.join(self.base_path, "assets", "avatars", name)
             if os.path.exists(path):
                 img = ctk.CTkImage(light_image=Image.open(path), size=size)
                 self._images[cache_key] = img
                 return img
-        except Exception: return None
+        except Exception as e:
+            print(f"Erro ao carregar imagem {name}: {e}")
+            return None
 
     def render_layout(self):
         header = self.criar_secao_header("Preferências do Sistema", "Personalize sua experiência no SerPleno", show_actions=True)
@@ -73,7 +76,16 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         h.pack(fill="x", padx=20, pady=15)
         ctk.CTkLabel(h, text="👤 Informações Pessoais", font=font(14, "bold")).pack(side="left")
 
-        self.avatar_display = ctk.CTkLabel(card, text="", image=self.load_image("avatar-1.jpg", (160, 160)))
+        # Carregar avatar salvo no perfil
+        try:
+            with open(os.path.join(self.base_path, "user_profile.json"), "r") as f:
+                profile = json.load(f)
+            avatar_name = profile.get("avatar", "avatar-1.jpg")
+        except Exception as e:
+            print(f"Erro ao carregar perfil: {e}")
+            avatar_name = "avatar-1.jpg"
+        
+        self.avatar_display = ctk.CTkLabel(card, text="", image=self.load_image(avatar_name, (160, 160)))
         self.avatar_display.pack(pady=10)
 
         change_btn = ctk.CTkButton(card, text="Toque para alterar imagem", fg_color="transparent", text_color="#4F46E5", font=font(11, "bold"), command=self.toggle_gallery)
@@ -83,12 +95,39 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self.grid_galeria = ctk.CTkFrame(self.gallery_frame, fg_color="transparent")
         self.grid_galeria.pack(padx=10, pady=10)
         
-        for i in range(1, 7):
-            btn = ctk.CTkButton(self.grid_galeria, text="", image=self.load_image(f"avatar-{i}.jpg", (50, 50)), width=50, height=50, fg_color="white", command=lambda x=i: self.update_avatar(x))
-            btn.grid(row=(i-1)//3, column=(i-1)%3, padx=2, pady=2)
+        # Carregar todos os avatares disponíveis na pasta assets/avatars
+        avatars_dir = os.path.join(self.base_path, "assets", "avatars")
+        try:
+            avatar_files = [f for f in os.listdir(avatars_dir) if f.startswith("avatar-") and f.endswith(".jpg")]
+            avatar_files.sort()
+            print(f"Avatars carregados: {avatar_files}")
+        except Exception as e:
+            print(f"Erro ao listar avatares: {e}")
+            avatar_files = []
+        
+        for i, filename in enumerate(avatar_files):
+            btn = ctk.CTkButton(
+                self.grid_galeria, 
+                text="", 
+                image=self.load_image(filename, (50, 50)), 
+                width=50, 
+                height=50, 
+                fg_color="white", 
+                command=lambda x=filename: self.update_avatar(x)
+            )
+            btn.grid(row=i//3, column=i%3, padx=2, pady=2)
 
-        self.criar_input_field(card, "Nome de exibição", "Admin", "👤")
-        self.criar_input_field(card, "Endereço de E-mail", "analista@teste.com", "📧")
+        # Usar dados do usuário logado
+        if self.controller.usuario_logado:
+            nome_usuario = f"{self.controller.usuario_logado.get('first_name', '')} {self.controller.usuario_logado.get('last_name', '')}".strip()
+            nome_usuario = nome_usuario if nome_usuario else self.controller.usuario_logado.get('username', 'Usuário')
+            email_usuario = self.controller.usuario_logado.get('email', 'email@exemplo.com')
+        else:
+            nome_usuario = 'Usuário'
+            email_usuario = 'email@exemplo.com'
+
+        self.criar_input_field(card, "Nome de exibição", nome_usuario, "👤")
+        self.criar_input_field(card, "Endereço de E-mail", email_usuario, "📧")
 
     def toggle_gallery(self):
         if self.gallery_frame.winfo_ismapped():
@@ -96,9 +135,16 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         else:
             self.gallery_frame.pack(fill="x", padx=20, pady=10, before=self.avatar_display)
 
-    def update_avatar(self, idx):
-        img = self.load_image(f"avatar-{idx}.jpg", (160, 160))
-        if img: self.avatar_display.configure(image=img)
+    def update_avatar(self, filename):
+        img = self.load_image(filename, (160, 160))
+        if img: 
+            self.avatar_display.configure(image=img)
+            # Salvar a escolha do avatar no perfil
+            try:
+                with open(os.path.join(self.base_path, "user_profile.json"), "w") as f:
+                    json.dump({"avatar": filename}, f)
+            except Exception as e:
+                print(f"Erro ao salvar avatar: {e}")
         self.gallery_frame.pack_forget()
 
     def render_central_avisos(self, container):
@@ -116,8 +162,18 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             ("Feedback de Alunos", "Novas avaliações e comentários"),
             ("Efeitos Sonoros", "Feedback auditivo para alertas")
         ]
+        self.notification_switches = {}
         for t, s in items:
-            self.criar_toggle_row(card, t, s)
+            switch = self.criar_toggle_row(card, t, s)
+            self.notification_switches[t] = switch
+            # Adicionar funcionalidade ao switch
+            switch.configure(command=lambda switch=switch, t=t: self.toggle_notification(t, switch))
+
+    def toggle_notification(self, notification_type, switch):
+        """Função para tratar a alternância de notificações"""
+        estado = switch.get()
+        print(f"Notificação '{notification_type}' {'ativada' if estado else 'desativada'}")
+        # Aqui você poderia salvar a preferência no banco de dados ou arquivo de configuração
 
     def render_aparencia(self, container):
         card = ctk.CTkFrame(container, fg_color=self.colors["card"], corner_radius=RADIUS["card"])
@@ -129,8 +185,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="x", padx=20, pady=10)
-        self.criar_select(row, "Esquema de Cores", ["Modo Sereno (Claro)", "Modo Foco (Escuro)"]).pack(side="left", expand=True, fill="x", padx=(0, 10))
-        self.criar_select(row, "Escala de Texto", ["Padrão (16px)", "Grande (18px)"]).pack(side="left", expand=True, fill="x")
+        self.theme_select = self.criar_select(row, "Esquema de Cores", ["Modo Sereno (Claro)", "Modo Foco (Escuro)"])
+        self.theme_select.pack(side="left", expand=True, fill="x", padx=(0, 10))
+        self.font_select = self.criar_select(row, "Escala de Texto", ["Padrão (16px)", "Grande (18px)"])
+        self.font_select.pack(side="left", expand=True, fill="x")
 
         tip = ctk.CTkFrame(card, fg_color="#F8FAFC", corner_radius=8, border_width=1, border_color="#E2E8F0")
         tip.pack(fill="x", padx=20, pady=(0, 20))
@@ -149,6 +207,78 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self.criar_item_lista(card, "🔑", "Credenciais", "Última alteração há 3 meses", btn_text="Alterar Senha")
         self.criar_item_lista(card, "💻", "Este Dispositivo", "Sessão ativa agora • Windows Desktop", btn_text="Encerrar Acesso", danger=True)
 
+    def alterar_configuracao(self, valor):
+        """Função para tratar alterações nas opções de aparência"""
+        print(f"Configuração alterada para: {valor}")
+        # Aqui você poderia implementar a lógica para alterar o tema ou a escala de texto
+        if valor == "Modo Sereno (Claro)":
+            ctk.set_appearance_mode("light")
+        elif valor == "Modo Foco (Escuro)":
+            ctk.set_appearance_mode("dark")
+
+    def toggle_seguranca_opcao(self, opcao, switch):
+        """Função para tratar alternância de opções de segurança"""
+        estado = switch.get()
+        print(f"Opção '{opcao}' {'ativada' if estado else 'desativada'}")
+
+    def clicar_botao_seguranca(self, btn_text):
+        """Função para tratar cliques em botões de segurança"""
+        if btn_text == "Alterar Senha":
+            self.abrir_tela_alterar_senha()
+        elif btn_text == "Encerrar Acesso":
+            self.encerrar_sessao()
+
+    def abrir_tela_alterar_senha(self):
+        """Abre uma tela para alterar a senha do usuário"""
+        top = ctk.CTkToplevel(self)
+        top.title("Alterar Senha")
+        top.geometry("400x300")
+        top.resizable(False, False)
+        
+        # Centralizar a janela
+        top.update_idletasks()
+        x = (top.winfo_screenwidth() // 2) - (400 // 2)
+        y = (top.winfo_screenheight() // 2) - (300 // 2)
+        top.geometry(f"+{x}+{y}")
+        
+        frame = ctk.CTkFrame(top, fg_color=THEME["card"])
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(frame, text="Alterar Senha", font=font(16, "bold")).pack(pady=(0, 20))
+        
+        # Campo para senha atual
+        self.senha_atual_entry = self.criar_input_field(frame, "Senha Atual", "", "🔒")
+        
+        # Campo para nova senha
+        self.nova_senha_entry = self.criar_input_field(frame, "Nova Senha", "", "🔑")
+        
+        # Campo para confirmar nova senha
+        self.confirmar_senha_entry = self.criar_input_field(frame, "Confirmar Senha", "", "🔑")
+        
+        # Botão para salvar
+        btn_salvar = ctk.CTkButton(frame, text="Salvar Alterações", fg_color="#4F46E5", hover_color="#4338CA", font=font(12, "bold"), command=self.salvar_alteracao_senha)
+        btn_salvar.pack(fill="x", pady=(20, 0))
+
+    def salvar_alteracao_senha(self):
+        """Salva a alteração de senha"""
+        senha_atual = self.senha_atual_entry.get()
+        nova_senha = self.nova_senha_entry.get()
+        confirmar_senha = self.confirmar_senha_entry.get()
+        
+        if nova_senha != confirmar_senha:
+            print("As senhas não coincidem")
+            return
+        
+        if len(nova_senha) < 6:
+            print("Senha deve ter pelo menos 6 caracteres")
+            return
+        
+        print("Senha alterada com sucesso")
+
+    def encerrar_sessao(self):
+        """Encerra a sessão do usuário"""
+        self.controller.mostrar_login()
+
     def criar_toggle_row(self, parent, title, sub):
         f = ctk.CTkFrame(parent, fg_color="transparent")
         f.pack(fill="x", padx=20, pady=10)
@@ -156,7 +286,9 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         txt.pack(side="left")
         ctk.CTkLabel(txt, text=title, font=font(12, "bold")).pack(anchor="w")
         ctk.CTkLabel(txt, text=sub, font=font(10), text_color="#64748B").pack(anchor="w")
-        ctk.CTkSwitch(f, text="", progress_color="#4F46E5").pack(side="right")
+        switch = ctk.CTkSwitch(f, text="", progress_color="#4F46E5")
+        switch.pack(side="right")
+        return switch
 
     def criar_input_field(self, parent, label, val, icon):
         f = ctk.CTkFrame(parent, fg_color="transparent")
@@ -169,11 +301,13 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         e = ctk.CTkEntry(entry_f, fg_color="transparent", border_width=0, font=font(11))
         e.pack(side="left", fill="both", expand=True)
         e.insert(0, val)
+        return e
 
     def criar_select(self, parent, label, opts):
         f = ctk.CTkFrame(parent, fg_color="transparent")
         ctk.CTkLabel(f, text=label, font=font(10, "bold"), text_color="#64748B").pack(anchor="w")
-        ctk.CTkOptionMenu(f, values=opts, fg_color="#F8FAFC", text_color="black", button_color="#F8FAFC", button_hover_color="#E2E8F0", height=35).pack(fill="x", pady=4)
+        option_menu = ctk.CTkOptionMenu(f, values=opts, fg_color="#F8FAFC", text_color="black", button_color="#F8FAFC", button_hover_color="#E2E8F0", height=35, command=self.alterar_configuracao)
+        option_menu.pack(fill="x", pady=4)
         return f
 
     def criar_item_lista(self, parent, icon, title, sub, toggle=False, btn_text=None, danger=False):
@@ -190,7 +324,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         ctk.CTkLabel(txt, text=sub, font=font(10), text_color="#64748B").pack(anchor="w")
 
         if toggle:
-            ctk.CTkSwitch(inner, text="", progress_color="#4F46E5").pack(side="right")
+            switch = ctk.CTkSwitch(inner, text="", progress_color="#4F46E5")
+            switch.pack(side="right")
+            switch.configure(command=lambda switch=switch, title=title: self.toggle_seguranca_opcao(title, switch))
         elif btn_text:
             color = "#EF4444" if danger else "#4F46E5"
-            ctk.CTkButton(inner, text=btn_text, font=font(10, "bold"), fg_color="transparent", text_color=color, hover_color="#FEF2F2" if danger else "#EEF2FF", width=100).pack(side="right")
+            btn = ctk.CTkButton(inner, text=btn_text, font=font(10, "bold"), fg_color="transparent", text_color=color, hover_color="#FEF2F2" if danger else "#EEF2FF", width=100, command=lambda btn_text=btn_text: self.clicar_botao_seguranca(btn_text))
+            btn.pack(side="right")
