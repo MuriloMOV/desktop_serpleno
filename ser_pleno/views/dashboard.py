@@ -22,6 +22,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         def fetch():
             data = self.servico_dashboard.obter_kpis()
             self.after(0, lambda: self.update_dashboard(data))
+            # Atualizar badges de notificações
+            self.after(0, lambda: self.atualizar_badge_notificacoes())
         threading.Thread(target=fetch, daemon=True).start()
 
     def update_dashboard(self, data):
@@ -124,14 +126,33 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         r_tools = ctk.CTkFrame(header, fg_color="transparent")
         r_tools.pack(side="right")
 
-        msg_f = ctk.CTkFrame(r_tools, fg_color="transparent", width=45, height=45)
-        msg_f.pack(side="left", padx=10)
-        ctk.CTkLabel(msg_f, text="💬", font=font(20)).place(relx=0.5, rely=0.5, anchor="center")
-        ctk.CTkLabel(msg_f, text="1", font=font(10, "bold"), text_color="white", fg_color="#EF4444", width=16, height=16, corner_radius=8).place(x=25, y=5)
+        # Ícone de mãos - Notificações de ajuda
+        help_f = ctk.CTkFrame(r_tools, fg_color="transparent", width=45, height=45, cursor="hand2")
+        help_f.pack(side="left", padx=10)
+        help_f.bind("<Button-1>", lambda e: self.abrir_notificacoes_ajuda())
+        ctk.CTkLabel(help_f, text="🤝", font=font(20)).place(relx=0.5, rely=0.5, anchor="center")
+        self.help_badge = ctk.CTkLabel(help_f, text="0", font=font(10, "bold"), text_color="white", fg_color="#EF4444", width=16, height=16, corner_radius=8)
+        self.help_badge.place(x=25, y=5)
 
-        ctk.CTkLabel(r_tools, text="🔔", font=font(20), text_color="#64748B").pack(side="left", padx=15)
-        ctk.CTkLabel(r_tools, text="U", font=font(15, "bold"), text_color="#1E293B", fg_color="#E2E8F0", width=40, height=40, corner_radius=20).pack(side="left", padx=10)
-        ctk.CTkLabel(r_tools, text="⎗", font=font(20), text_color="#64748B", cursor="hand2").pack(side="left", padx=15)
+        # Ícone de sino - Notificações de alertas
+        alert_f = ctk.CTkFrame(r_tools, fg_color="transparent", width=45, height=45, cursor="hand2")
+        alert_f.pack(side="left", padx=10)
+        alert_f.bind("<Button-1>", lambda e: self.abrir_notificacoes_alertas())
+        ctk.CTkLabel(alert_f, text="🔔", font=font(20), text_color="#64748B").place(relx=0.5, rely=0.5, anchor="center")
+        self.alert_badge = ctk.CTkLabel(alert_f, text="0", font=font(10, "bold"), text_color="white", fg_color="#EF4444", width=16, height=16, corner_radius=8)
+        self.alert_badge.place(x=25, y=5)
+
+        # Ícone de perfil - Conta logada
+        profile_f = ctk.CTkFrame(r_tools, fg_color="transparent", width=45, height=45, cursor="hand2")
+        profile_f.pack(side="left", padx=10)
+        profile_f.bind("<Button-1>", lambda e: self.abrir_perfil())
+        ctk.CTkLabel(profile_f, text="👤", font=font(20), text_color="#64748B").place(relx=0.5, rely=0.5, anchor="center")
+
+        # Ícone de logout - Porta de saída
+        logout_f = ctk.CTkFrame(r_tools, fg_color="transparent", width=45, height=45, cursor="hand2")
+        logout_f.pack(side="left", padx=10)
+        logout_f.bind("<Button-1>", lambda e: self.fazer_logout())
+        ctk.CTkLabel(logout_f, text="🚪", font=font(20), text_color="#64748B").place(relx=0.5, rely=0.5, anchor="center")
 
     def criar_card_kpi(self, parent, col, d):
         card = ctk.CTkFrame(parent, fg_color="white", corner_radius=15, border_width=1, border_color="#F1F5F9")
@@ -280,6 +301,202 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             if i % 2 == 0:
                 self.canvas.create_text(x, h-15, text=dates[i], font=("Arial", 8), fill="#94A3B8")
 
+    def abrir_notificacoes_ajuda(self):
+        """Abre o painel de notificações de ajuda."""
+        # Obter notificações de ajuda
+        notificacoes = self.servico_dashboard.obter_notificacoes_ajuda()
+        
+        # Criar janela de notificações
+        modal = ctk.CTkToplevel(self)
+        modal.title("Notificações de Ajuda")
+        modal.geometry("500x400")
+        modal.resizable(False, False)
+        modal.attributes("-topmost", True)
+        
+        # Centralizar janela
+        modal.update_idletasks()
+        width = modal.winfo_width()
+        height = modal.winfo_height()
+        x = (modal.winfo_screenwidth() // 2) - (width // 2)
+        y = (modal.winfo_screenheight() // 2) - (height // 2)
+        modal.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Cabeçalho
+        header = ctk.CTkFrame(modal, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(header, text="Notificações de Ajuda", font=font(18, "bold"), text_color="#1E293B").pack(side="left")
+        ctk.CTkButton(header, text="Marcar todas como lidas", font=font(12), width=120, height=30, command=lambda: self.marcar_todas_como_lidas(modal, "ajuda")).pack(side="right")
+        
+        # Lista de notificações
+        list_frame = ctk.CTkScrollableFrame(modal, fg_color="transparent")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        if not notificacoes:
+            ctk.CTkLabel(list_frame, text="Não há notificações de ajuda", font=font(14), text_color="#94A3B8").pack(pady=40)
+        else:
+            for notif in notificacoes:
+                self.criar_item_notificacao(list_frame, notif, "ajuda")
+        
+        # Atualizar badge
+        self.atualizar_badge_notificacoes()
+    
+    def abrir_notificacoes_alertas(self):
+        """Abre o painel de notificações de alertas."""
+        # Obter notificações de alertas
+        notificacoes = self.servico_dashboard.obter_notificacoes_alertas()
+        
+        # Criar janela de notificações
+        modal = ctk.CTkToplevel(self)
+        modal.title("Notificações de Alertas")
+        modal.geometry("500x400")
+        modal.resizable(False, False)
+        modal.attributes("-topmost", True)
+        
+        # Centralizar janela
+        modal.update_idletasks()
+        width = modal.winfo_width()
+        height = modal.winfo_height()
+        x = (modal.winfo_screenwidth() // 2) - (width // 2)
+        y = (modal.winfo_screenheight() // 2) - (height // 2)
+        modal.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Cabeçalho
+        header = ctk.CTkFrame(modal, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(header, text="Notificações de Alertas", font=font(18, "bold"), text_color="#1E293B").pack(side="left")
+        ctk.CTkButton(header, text="Marcar todas como lidas", font=font(12), width=120, height=30, command=lambda: self.marcar_todas_como_lidas(modal, "alerta")).pack(side="right")
+        
+        # Lista de notificações
+        list_frame = ctk.CTkScrollableFrame(modal, fg_color="transparent")
+        list_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        if not notificacoes:
+            ctk.CTkLabel(list_frame, text="Não há notificações de alertas", font=font(14), text_color="#94A3B8").pack(pady=40)
+        else:
+            for notif in notificacoes:
+                self.criar_item_notificacao(list_frame, notif, "alerta")
+        
+        # Atualizar badge
+        self.atualizar_badge_notificacoes()
+    
+    def abrir_perfil(self):
+        """Abre o painel de perfil do usuário logado."""
+        # Criar janela de perfil
+        modal = ctk.CTkToplevel(self)
+        modal.title("Perfil do Usuário")
+        modal.geometry("400x300")
+        modal.resizable(False, False)
+        modal.attributes("-topmost", True)
+        
+        # Centralizar janela
+        modal.update_idletasks()
+        width = modal.winfo_width()
+        height = modal.winfo_height()
+        x = (modal.winfo_screenwidth() // 2) - (width // 2)
+        y = (modal.winfo_screenheight() // 2) - (height // 2)
+        modal.geometry(f"{width}x{height}+{x}+{y}")
+        
+        # Dados do usuário
+        user_data = self.controller.usuario_logado
+        if user_data:
+            # Avatar
+            avatar_frame = ctk.CTkFrame(modal, fg_color="transparent")
+            avatar_frame.pack(pady=(20, 10))
+            ctk.CTkLabel(avatar_frame, text="👤", font=font(40)).pack()
+            
+            # Nome e email
+            ctk.CTkLabel(modal, text=user_data.get("first_name", "") + " " + user_data.get("last_name", ""), font=font(16, "bold"), text_color="#1E293B").pack(pady=5)
+            ctk.CTkLabel(modal, text=user_data.get("email", ""), font=font(12), text_color="#64748B").pack(pady=2)
+            
+            # Divisor
+            ctk.CTkFrame(modal, height=1, fg_color="#E2E8F0").pack(fill="x", padx=30, pady=15)
+            
+            # Informações adicionais
+            info_frame = ctk.CTkFrame(modal, fg_color="transparent")
+            info_frame.pack(fill="x", padx=30)
+            
+            ctk.CTkLabel(info_frame, text="Nome de usuário:", font=font(12), text_color="#64748B").pack(anchor="w")
+            ctk.CTkLabel(info_frame, text=user_data.get("username", ""), font=font(12, "bold"), text_color="#1E293B").pack(anchor="w", pady=2)
+            
+            ctk.CTkLabel(info_frame, text="Tipo de usuário:", font=font(12), text_color="#64748B").pack(anchor="w", pady=(10, 0))
+            ctk.CTkLabel(info_frame, text="Analista Escolar", font=font(12, "bold"), text_color="#1E293B").pack(anchor="w", pady=2)
+        
+        # Botão de editar perfil
+        ctk.CTkButton(modal, text="Editar Perfil", font=font(12), width=150, height=35, command=lambda: self.editar_perfil()).pack(pady=(20, 10))
+    
+    def fazer_logout(self):
+        """Realiza o logout do usuário."""
+        # Confirmação
+        from tkinter import messagebox
+        if messagebox.askyesno("Logout", "Deseja realmente sair do sistema?"):
+            self.controller.mostrar_login()
+    
+    def editar_perfil(self):
+        """Abre o formulário de edição de perfil."""
+        print("Editar perfil")
+    
+    def criar_item_notificacao(self, parent, notif, tipo):
+        """Cria um item de notificação na lista."""
+        item_frame = ctk.CTkFrame(parent, fg_color="#F8FAFC", corner_radius=10, border_width=1, border_color="#E2E8F0")
+        item_frame.pack(fill="x", pady=5, padx=5)
+        item_frame.bind("<Button-1>", lambda e: self.marcar_notificacao_como_lida(notif["id"], tipo))
+        
+        content_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+        content_frame.pack(fill="x", padx=15, pady=12)
+        
+        # Ícone e título
+        icon_text = "🤝" if tipo == "ajuda" else "🔔"
+        icon_color = "#6366F1" if tipo == "ajuda" else "#EF4444"
+        
+        icon_frame = ctk.CTkFrame(content_frame, fg_color=icon_color, width=30, height=30, corner_radius=6)
+        icon_frame.pack(side="left", padx=(0, 10))
+        icon_frame.pack_propagate(False)
+        ctk.CTkLabel(icon_frame, text=icon_text, font=font(14)).place(relx=0.5, rely=0.5, anchor="center")
+        
+        text_frame = ctk.CTkFrame(content_frame, fg_color="transparent")
+        text_frame.pack(side="left", fill="both", expand=True)
+        
+        ctk.CTkLabel(text_frame, text=notif["titulo"], font=font(13, "bold"), text_color="#1E293B").pack(anchor="w")
+        ctk.CTkLabel(text_frame, text=notif["descricao"], font=font(11), text_color="#64748B").pack(anchor="w", pady=2)
+        ctk.CTkLabel(text_frame, text=notif["data"], font=font(10), text_color="#94A3B8").pack(anchor="w", pady=1)
+    
+    def marcar_notificacao_como_lida(self, notif_id, tipo):
+        """Marca uma notificação como lida."""
+        self.servico_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
+        self.atualizar_badge_notificacoes()
+    
+    def marcar_todas_como_lidas(self, modal, tipo):
+        """Marca todas as notificações como lidas."""
+        notificacoes = self.servico_dashboard.obter_notificacoes_ajuda() if tipo == "ajuda" else self.servico_dashboard.obter_notificacoes_alertas()
+        for notif in notificacoes:
+            self.servico_dashboard.marcar_notificacao_como_lida(notif["id"], tipo)
+        
+        # Fechar modal e atualizar badges
+        modal.destroy()
+        self.atualizar_badge_notificacoes()
+    
+    def atualizar_badge_notificacoes(self):
+        """Atualiza os badges de notificações."""
+        # Obter contagem de notificações não lidas
+        ajuda_notificacoes = self.servico_dashboard.obter_notificacoes_ajuda()
+        alertas_notificacoes = self.servico_dashboard.obter_notificacoes_alertas()
+        
+        ajuda_count = sum(1 for notif in ajuda_notificacoes if not notif["lida"])
+        alertas_count = sum(1 for notif in alertas_notificacoes if not notif["lida"])
+        
+        # Atualizar badges
+        self.help_badge.configure(text=str(ajuda_count) if ajuda_count > 0 else "0")
+        self.alert_badge.configure(text=str(alertas_count) if alertas_count > 0 else "0")
+        
+        # Esconder badge se não houver notificações
+        self.help_badge.place_forget()
+        self.alert_badge.place_forget()
+        
+        if ajuda_count > 0:
+            self.help_badge.place(x=25, y=5)
+        if alertas_count > 0:
+            self.alert_badge.place(x=25, y=5)
+    
     def blend_color(self, hex_c, alpha):
         r, g, b = int(hex_c[1:3], 16), int(hex_c[3:5], 16), int(hex_c[5:7], 16)
         return f"#{int(r*alpha + 255*(1-alpha)):02x}{int(g*alpha + 255*(1-alpha)):02x}{int(b*alpha + 255*(1-alpha)):02x}"

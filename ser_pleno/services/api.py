@@ -38,6 +38,14 @@ class ClienteAPI:
     
     def _get_mock_response(self, endpoint, params=None):
         """Retorna responses mockadas para testes e fallback"""
+        if endpoint == "help/notifications/":
+            return {
+                "success": True,
+                "data": [
+                    {"id": 1, "titulo": "Ajuda com agendamento", "descricao": "Você tem 5 agendamentos pendentes de confirmação", "data": "2026-02-11", "lida": False},
+                    {"id": 2, "titulo": "Orientação sobre relatórios", "descricao": "Novo template de relatório disponível", "data": "2026-02-10", "lida": True}
+                ]
+            }
         return {"success": False, "message": "Endpoint não implementado"}
 
     def post(self, endpoint, data=None, json=None, files=None, headers=None):
