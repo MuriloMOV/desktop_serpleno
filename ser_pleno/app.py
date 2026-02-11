@@ -21,8 +21,8 @@ class App(ctk.CTk):
         ctk.set_appearance_mode("light")
 
         self.title("SerPleno")
-        self.geometry("1320x780")
-        self.minsize(1200, 700)
+        self.geometry("1280x720")
+        self.minsize(800, 480)
         self.configure(fg_color=THEME["bg"])
 
         self.usuario_logado = None  # Armazena os dados do usuário logado

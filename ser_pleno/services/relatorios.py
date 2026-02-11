@@ -47,7 +47,7 @@ class ServicoRelatorio:
         cursor.execute("SELECT COUNT(*) as total_students FROM aluno")
         total_students = cursor.fetchone()['total_students']
         
-        cursor.execute("SELECT COUNT(*) as active_appointments FROM desktop_appointment WHERE status = 'completed'")
+        cursor.execute("SELECT COUNT(*) as active_appointments FROM agendamento WHERE status = 'completed'")
         active_appointments = cursor.fetchone()['active_appointments']
         
         cursor.execute("SELECT COUNT(*) as pending_screenings FROM desktop_screening WHERE status = 'pending'")
@@ -120,7 +120,7 @@ class ServicoRelatorio:
     def exportar_agendamentos(self):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM desktop_appointment ORDER BY date DESC")
+        cursor.execute("SELECT * FROM agendamento ORDER BY data_hora DESC")
         rows = cursor.fetchall()
         connection.close()
         

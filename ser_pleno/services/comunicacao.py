@@ -230,12 +230,35 @@ class ServicoComunicacao:
     def marcar_mensagem_lida(self, id_mensagem):
         connection = get_db_connection()
         cursor = connection.cursor()
-        cursor.execute("UPDATE desktop_message SET read = 1 WHERE id = %s", (id_mensagem,))
+        cursor.execute("UPDATE desktop_message SET `read` = 1 WHERE id = %s", (id_mensagem,))
         connection.commit()
         connection.close()
         
         return {"success": True, "message": "Mensagem marcada como lida"}
 
+    def contar_mensagens_nao_lidas(self, id_usuario_logado):
+        """
+        Conta o número de mensagens não lidas por contato para o usuário logado
+        """
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT 
+                sender_id as contato_id,
+                COUNT(*) as total_nao_lidas
+            FROM desktop_message
+            WHERE recipient_id = %s AND `read` = 0
+            GROUP BY sender_id
+        """, (id_usuario_logado,))
+        rows = cursor.fetchall()
+        
+        contador = {}
+        for r in rows:
+            contador[r['contato_id']] = r['total_nao_lidas']
+            
+        connection.close()
+        return {"success": True, "data": contador}
+        
     def deletar_mensagem(self, id_mensagem):
         connection = get_db_connection()
         cursor = connection.cursor()

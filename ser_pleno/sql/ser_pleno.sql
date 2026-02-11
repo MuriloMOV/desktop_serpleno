@@ -77,27 +77,30 @@ COLLATE = utf8mb4_0900_ai_ci;
 
 
 -- -----------------------------------------------------
--- Table `ser_pleno`.`agendamentos`
+-- Table `ser_pleno`.`agendamento`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ser_pleno`.`agendamentos` (
-  `id_agendamentos` INT NOT NULL AUTO_INCREMENT,
-  `nome` VARCHAR(200) NOT NULL,
+CREATE TABLE IF NOT EXISTS `ser_pleno`.`agendamento` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `student_id` INT NOT NULL,
   `data_hora` DATETIME(6) NOT NULL,
-  `motivo` VARCHAR(500) NOT NULL,
-  `status` VARCHAR(60) NOT NULL,
-  `laudo` VARCHAR(45) NOT NULL,
-  `Aluno_id_aluno` INT NOT NULL,
-  `desktop_appointment_id` INT NULL DEFAULT NULL,
+  `motivo` LONGTEXT NOT NULL,
+  `status` VARCHAR(20) NOT NULL DEFAULT 'scheduled',
   `local` VARCHAR(200) NULL DEFAULT NULL,
-  `origem` VARCHAR(20) NOT NULL,
   `profissional` VARCHAR(200) NULL DEFAULT NULL,
-  PRIMARY KEY (`id_agendamentos`),
-  INDEX `agendamentos_Aluno_id_aluno_8947a1d5_fk_aluno_id_aluno` (`Aluno_id_aluno` ASC) VISIBLE,
-  CONSTRAINT `agendamentos_Aluno_id_aluno_8947a1d5_fk_aluno_id_aluno`
-    FOREIGN KEY (`Aluno_id_aluno`)
-    REFERENCES `ser_pleno`.`aluno` (`id_aluno`))
+  `laudo` VARCHAR(45) NULL DEFAULT NULL,
+  `origem` VARCHAR(20) NULL DEFAULT NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`),
+  INDEX `agendamento_student_id_idx` (`student_id` ASC) VISIBLE,
+  INDEX `agendamento_data_hora_idx` (`data_hora` ASC) VISIBLE,
+  INDEX `agendamento_status_idx` (`status` ASC) VISIBLE,
+  INDEX `agendamento_data_status_idx` (`data_hora` ASC, `status` ASC) VISIBLE,
+  CONSTRAINT `agendamento_ibfk_1`
+    FOREIGN KEY (`student_id`)
+    REFERENCES `ser_pleno`.`aluno` (`id_aluno`)
+    ON DELETE CASCADE)
 ENGINE = InnoDB
-AUTO_INCREMENT = 58
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -130,6 +133,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`auth_group` (
   PRIMARY KEY (`id`),
   UNIQUE INDEX `name` (`name` ASC) VISIBLE)
 ENGINE = InnoDB
+AUTO_INCREMENT = 4
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -206,6 +210,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`auth_user_groups` (
     FOREIGN KEY (`user_id`)
     REFERENCES `ser_pleno`.`auth_user` (`id`))
 ENGINE = InnoDB
+AUTO_INCREMENT = 3
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -339,57 +344,6 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_alert` (
     REFERENCES `ser_pleno`.`aluno` (`id_aluno`))
 ENGINE = InnoDB
 AUTO_INCREMENT = 14
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `ser_pleno`.`disponibilidade`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ser_pleno`.`disponibilidade` (
-  `id_disponibilidade` INT NOT NULL AUTO_INCREMENT,
-  `Dias` VARCHAR(45) NULL DEFAULT NULL,
-  `Horario` TIME NOT NULL,
-  `Analista_id_analista` INT NULL DEFAULT NULL,
-  `is_active` TINYINT(1) NOT NULL,
-  PRIMARY KEY (`id_disponibilidade`),
-  UNIQUE INDEX `disponibilidade_Horario_71321063_uniq` (`Horario` ASC) VISIBLE,
-  UNIQUE INDEX `disponibilidade_Horario_Analista_id_analista_1004465e_uniq` (`Horario` ASC, `Analista_id_analista` ASC) VISIBLE,
-  INDEX `disponibilidade_Analista_id_analista_04058a77_fk_analista_` (`Analista_id_analista` ASC) VISIBLE,
-  CONSTRAINT `disponibilidade_Analista_id_analista_04058a77_fk_analista_`
-    FOREIGN KEY (`Analista_id_analista`)
-    REFERENCES `ser_pleno`.`analista` (`id_analista`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 41
-DEFAULT CHARACTER SET = utf8mb4
-COLLATE = utf8mb4_0900_ai_ci;
-
-
--- -----------------------------------------------------
--- Table `ser_pleno`.`desktop_appointment`
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_appointment` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT,
-  `date` DATE NOT NULL,
-  `status` VARCHAR(20) NOT NULL,
-  `notes` LONGTEXT NOT NULL,
-  `created_at` DATETIME(6) NOT NULL,
-  `updated_at` DATETIME(6) NOT NULL,
-  `time` INT NULL DEFAULT NULL,
-  `student_id` INT NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `desktop_appointment_date_time_id_001cc6a7_uniq` (`date` ASC, `time` ASC) VISIBLE,
-  INDEX `desktop_app_date_59251b_idx` (`date` ASC, `status` ASC) VISIBLE,
-  INDEX `desktop_app_student_047566_idx` (`student_id` ASC, `date` ASC) VISIBLE,
-  INDEX `desktop_appointment_time_5654d697` (`time` ASC) VISIBLE,
-  CONSTRAINT `desktop_appointment_student_id_a017d62e_fk_aluno_id_aluno`
-    FOREIGN KEY (`student_id`)
-    REFERENCES `ser_pleno`.`aluno` (`id_aluno`),
-  CONSTRAINT `desktop_appointment_time_5654d697_fk_disponibi`
-    FOREIGN KEY (`time`)
-    REFERENCES `ser_pleno`.`disponibilidade` (`id_disponibilidade`))
-ENGINE = InnoDB
-AUTO_INCREMENT = 30
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -538,6 +492,8 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_message` (
   `text` LONGTEXT NOT NULL,
   `timestamp` DATETIME(6) NOT NULL,
   `read` TINYINT(1) NOT NULL,
+  `caminho_arquivo` VARCHAR(500) NULL DEFAULT NULL,
+  `tipo_arquivo` VARCHAR(50) NULL DEFAULT NULL,
   `recipient_id` INT NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   INDEX `desktop_message_sender_id_19765a9f` (`sender_id` ASC) VISIBLE,
@@ -550,7 +506,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_message` (
     FOREIGN KEY (`sender_id`)
     REFERENCES `ser_pleno`.`auth_user` (`id`))
 ENGINE = InnoDB
-AUTO_INCREMENT = 11
+AUTO_INCREMENT = 46
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -835,6 +791,28 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_wellnesscheckin` (
     FOREIGN KEY (`student_id`)
     REFERENCES `ser_pleno`.`aluno` (`id_aluno`))
 ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+
+-- -----------------------------------------------------
+-- Table `ser_pleno`.`disponibilidade`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `ser_pleno`.`disponibilidade` (
+  `id_disponibilidade` INT NOT NULL AUTO_INCREMENT,
+  `Dias` VARCHAR(45) NULL DEFAULT NULL,
+  `Horario` TIME NOT NULL,
+  `Analista_id_analista` INT NULL DEFAULT NULL,
+  `is_active` TINYINT(1) NOT NULL,
+  PRIMARY KEY (`id_disponibilidade`),
+  UNIQUE INDEX `disponibilidade_Horario_71321063_uniq` (`Horario` ASC) VISIBLE,
+  UNIQUE INDEX `disponibilidade_Horario_Analista_id_analista_1004465e_uniq` (`Horario` ASC, `Analista_id_analista` ASC) VISIBLE,
+  INDEX `disponibilidade_Analista_id_analista_04058a77_fk_analista_` (`Analista_id_analista` ASC) VISIBLE,
+  CONSTRAINT `disponibilidade_Analista_id_analista_04058a77_fk_analista_`
+    FOREIGN KEY (`Analista_id_analista`)
+    REFERENCES `ser_pleno`.`analista` (`id_analista`))
+ENGINE = InnoDB
+AUTO_INCREMENT = 42
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
