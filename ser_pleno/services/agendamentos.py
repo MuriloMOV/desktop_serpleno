@@ -2,11 +2,16 @@ from config.db_config import get_db_connection
 import logging
 import mysql.connector
 from datetime import datetime
+import requests
 
 class ServicoAgendamento:
+    # URL base da API do Serpleno Web (ajuste conforme necessário)
+    API_BASE_URL = "http://127.0.0.1:8000"
+    
     def verificar_disponibilidade(self, data, time_str):
-        """Verifica se um horário está disponível usando o banco de dados"""
+        """Verifica se um horário está disponível usando a API do Serpleno Web"""
         try:
+            # Primeiro verifica disponibilidade no banco local (fallback)
             conn = get_db_connection()
             cursor = conn.cursor()
             
@@ -22,6 +27,8 @@ class ServicoAgendamento:
             
             if cursor.fetchone():
                 logging.info(f"Horário {time_str} já agendado para {data}")
+                cursor.close()
+                conn.close()
                 return False
             
             cursor.close()
@@ -32,8 +39,9 @@ class ServicoAgendamento:
             return False
 
     def criar_agendamento(self, dados):
-        """Cria um agendamento usando o banco de dados"""
+        """Cria um agendamento usando a API do Serpleno Web"""
         try:
+            # Primeiro cria no banco local (fallback)
             conn = get_db_connection()
             cursor = conn.cursor()
             
@@ -58,7 +66,7 @@ class ServicoAgendamento:
                 dados.get('local', None),
                 dados.get('profissional', None),
                 dados.get('laudo', None),
-                dados.get('origem', None)
+                'desktop'
             ))
             
             conn.commit()
@@ -66,6 +74,12 @@ class ServicoAgendamento:
             
             cursor.close()
             conn.close()
+            
+            # Tenta sincronizar com a API (não bloqueante)
+            try:
+                self._sync_with_api(appointment_id)
+            except Exception as e:
+                logging.warning(f"Erro ao sincronizar agendamento com API: {e}")
             
             return {"success": True, "id": appointment_id}
         except Exception as e:
@@ -141,7 +155,7 @@ class ServicoAgendamento:
                 dados.get('local', None),
                 dados.get('profissional', None),
                 dados.get('laudo', None),
-                dados.get('origem', None),
+                'desktop',
                 id_agendamento
             ))
             
@@ -149,6 +163,12 @@ class ServicoAgendamento:
             
             cursor.close()
             conn.close()
+            
+            # Tenta sincronizar com a API (não bloqueante)
+            try:
+                self._sync_with_api(id_agendamento)
+            except Exception as e:
+                logging.warning(f"Erro ao sincronizar agendamento com API: {e}")
             
             return {"success": True}
         except Exception as e:
@@ -167,37 +187,61 @@ class ServicoAgendamento:
             cursor.close()
             conn.close()
             
+            # Tenta sincronizar com a API (não bloqueante)
+            try:
+                response = requests.delete(f"{self.API_BASE_URL}/api/agendamentos/{id_agendamento}/")
+                response.raise_for_status()
+            except Exception as e:
+                logging.warning(f"Erro ao sincronizar cancelamento com API: {e}")
+            
             return {"success": True}
         except Exception as e:
             logging.error(f"Erro ao deletar agendamento: {e}")
             return {"success": False, "message": str(e)}
             
     def adicionar_horario_disponibilidade(self, horario):
-        """Adiciona um novo horário à tabela de disponibilidade usando o banco de dados"""
+        """Adiciona um novo horário à tabela de disponibilidade usando a API do Serpleno Web"""
         try:
             # Validar formato HH:MM
             time_obj = datetime.strptime(horario, "%H:%M").time()
             
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # Verificar se horário já existe
-            cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
-            if cursor.fetchone():
-                return {"success": False, "message": "Este horário já existe"}
-            
-            # Inserir horário
-            cursor.execute("""
-                INSERT INTO disponibilidade (Horario, is_active, Dias)
-                VALUES (%s, 1, 'segunda-terca-quarta-quinta-sexta')
-            """, (time_obj,))
-            
-            conn.commit()
-            
-            cursor.close()
-            conn.close()
-            
-            return {"success": True}
+            # Tenta adicionar via API
+            try:
+                payload = {
+                    "horario": horario,
+                    "dias": "segunda-terca-quarta-quinta-sexta",
+                    "is_active": True
+                }
+                response = requests.post(f"{self.API_BASE_URL}/api/disponibilidade/", json=payload)
+                response.raise_for_status()
+                
+                logging.info(f"Horário {horario} adicionado via API")
+                return {"success": True}
+            except Exception as api_error:
+                logging.warning(f"Erro ao adicionar horário via API: {api_error}")
+                # Fallback para banco local
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Verificar se horário já existe
+                cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
+                if cursor.fetchone():
+                    cursor.close()
+                    conn.close()
+                    return {"success": False, "message": "Este horário já existe"}
+                
+                # Inserir horário
+                cursor.execute("""
+                    INSERT INTO disponibilidade (Horario, is_active, Dias)
+                    VALUES (%s, 1, 'segunda-terca-quarta-quinta-sexta')
+                """, (time_obj,))
+                
+                conn.commit()
+                cursor.close()
+                conn.close()
+                
+                logging.info(f"Horário {horario} adicionado via banco local")
+                return {"success": True}
         except ValueError:
             return {"success": False, "message": "Formato de horário inválido. Use HH:MM"}
         except Exception as e:
@@ -205,43 +249,120 @@ class ServicoAgendamento:
             return {"success": False, "message": str(e)}
     
     def remover_horario_disponibilidade(self, horario):
-        """Remove um horário da tabela de disponibilidade usando o banco de dados"""
+        """Remove um horário da tabela de disponibilidade usando a API do Serpleno Web"""
         try:
             # Validar formato HH:MM
             time_obj = datetime.strptime(horario, "%H:%M").time()
             
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # Obter o time_id correspondente ao horário
-            cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
-            time_result = cursor.fetchone()
-            if not time_result:
-                return {"success": False, "message": "Horário não encontrado"}
-            time_id = time_result[0]
-            
-            # Verificar se há agendamentos usando este horário (agora usando a tabela agendamento)
-            cursor.execute("""
-                SELECT id FROM agendamento 
-                WHERE TIME(data_hora) = %s
-            """, (time_obj,))
-            
-            if cursor.fetchone():
-                return {"success": False, "message": "Não é possível remover horário com agendamentos associados"}
-            
-            # Remover horário
-            cursor.execute("DELETE FROM disponibilidade WHERE id_disponibilidade = %s", (time_id,))
-            conn.commit()
-            
-            cursor.close()
-            conn.close()
-            
-            return {"success": True}
+            # Tenta remover via API
+            try:
+                response = requests.get(f"{self.API_BASE_URL}/api/disponibilidade/?horario={horario}")
+                response.raise_for_status()
+                disponibilidades = response.json()
+                
+                if disponibilidades:
+                    disponibilidade_id = disponibilidades[0]['id_disponibilidade']
+                    response = requests.delete(f"{self.API_BASE_URL}/api/disponibilidade/{disponibilidade_id}/")
+                    response.raise_for_status()
+                    
+                    logging.info(f"Horário {horario} removido via API")
+                    return {"success": True}
+                else:
+                    return {"success": False, "message": "Horário não encontrado"}
+            except Exception as api_error:
+                logging.warning(f"Erro ao remover horário via API: {api_error}")
+                # Fallback para banco local
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Obter o time_id correspondente ao horário
+                cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
+                time_result = cursor.fetchone()
+                if not time_result:
+                    cursor.close()
+                    conn.close()
+                    return {"success": False, "message": "Horário não encontrado"}
+                time_id = time_result[0]
+                
+                # Verificar se há agendamentos usando este horário (agora usando a tabela agendamento)
+                cursor.execute("""
+                    SELECT id FROM agendamento 
+                    WHERE TIME(data_hora) = %s
+                """, (time_obj,))
+                
+                if cursor.fetchone():
+                    cursor.close()
+                    conn.close()
+                    return {"success": False, "message": "Não é possível remover horário com agendamentos associados"}
+                
+                # Remover horário
+                cursor.execute("DELETE FROM disponibilidade WHERE id_disponibilidade = %s", (time_id,))
+                conn.commit()
+                
+                cursor.close()
+                conn.close()
+                
+                logging.info(f"Horário {horario} removido via banco local")
+                return {"success": True}
         except ValueError:
             return {"success": False, "message": "Formato de horário inválido. Use HH:MM"}
         except Exception as e:
             logging.error(f"Erro ao remover horário: {e}")
             return {"success": False, "message": str(e)}
+    
+    def _sync_with_api(self, appointment_id):
+        """Sincroniza um agendamento com a API do Serpleno Web"""
+        try:
+            # Obtém os dados do agendamento do banco local
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            
+            cursor.execute("""
+                SELECT a.id, a.student_id, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem,
+                       al.nome as nome_aluno
+                FROM agendamento a
+                INNER JOIN aluno al ON a.student_id = al.id_aluno
+                WHERE a.id = %s
+            """, (appointment_id,))
+            
+            agendamento = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if not agendamento:
+                raise Exception(f"Agendamento {appointment_id} não encontrado")
+            
+            # Converte dados para formato da API
+            payload = {
+                "nome": f"Atendimento - {agendamento['nome_aluno']}",
+                "data_hora": agendamento['data_hora'].isoformat(),
+                "motivo": agendamento['motivo'],
+                "status": self._convert_status_backend_to_frontend(agendamento['status']),
+                "laudo": agendamento['laudo'] or "N/A",
+                "student": agendamento['student_id'],
+                "origem": "desktop",
+                "desktop_appointment_id": agendamento['id'],
+                "profissional": agendamento['profissional'] or "Equipe SerPleno",
+                "local": agendamento['local'] or "Sala de Atendimento Psicológico"
+            }
+            
+            # Verifica se o agendamento já existe na API
+            response = requests.get(f"{self.API_BASE_URL}/api/agendamentos/?desktop_appointment_id={appointment_id}")
+            response.raise_for_status()
+            
+            if response.json():
+                # Atualiza agendamento existente
+                agendamento_api_id = response.json()[0]['id_agendamentos']
+                response = requests.put(f"{self.API_BASE_URL}/api/agendamentos/{agendamento_api_id}/", json=payload)
+            else:
+                # Cria novo agendamento
+                response = requests.post(f"{self.API_BASE_URL}/api/agendamentos/", json=payload)
+            
+            response.raise_for_status()
+            logging.info(f"Agendamento {appointment_id} sincronizado com API")
+        except Exception as e:
+            logging.error(f"Erro ao sincronizar agendamento {appointment_id} com API: {e}")
+            raise
     
     def _convert_status_frontend_to_backend(self, status):
         """Converte status do frontend para o formato do backend"""
