@@ -1,40 +1,71 @@
 import os
-from .api import api
+from config.db_config import get_db_connection
 
 class ServicoMural:
     def listar_mensagens(self, busca=None, pagina=1):
-        params = {'page': pagina}
-        if busca: params['search'] = busca
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
         
-        return api.get('board/messages/', params=params)
+        query = "SELECT * FROM mural_posts WHERE ativo = 1"
+        params = []
+        
+        if busca:
+            query += " AND (titulo LIKE %s OR conteudo LIKE %s OR autor LIKE %s)"
+            params.extend([f"%{busca}%", f"%{busca}%", f"%{busca}%"])
+            
+        offset = (pagina - 1) * 10
+        query += " ORDER BY publicado_em DESC LIMIT 10 OFFSET %s"
+        params.append(offset)
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        mensagens = []
+        for r in rows:
+            mensagens.append({
+                'id': r.get('id'),
+                'titulo': r.get('titulo'),
+                'conteudo': r.get('conteudo'),
+                'autor': r.get('autor'),
+                'publicado_em': str(r.get('publicado_em')),
+                'ativo': bool(r.get('ativo')),
+                'categoria': r.get('categoria'),
+                'data_agendamento': str(r.get('data_agendamento')) if r.get('data_agendamento') else None,
+                'link_externo': r.get('link_externo'),
+                'blocos': r.get('blocos'),
+                'layout': r.get('layout'),
+                'horario_evento': str(r.get('horario_evento')) if r.get('horario_evento') else None,
+                'local_fisico': r.get('local_fisico')
+            })
+            
+        connection.close()
+        return {"success": True, "data": mensagens}
 
     def upload_attachment(self, filepath):
-        """Upload de arquivo usando o cliente API. Tenta `api.upload_file` e faz fallback para o comportamento anterior."""
+        """Upload de arquivo - para desktop, retorna caminho local"""
         filename = os.path.basename(filepath)
-        # Prefer upload multipart se disponível
-        try:
-            if hasattr(api, 'upload_file'):
-                res = api.upload_file('files/upload/', filepath)
-                if res.get('success') and res.get('data'):
-                    return res['data']
-                # If upload_file returned a simple success structure, normalize
-                if res.get('data'):
-                    return res['data']
-                if res.get('url'):
-                    return {'url': res.get('url'), 'name': res.get('name', filename)}
-        except Exception:
-            pass
+        return {'url': filepath, 'name': filename}
 
-        # Fallback para comportamento antigo (útil nos testes)
-        res = api.post('files/upload/', json={'filename': filename})
-        if res.get('success') and res.get('data'):
-            return res['data']
-        return {'url': f'/media/{filename}', 'name': filename}
     def criar_mensagem(self, dados):
-        # Se houver caminho de anexo, faz upload antes
-        attachment_path = dados.pop('attachment_path', None)
-        if attachment_path:
-            uploaded = self.upload_attachment(attachment_path)
-            # Adiciona campo attachments no payload esperado pela API
-            dados['attachments'] = [uploaded]
-        return api.post('board/messages/add/', json=dados)
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        
+        query = """
+            INSERT INTO mural_posts (
+                titulo, conteudo, autor, publicado_em, ativo, categoria,
+                data_agendamento, link_externo, blocos, layout, horario_evento, local_fisico,
+                created_at, updated_at
+            ) VALUES (%s, %s, %s, NOW(), 1, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        """
+        cursor.execute(query, (
+            dados['titulo'], dados['conteudo'], dados.get('autor', 'Admin'),
+            dados.get('categoria', 'Geral'), dados.get('data_agendamento'),
+            dados.get('link_externo'), dados.get('blocos', '[]'),
+            dados.get('layout', 'default'), dados.get('horario_evento'),
+            dados.get('local_fisico')
+        ))
+        connection.commit()
+        mensagem_id = cursor.lastrowid
+        connection.close()
+        
+        return {"success": True, "data": {"id": mensagem_id}}

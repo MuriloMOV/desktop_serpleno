@@ -1,5 +1,6 @@
 import logging
 import os
+import datetime
 
 try:
     import requests
@@ -8,27 +9,44 @@ except Exception:
 
 class ClienteAPI:
     def __init__(self):
-        self.base_url = "http://localhost:8000/desktop/api"  # ajuste conforme necessário
+        self.base_url = "http://localhost:8000/api/v1/desktop"  # ajuste conforme necessário
 
     def get(self, endpoint, params=None):
         logging.info(f"GET request to {endpoint} with params {params}")
-        # Mocked/simulated responses for views/services tests
-        if endpoint == "wellness/dashboard/":
-            return {"success": True, "data": {"message": "Mock dashboard data"}}
-        elif endpoint == "wellness/mood/":
-            return {"success": True, "data": {"mood": "happy"}}
-        elif endpoint == "wellness/mood/averages/":
-            return {"success": True, "data": {"average_mood": 4.5}}
-        elif endpoint.startswith("wellness/mood/student/"):
-            return {"success": True, "data": {"student_mood": "stressed"}}
-        elif endpoint == "wellness/checkins/":
-            return {"success": True, "data": {"checkins": ["checkin1", "checkin2"]}}
-        elif endpoint == "wellness/risk-students/":
-            return {"success": True, "data": {"students_at_risk": ["student1", "student2"]}}
-        elif endpoint == "settings/preferences/":
-            return {"success": True, "data": {"theme": "light", "notifications": True}}
-        else:
-            return {"success": False, "message": "Endpoint não encontrado"}
+        
+        # Verificar se requests está disponível e fazer chamada real
+        if requests:
+            try:
+                url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+                response = requests.get(url, params=params)
+                logging.info(f"Resposta bruta do servidor: {repr(response.text)}")  # Log da resposta bruta
+                if response.ok:
+                    try:
+                        return response.json()
+                    except Exception as e:
+                        logging.error(f"Erro ao decodificar JSON na resposta: {e}")
+                        logging.error(f"Conteúdo da resposta: {repr(response.text)}")
+                        return {"success": False, "message": "Resposta inválida do servidor"}
+                return {"success": False, "message": f"Erro na requisição: {response.status_code}"}
+            except Exception as e:
+                logging.error(f"Erro na requisição: {e}")
+                # Se a requisição real falhar, retornar dados mockados
+                return self._get_mock_response(endpoint, params)
+        
+        # Se requests não está disponível, retornar dados mockados
+        return self._get_mock_response(endpoint, params)
+    
+    def _get_mock_response(self, endpoint, params=None):
+        """Retorna responses mockadas para testes e fallback"""
+        if endpoint == "help/notifications/":
+            return {
+                "success": True,
+                "data": [
+                    {"id": 1, "titulo": "Ajuda com agendamento", "descricao": "Você tem 5 agendamentos pendentes de confirmação", "data": "2026-02-11", "lida": False},
+                    {"id": 2, "titulo": "Orientação sobre relatórios", "descricao": "Novo template de relatório disponível", "data": "2026-02-10", "lida": True}
+                ]
+            }
+        return {"success": False, "message": "Endpoint não implementado"}
 
     def post(self, endpoint, data=None, json=None, files=None, headers=None):
         """Generic POST. If `files` is provided and requests is available, perform a multipart upload.
@@ -50,6 +68,39 @@ class ClienteAPI:
                 logging.exception("Error during file upload")
                 return {"success": False, "message": str(e)}
 
+        # Verificar se requests está disponível e fazer chamada real
+        if requests:
+            try:
+                url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+                response = requests.post(url, data=data, json=json, headers=headers)
+                logging.info(f"Resposta bruta do servidor: {repr(response.text)}")  # Log da resposta bruta
+                if response.ok:
+                    try:
+                        return response.json()
+                    except Exception as e:
+                        logging.error(f"Erro ao decodificar JSON na resposta: {e}")
+                        logging.error(f"Conteúdo da resposta: {repr(response.text)}")
+                        return {"success": False, "message": "Resposta inválida do servidor"}
+                return {"success": False, "message": f"Erro na requisição: {response.status_code}"}
+            except Exception as e:
+                logging.error(f"Erro na requisição: {e}")
+                return {"success": False, "message": f"Erro de conexão: {str(e)}"}
+        
+        # Mock response for messages send
+        if endpoint == "messages/send/":
+            return {
+                "success": True,
+                "message": "Mensagem enviada",
+                "data": {
+                    "id": 100 + len(json.get('text', '')),
+                    "text": json.get('text', ''),
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "sender_id": 1,
+                    "read": False,
+                    "self": True
+                }
+            }
+        
         logging.info(f"Mock POST request to {endpoint} with data {data} and json {json}")
         return {"success": True, "message": "Dados enviados com sucesso"}
 

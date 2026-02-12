@@ -253,7 +253,7 @@ class LoginFrame(ctk.CTkFrame):
                 if result['success']:
                     self.lbl_erro.configure(text="")
                     # Must schedule UI update on main thread
-                    self.after(0, self.controller.iniciar_sistema)
+                    self.after(0, lambda: self.controller.iniciar_sistema(result['user']))
                 else:
                     msg = result.get('message', 'Erro ao fazer login')
                     self.after(0, lambda: self.lbl_erro.configure(text=msg, text_color="red"))
