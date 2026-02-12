@@ -7,6 +7,15 @@ import requests
 class ServicoAgendamento:
     # URL base da API do Serpleno Web (ajuste conforme necessário)
     API_BASE_URL = "http://127.0.0.1:8000"
+    # Token para autenticação na API
+    API_TOKEN = "serpleno-desktop-token-2024"
+    
+    def _get_headers(self):
+        """Retorna os headers para as requisições API"""
+        return {
+            "Content-Type": "application/json",
+            "X-Desktop-Token": self.API_TOKEN
+        }
     
     def verificar_disponibilidade(self, data, time_str):
         """Verifica se um horário está disponível usando a API do Serpleno Web"""
@@ -187,11 +196,20 @@ class ServicoAgendamento:
             cursor.close()
             conn.close()
             
-            # Tenta sincronizar com a API (não bloqueante)
+            # Tenta cancelar o agendamento no SerPleno Web via desktop_appointment_id
             try:
-                response = requests.delete(f"{self.API_BASE_URL}/api/agendamentos/{id_agendamento}/")
-                response.raise_for_status()
-            except Exception as e:
+                response = requests.delete(
+                    f"{self.API_BASE_URL}/api/agendamentos/by-desktop-id/{id_agendamento}/",
+                    headers=self._get_headers()
+                )
+                if response.status_code == 200:
+                    logging.info(f"Agendamento {id_agendamento} cancelado no SerPleno Web via desktop_appointment_id")
+                elif response.status_code == 404:
+                    # Agendamento não existe no web, pode ter sido criado no web
+                    logging.warning(f"Agendamento {id_agendamento} não encontrado no SerPleno Web para cancelamento")
+                else:
+                    response.raise_for_status()
+            except requests.exceptions.RequestException as e:
                 logging.warning(f"Erro ao sincronizar cancelamento com API: {e}")
             
             return {"success": True}
@@ -347,16 +365,27 @@ class ServicoAgendamento:
             }
             
             # Verifica se o agendamento já existe na API
-            response = requests.get(f"{self.API_BASE_URL}/api/agendamentos/?desktop_appointment_id={appointment_id}")
+            response = requests.get(
+                f"{self.API_BASE_URL}/api/agendamentos/?desktop_appointment_id={appointment_id}",
+                headers=self._get_headers()
+            )
             response.raise_for_status()
             
             if response.json():
                 # Atualiza agendamento existente
                 agendamento_api_id = response.json()[0]['id_agendamentos']
-                response = requests.put(f"{self.API_BASE_URL}/api/agendamentos/{agendamento_api_id}/", json=payload)
+                response = requests.put(
+                    f"{self.API_BASE_URL}/api/agendamentos/{agendamento_api_id}/",
+                    json=payload,
+                    headers=self._get_headers()
+                )
             else:
                 # Cria novo agendamento
-                response = requests.post(f"{self.API_BASE_URL}/api/agendamentos/", json=payload)
+                response = requests.post(
+                    f"{self.API_BASE_URL}/api/agendamentos/",
+                    json=payload,
+                    headers=self._get_headers()
+                )
             
             response.raise_for_status()
             logging.info(f"Agendamento {appointment_id} sincronizado com API")
