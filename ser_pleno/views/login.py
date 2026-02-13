@@ -1,3 +1,4 @@
+import os
 import customtkinter as ctk
 import random
 import math
@@ -5,8 +6,12 @@ from services.autenticacao import ServicoAutenticacao
 # Compat alias para testes que esperam o nome em inglês
 AuthService = ServicoAutenticacao
 import threading
+from pygame import mixer
 
 from ui_theme import THEME, RADIUS, font
+
+os.environ['SDL_AUDIODRIVER'] = 'directsound'
+mixer.init()
 
 
 class LoginFrame(ctk.CTkFrame):
@@ -65,7 +70,7 @@ class LoginFrame(ctk.CTkFrame):
 
     # ================= BOLHAS FLUTUANTES (BUBBLES) =================
     def criar_bolhas(self):
-        chars = ['a', 'b', 'c'] + [''] * 22
+        chars = [''] * 22
         for i in range(25):
             x = random.randint(0, 1200)
             y = random.randint(100, 800)
@@ -269,12 +274,31 @@ class LoginFrame(ctk.CTkFrame):
         lb = ctk.CTkLabel(top, text="Política de Privacidade\n\n(Texto Simulado)", font=font(14))
         lb.pack(expand=True)
 
+    # Lógica de tocar música 
     def toggle_music(self):
-        # Lógica de tocar música (Placeholder)
+
         status = self.music_var.get()
+
         if status == "on":
             print("Music Playing...")
-            # Implementação real necessitaria de pygame ou similar
+            mixer.music.load("assets/Music/background-music.mp3") 
+          # Loop infinito
+            try:
+                # 1. Verifica se o arquivo existe para não crashar o app
+                caminho_musica = "assets/Music/background-music.mp3"
+
+                if os.path.exists(caminho_musica):
+                    print("Music Playing...")
+                    mixer.music.load(caminho_musica)
+                    # 2. O parâmetro loops=-1 faz a música repetir infinitamente
+                    mixer.music.play(loops=-1) 
+                else:
+                    print(f"Erro: Arquivo não encontrado em {caminho_musica}")
+                    self.music_var.set("off") # Volta o switch para desligado
+            except Exception as e:
+                print(f"Erro ao tocar música: {e}")
         else:
             print("Music Paused...")
+            print("Music Stopped...")
+            mixer.music.stop()
 
