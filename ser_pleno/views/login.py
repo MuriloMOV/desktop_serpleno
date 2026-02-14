@@ -2,6 +2,8 @@ import customtkinter as ctk
 import random
 import math
 from services.autenticacao import ServicoAutenticacao
+from services.agendamentos import set_auth_service as set_auth_service_agendamentos
+from services.api import set_auth_service as set_auth_service_api
 # Compat alias para testes que esperam o nome em inglês
 AuthService = ServicoAutenticacao
 import threading
@@ -252,6 +254,9 @@ class LoginFrame(ctk.CTkFrame):
                 result = self.servico_autenticacao.login(username, password)
                 if result['success']:
                     self.lbl_erro.configure(text="")
+                    # Define o serviço de autenticação para uso nas requisições API
+                    set_auth_service_agendamentos(self.servico_autenticacao)
+                    set_auth_service_api(self.servico_autenticacao)
                     # Must schedule UI update on main thread
                     self.after(0, lambda: self.controller.iniciar_sistema(result['user']))
                 else:

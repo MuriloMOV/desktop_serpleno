@@ -7,9 +7,28 @@ try:
 except Exception:
     requests = None
 
+# Referência global ao serviço de autenticação
+_auth_service = None
+
+def set_auth_service(auth_service):
+    """Define o serviço de autenticação global para usar nas requisições API"""
+    global _auth_service
+    _auth_service = auth_service
+
+def get_auth_service():
+    """Retorna o serviço de autenticação global"""
+    return _auth_service
+
 class ClienteAPI:
     def __init__(self):
         self.base_url = "http://localhost:8000/api/v1/desktop"  # ajuste conforme necessário
+
+    def _get_session(self):
+        """Retorna a sessão HTTP do serviço de autenticação ou requests padrão"""
+        auth = get_auth_service()
+        if auth and hasattr(auth, 'get_session'):
+            return auth.get_session()
+        return requests
 
     def get(self, endpoint, params=None):
         logging.info(f"GET request to {endpoint} with params {params}")
@@ -18,7 +37,8 @@ class ClienteAPI:
         if requests:
             try:
                 url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-                response = requests.get(url, params=params)
+                session = self._get_session()
+                response = session.get(url, params=params, timeout=5)
                 logging.info(f"Resposta bruta do servidor: {repr(response.text)}")  # Log da resposta bruta
                 if response.ok:
                     try:
@@ -56,7 +76,8 @@ class ClienteAPI:
             url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
             logging.info(f"Uploading files to {url}")
             try:
-                resp = requests.post(url, files=files, data=data, headers=headers)
+                session = self._get_session()
+                resp = session.post(url, files=files, data=data, headers=headers, timeout=10)
                 if resp.ok:
                     # try JSON response
                     try:
@@ -72,7 +93,8 @@ class ClienteAPI:
         if requests:
             try:
                 url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
-                response = requests.post(url, data=data, json=json, headers=headers)
+                session = self._get_session()
+                response = session.post(url, data=data, json=json, headers=headers, timeout=5)
                 logging.info(f"Resposta bruta do servidor: {repr(response.text)}")  # Log da resposta bruta
                 if response.ok:
                     try:
@@ -87,7 +109,7 @@ class ClienteAPI:
                 return {"success": False, "message": f"Erro de conexão: {str(e)}"}
         
         # Mock response for messages send
-        if endpoint == "messages/send/":
+        if endpoint == "messages/send/" and json:
             return {
                 "success": True,
                 "message": "Mensagem enviada",
@@ -121,7 +143,8 @@ class ClienteAPI:
         try:
             with open(filepath, 'rb') as f:
                 files = {field_name: (os.path.basename(filepath), f)}
-                resp = requests.post(url, files=files)
+                session = self._get_session()
+                resp = session.post(url, files=files, timeout=10)
                 if resp.ok:
                     try:
                         return resp.json()
