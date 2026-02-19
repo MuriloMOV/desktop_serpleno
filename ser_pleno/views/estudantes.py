@@ -202,9 +202,22 @@ class EstudantesFrame(ctk.CTkFrame):
 
     def render_list(self, result):
         for widget in self.scroll_list.winfo_children(): widget.destroy()
-        students = result.get('data', []) if result.get('success') else []
+        
+        # Processar resposta da API
+        students = []
+        if result.get('success'):
+            data = result.get('data', [])
+            # A API pode retornar data como dict com 'students' ou como lista direta
+            if isinstance(data, dict):
+                students = data.get('students', []) or data.get('results', [])
+            elif isinstance(data, list):
+                students = data
         
         for st in students:
+            # Verificar se st é um dicionário
+            if not isinstance(st, dict):
+                continue
+                
             item = ctk.CTkFrame(self.scroll_list, fg_color="transparent", height=60, cursor="hand2")
             item.pack(fill="x", pady=2)
             

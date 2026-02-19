@@ -42,6 +42,9 @@ class ServicoAutenticacao:
     def _get_csrf_token(self):
         """Obtém o CSRF token fazendo uma requisição para obter o cookie"""
         try:
+            # Limpa cookies duplicados antes de fazer a requisição
+            self._clear_duplicate_cookies()
+            
             # Faz uma requisição GET para obter o cookie CSRF
             response = self.session.get(
                 f"{self.API_BASE_URL}/api/v1/desktop/schedule/times/",
@@ -58,6 +61,25 @@ class ServicoAutenticacao:
         except Exception as e:
             logging.warning(f"Erro ao obter CSRF token: {e}")
             return None
+    
+    def _clear_duplicate_cookies(self):
+        """Remove cookies duplicados da sessão"""
+        try:
+            # Obtém todos os cookies
+            cookies_dict = {}
+            for cookie in self.session.cookies:
+                cookies_dict[cookie.name] = cookie.value
+            
+            # Limpa todos os cookies
+            self.session.cookies.clear()
+            
+            # Re-adiciona cookies únicos
+            for name, value in cookies_dict.items():
+                self.session.cookies.set(name, value)
+                
+            logging.debug(f"Cookies limpos. Cookies únicos: {list(cookies_dict.keys())}")
+        except Exception as e:
+            logging.warning(f"Erro ao limpar cookies duplicados: {e}")
     
     def login(self, usuario, senha):
         """
