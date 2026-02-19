@@ -283,7 +283,8 @@ class OrientacoesFrame(ctk.CTkFrame):
             corner_radius=8, font=font(12)
         )
         textbox.pack(fill="x", pady=(4, 0))
-        textbox.insert("0.0", placeholder)
+        # Não inserir placeholder como texto - CTkTextbox não suporta placeholder nativo
+        # O usuário verá o campo vazio
         
         return textbox
     
@@ -713,8 +714,13 @@ class OrientacoesFrame(ctk.CTkFrame):
                 entry = ctk.CTkEntry(inner, placeholder_text=comp['label'], width=300)
                 entry.pack(side="left", fill="x", expand=True)
             elif comp['type'] == 'textarea':
-                text = ctk.CTkTextbox(inner, height=60, placeholder_text=comp['label'])
-                text.pack(side="left", fill="x", expand=True)
+                # CTkTextbox não suporta placeholder_text, então usamos um label acima
+                textarea_frame = ctk.CTkFrame(inner, fg_color="transparent")
+                textarea_frame.pack(side="left", fill="x", expand=True)
+                ctk.CTkLabel(textarea_frame, text=comp['label'], font=font(10), 
+                            text_color=self.colors["text_muted"]).pack(anchor="w")
+                text = ctk.CTkTextbox(textarea_frame, height=60)
+                text.pack(fill="x", expand=True)
             elif comp['type'] == 'checkbox':
                 check = ctk.CTkCheckBox(inner, text=comp['label'])
                 check.pack(side="left")
@@ -1125,21 +1131,39 @@ class OrientacoesFrame(ctk.CTkFrame):
             self._show_message("Selecione um estudante primeiro.")
             return
         
-        # Coletar dados
+        # Coletar dados do formulário
         titulo = self.entry_titulo.get().strip() if self.entry_titulo else ""
         if not titulo:
             titulo = f"Orientação - {datetime.now().strftime('%d/%m/%Y')}"
         
+        tema = self.entry_tema.get().strip() if self.entry_tema else ""
+        
+        # Coletar conteúdo dos textboxes (remover espaços em branco extras)
+        content = ""
+        if self.text_conteudo:
+            content = self.text_conteudo.get("0.0", "end-1c").strip()
+        
+        motivational_message = ""
+        if self.text_mensagem:
+            motivational_message = self.text_mensagem.get("0.0", "end-1c").strip()
+        
+        # CTkCheckBox.get() retorna int (0 ou 1), converter para boolean
+        is_markdown = bool(self.check_markdown.get()) if self.check_markdown else False
+        
         dados = {
             'student_id': self.selected_student_id,
             'title': titulo,
-            'theme': self.entry_tema.get().strip() if self.entry_tema else "",
+            'theme': tema,
             'session_date': datetime.now().strftime('%Y-%m-%d'),
-            'content': self.text_conteudo.get("0.0", "end-1c") if self.text_conteudo else "",
-            'is_markdown': self.check_markdown.get() if self.check_markdown else False,
-            'motivational_message': self.text_mensagem.get("0.0", "end-1c") if self.text_mensagem else "",
-            'action_plan': json.dumps(self.action_plan)
+            'content': content,
+            'is_markdown': is_markdown,
+            'motivational_message': motivational_message,
+            'action_plan': self.action_plan
         }
+        
+        # Log para debug
+        print(f"[DEBUG] Salvando orientação: is_editing={self.is_editing}, editing_id={self.editing_orientation_id}")
+        print(f"[DEBUG] Dados: {dados}")
         
         def save():
             if self.is_editing and self.editing_orientation_id:
@@ -1203,19 +1227,31 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _populate_form(self, orientation: Dict):
         """Preenche o formulário com dados de uma orientação existente"""
-        # Limpa campos primeiro
-        self._reset_form()
+        # NOTA: NÃO chamar _reset_form() aqui porque ele reseta o estado de edição!
+        # Apenas limpa os campos de texto manualmente
+        
+        # Limpa campos de texto (sem resetar estado de edição)
+        if self.entry_titulo:
+            self.entry_titulo.delete(0, "end")
+        if self.entry_tema:
+            self.entry_tema.delete(0, "end")
+        if self.text_mensagem:
+            self.text_mensagem.delete("0.0", "end")
+        if self.text_conteudo:
+            self.text_conteudo.delete("0.0", "end")
+        
+        # Limpa componentes dinâmicos
+        self.dynamic_components = []
+        self.action_plan = []
         
         # Preenche título
         titulo = orientation.get('title', '')
         if titulo and self.entry_titulo:
-            self.entry_titulo.delete(0, "end")
             self.entry_titulo.insert(0, titulo)
         
         # Preenche tema
         tema = orientation.get('theme', '')
         if tema and self.entry_tema:
-            self.entry_tema.delete(0, "end")
             self.entry_tema.insert(0, tema)
         
         # Preenche data
@@ -1233,13 +1269,11 @@ class OrientacoesFrame(ctk.CTkFrame):
         # Preenche mensagem motivacional
         motivational_message = orientation.get('motivational_message', '')
         if motivational_message and self.text_mensagem:
-            self.text_mensagem.delete("0.0", "end")
             self.text_mensagem.insert("0.0", motivational_message)
         
         # Preenche conteúdo
         content = orientation.get('content', '')
         if content and self.text_conteudo:
-            self.text_conteudo.delete("0.0", "end")
             self.text_conteudo.insert("0.0", content)
         
         # Preenche checkbox markdown
@@ -1251,13 +1285,13 @@ class OrientacoesFrame(ctk.CTkFrame):
                 self.check_markdown.deselect()
         
         # Carrega action plan se existir
-        action_plan_str = orientation.get('action_plan', '')
-        if action_plan_str:
+        action_plan_data = orientation.get('action_plan', [])
+        if action_plan_data:
             try:
-                if isinstance(action_plan_str, str):
-                    self.action_plan = json.loads(action_plan_str)
+                if isinstance(action_plan_data, str):
+                    self.action_plan = json.loads(action_plan_data)
                 else:
-                    self.action_plan = action_plan_str
+                    self.action_plan = action_plan_data
             except:
                 self.action_plan = []
         
