@@ -35,6 +35,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         self.editing_orientation_id: Optional[int] = None
         self.is_editing: bool = False
         
+        # Referências para widgets dinâmicos (para coletar valores ao salvar)
+        self.dynamic_widgets: Dict[str, Any] = {}
+        
         # Campos do formulário
         self.entry_titulo: Optional[ctk.CTkEntry] = None
         self.entry_data: Optional[ctk.CTkEntry] = None
@@ -693,6 +696,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         for w in self.preview_container.winfo_children():
             w.destroy()
         
+        # Limpar referências de widgets anteriores
+        self.dynamic_widgets = {}
+        
         if not self.dynamic_components:
             self.empty_preview_label = ctk.CTkLabel(
                 self.preview_container,
@@ -710,9 +716,15 @@ class OrientacoesFrame(ctk.CTkFrame):
             inner = ctk.CTkFrame(row, fg_color="transparent")
             inner.pack(fill="x", padx=10, pady=8)
             
+            comp_id = comp['id']
+            
             if comp['type'] == 'text':
                 entry = ctk.CTkEntry(inner, placeholder_text=comp['label'], width=300)
                 entry.pack(side="left", fill="x", expand=True)
+                # Restaurar valor se existir
+                if comp.get('value'):
+                    entry.insert(0, comp['value'])
+                self.dynamic_widgets[comp_id] = {'widget': entry, 'type': 'text', 'label': comp['label']}
             elif comp['type'] == 'textarea':
                 # CTkTextbox não suporta placeholder_text, então usamos um label acima
                 textarea_frame = ctk.CTkFrame(inner, fg_color="transparent")
@@ -721,12 +733,24 @@ class OrientacoesFrame(ctk.CTkFrame):
                             text_color=self.colors["text_muted"]).pack(anchor="w")
                 text = ctk.CTkTextbox(textarea_frame, height=60)
                 text.pack(fill="x", expand=True)
+                # Restaurar valor se existir
+                if comp.get('value'):
+                    text.insert("0.0", comp['value'])
+                self.dynamic_widgets[comp_id] = {'widget': text, 'type': 'textarea', 'label': comp['label']}
             elif comp['type'] == 'checkbox':
                 check = ctk.CTkCheckBox(inner, text=comp['label'])
                 check.pack(side="left")
+                # Restaurar estado se existir
+                if comp.get('checked'):
+                    check.select()
+                self.dynamic_widgets[comp_id] = {'widget': check, 'type': 'checkbox', 'label': comp['label']}
             elif comp['type'] == 'date':
                 entry = ctk.CTkEntry(inner, placeholder_text=comp['label'])
                 entry.pack(side="left", fill="x", expand=True)
+                # Restaurar valor se existir
+                if comp.get('value'):
+                    entry.insert(0, comp['value'])
+                self.dynamic_widgets[comp_id] = {'widget': entry, 'type': 'date', 'label': comp['label']}
             
             # Botão remover
             btn_remove = ctk.CTkButton(
@@ -1150,6 +1174,32 @@ class OrientacoesFrame(ctk.CTkFrame):
         # CTkCheckBox.get() retorna int (0 ou 1), converter para boolean
         is_markdown = bool(self.check_markdown.get()) if self.check_markdown else False
         
+        # Coletar valores dos componentes dinâmicos e montar action_plan
+        action_plan = []
+        for comp in self.dynamic_components:
+            comp_id = comp['id']
+            if comp_id in self.dynamic_widgets:
+                widget_info = self.dynamic_widgets[comp_id]
+                widget = widget_info['widget']
+                widget_type = widget_info['type']
+                label = widget_info['label']
+                
+                if widget_type == 'text':
+                    value = widget.get().strip() if hasattr(widget, 'get') else ""
+                    if value:
+                        action_plan.append({'text': f"{label}: {value}", 'done': False})
+                elif widget_type == 'textarea':
+                    value = widget.get("0.0", "end-1c").strip() if hasattr(widget, 'get') else ""
+                    if value:
+                        action_plan.append({'text': f"{label}: {value}", 'done': False})
+                elif widget_type == 'checkbox':
+                    checked = bool(widget.get()) if hasattr(widget, 'get') else False
+                    action_plan.append({'text': label, 'done': checked})
+                elif widget_type == 'date':
+                    value = widget.get().strip() if hasattr(widget, 'get') else ""
+                    if value:
+                        action_plan.append({'text': f"{label}: {value}", 'done': False})
+        
         dados = {
             'student_id': self.selected_student_id,
             'title': titulo,
@@ -1158,7 +1208,7 @@ class OrientacoesFrame(ctk.CTkFrame):
             'content': content,
             'is_markdown': is_markdown,
             'motivational_message': motivational_message,
-            'action_plan': self.action_plan
+            'action_plan': action_plan
         }
         
         # Log para debug
@@ -1240,9 +1290,10 @@ class OrientacoesFrame(ctk.CTkFrame):
         if self.text_conteudo:
             self.text_conteudo.delete("0.0", "end")
         
-        # Limpa componentes dinâmicos
+        # Limpa componentes dinâmicos e referências de widgets
         self.dynamic_components = []
         self.action_plan = []
+        self.dynamic_widgets = {}
         
         # Preenche título
         titulo = orientation.get('title', '')
@@ -1331,9 +1382,10 @@ class OrientacoesFrame(ctk.CTkFrame):
         if self.text_conteudo:
             self.text_conteudo.delete("0.0", "end")
         
-        # Limpa componentes dinâmicos
+        # Limpa componentes dinâmicos e referências de widgets
         self.dynamic_components = []
         self.action_plan = []
+        self.dynamic_widgets = {}
         self._render_preview()
         
         # Reseta estado de edição
