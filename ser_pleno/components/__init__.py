@@ -14,6 +14,9 @@ Uso:
     
     # Criar um campo de formulário
     field = FormField(parent, label="Nome", placeholder="Digite...")
+    
+    # Criar um componente de paginação
+    pagination = PaginationControl(parent, total_items=100, on_page_change=callback)
 """
 
 from .cards import (
@@ -34,6 +37,11 @@ from .forms import (
     Form
 )
 
+from .pagination import (
+    PaginationControl,
+    PageSelector
+)
+
 __all__ = [
     # Cards
     'KPICard',
@@ -49,4 +57,7 @@ __all__ = [
     'SelectField',
     'CheckboxField',
     'Form',
+    # Pagination
+    'PaginationControl',
+    'PageSelector',
 ]
