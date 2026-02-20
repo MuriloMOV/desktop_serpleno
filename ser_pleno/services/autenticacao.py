@@ -1,19 +1,47 @@
 
 from config.db_config import get_db_connection
 from passlib.hash import django_pbkdf2_sha256, django_pbkdf2_sha1, bcrypt_sha256, argon2
-import requests
 import logging
 import re
+from typing import Optional, Dict, Any
+
+try:
+    import requests
+except Exception:
+    requests = None  # type: ignore
+
+logger = logging.getLogger(__name__)
+
 
 class ServicoAutenticacao:
+    """Serviço de autenticação que funciona de forma independente ou conectada"""
+    
     # URL base da API
     API_BASE_URL = "http://127.0.0.1:8000"
     
     def __init__(self):
         # Sessão para manter cookies de autenticação
-        self.session = requests.Session()
-        self.user = None
-        self.csrf_token = None
+        self.session = requests.Session() if requests else None
+        self.user: Optional[Dict[str, Any]] = None
+        self.csrf_token: Optional[str] = None
+        self._operation_config = None
+    
+    def _get_operation_config(self):
+        """Obtém configuração de operação (lazy loading)"""
+        if self._operation_config is None:
+            try:
+                from config.operation_mode import get_operation_config
+                self._operation_config = get_operation_config()
+            except Exception:
+                pass
+        return self._operation_config
+    
+    def _should_use_api(self) -> bool:
+        """Verifica se deve tentar usar a API"""
+        config = self._get_operation_config()
+        if config is None:
+            return True  # Comportamento padrão: tentar API
+        return config.should_use_api()
     
     def _extract_csrf_token(self, response):
         """Extrai o CSRF token dos cookies ou do corpo da resposta"""

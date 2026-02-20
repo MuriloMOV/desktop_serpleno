@@ -1,6 +1,6 @@
 """
 Serviço de Estudantes para o Desktop CustomTkinter
-Integração com a API do SerPleno Web
+Funciona de forma independente com sincronização opcional com a API do SerPleno Web
 """
 import logging
 from typing import Optional, Dict, Any, List
@@ -10,16 +10,35 @@ try:
 except Exception:
     requests = None  # type: ignore
 
+from config.db_config import get_db_connection
 from services.api import api, get_auth_service
 
 logger = logging.getLogger(__name__)
 
 
 class ServicoEstudante:
-    """Serviço para gerenciar estudantes via API do SerPleno Web"""
+    """Serviço para gerenciar estudantes - funciona de forma independente ou conectada"""
     
     def __init__(self):
         self.base_url = "http://localhost:8000/api/v1/desktop"
+        self._operation_config = None
+    
+    def _get_operation_config(self):
+        """Obtém configuração de operação (lazy loading)"""
+        if self._operation_config is None:
+            try:
+                from config.operation_mode import get_operation_config
+                self._operation_config = get_operation_config()
+            except Exception:
+                pass
+        return self._operation_config
+    
+    def _should_use_api(self) -> bool:
+        """Verifica se deve tentar usar a API"""
+        config = self._get_operation_config()
+        if config is None:
+            return True  # Comportamento padrão: tentar API
+        return config.should_use_api()
     
     def _get_session(self):
         """Retorna a sessão HTTP autenticada"""
@@ -44,7 +63,8 @@ class ServicoEstudante:
     def listar_estudantes(self, busca: Optional[str] = None, possui_laudo: Optional[bool] = None, 
                           requer_atencao: Optional[bool] = None, pagina: int = 1) -> Dict[str, Any]:
         """
-        Lista estudantes com filtros opcionais via API
+        Lista estudantes com filtros opcionais
+        Prioriza banco local em modo independente
         
         Args:
             busca: Termo de busca para nome ou email
@@ -55,6 +75,11 @@ class ServicoEstudante:
         Returns:
             Dict com success, data (lista de estudantes)
         """
+        # Em modo independente, usa diretamente o banco local
+        if not self._should_use_api():
+            logger.info("Modo independente: usando banco local diretamente")
+            return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
+        
         try:
             params: Dict[str, Any] = {'page': pagina}
             if busca:
@@ -68,25 +93,93 @@ class ServicoEstudante:
             session = self._get_session()
             
             if session and requests:
-                response = session.get(url, params=params, timeout=10)
-                if response.ok:
-                    try:
-                        data = response.json()
-                        logger.info(f"Estudantes carregados via API: {len(data.get('data', []))} registros")
-                        return data
-                    except Exception as json_err:
-                        logger.debug(f"Resposta não é JSON válido: {json_err}")
-                        logger.debug(f"Conteúdo da resposta: {response.text[:500] if response.text else 'vazio'}")
-                        return self._fallback_listar_estudantes(busca, possui_laudo, requer_atencao, pagina)
-                else:
-                    logger.debug(f"API retornou status {response.status_code}, usando fallback local")
-                    return self._fallback_listar_estudantes(busca, possui_laudo, requer_atencao, pagina)
+                try:
+                    response = session.get(url, params=params, timeout=10)
+                    if response.ok:
+                        try:
+                            data = response.json()
+                            logger.info(f"Estudantes carregados via API: {len(data.get('data', []))} registros")
+                            return data
+                        except Exception as json_err:
+                            logger.debug(f"Resposta não é JSON válido: {json_err}")
+                            return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
+                    else:
+                        logger.debug(f"API retornou status {response.status_code}, usando banco local")
+                        return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
+                except Exception as conn_err:
+                    logger.warning(f"Erro de conexão com API: {conn_err}, usando banco local")
+                    return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
             
-            return self._fallback_listar_estudantes(busca, possui_laudo, requer_atencao, pagina)
+            return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
             
         except Exception as e:
             logger.exception(f"Erro ao listar estudantes: {e}")
-            return self._fallback_listar_estudantes(busca, possui_laudo, requer_atencao, pagina)
+            return self._listar_estudantes_local(busca, possui_laudo, requer_atencao, pagina)
+    
+    def _listar_estudantes_local(self, busca: Optional[str] = None, possui_laudo: Optional[bool] = None,
+                                  requer_atencao: Optional[bool] = None, pagina: int = 1) -> Dict[str, Any]:
+        """Busca estudantes diretamente do banco local"""
+        try:
+            logger.info("Tentando conectar ao banco de dados local...")
+            connection = get_db_connection()
+            cursor = connection.cursor(dictionary=True)
+            logger.info("Conexão com banco local estabelecida com sucesso")
+
+            # Join com auth_user para obter e-mail de contato
+            query = "SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE 1=1"
+            params: List[Any] = []
+
+            if busca:
+                query += " AND (a.nome LIKE %s OR u.email LIKE %s)"
+                params.extend([f"%{busca}%", f"%{busca}%"])
+
+            if possui_laudo is not None:
+                query += " AND a.has_medical_report = %s"
+                params.append(possui_laudo)
+
+            if requer_atencao is not None:
+                query += " AND a.requires_attention = %s"
+                params.append(requer_atencao)
+
+            # Ordenar por nome e retornar todos os registros (sem limite de paginação)
+            query += " ORDER BY a.nome ASC"
+
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            total = len(rows)
+            logger.info(f"Encontrados {total} estudantes no banco de dados local")
+            
+            # Mapear colunas do banco para o formato esperado pela UI
+            students = []
+            for r in rows:
+                students.append({
+                    'id': r.get('id_aluno'),
+                    'name': r.get('nome'),
+                    'course': r.get('curso'),
+                    'age': r.get('age') or r.get('idade'),
+                    'has_medical_report': bool(r.get('has_medical_report')),
+                    'requires_attention': bool(r.get('requires_attention')),
+                    'contact': r.get('contact') or r.get('email') or '',
+                    'priority_level': r.get('priority_level') or 0,
+                })
+            connection.close()
+            
+            # Retornar com informações de paginação para compatibilidade
+            return {
+                "success": True, 
+                "data": students,
+                "pagination": {
+                    "page": 1,
+                    "per_page": total,
+                    "total": total,
+                    "total_pages": 1
+                }
+            }
+        except Exception as e:
+            logger.error(f"Erro ao listar estudantes locais: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return {"success": False, "error": str(e), "data": []}
     
     def _fallback_listar_estudantes(self, busca: Optional[str] = None, possui_laudo: Optional[bool] = None,
                                      requer_atencao: Optional[bool] = None, pagina: int = 1) -> Dict[str, Any]:
