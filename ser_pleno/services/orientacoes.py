@@ -527,9 +527,9 @@ class ServicoOrientacoes:
             cursor = connection.cursor(dictionary=True)
             
             query = """
-                SELECT o.*, a.nome as student_name, a.id_aluno as student_id
+                SELECT o.*, a.nome as student_name, a.id as student_id
                 FROM desktop_orientation o
-                LEFT JOIN aluno a ON o.student_id = a.id_aluno
+                LEFT JOIN aluno a ON o.student_id = a.id
                 WHERE 1=1
             """
             params = []
@@ -722,9 +722,9 @@ class ServicoOrientacoes:
             cursor = connection.cursor(dictionary=True)
             
             query = """
-                SELECT o.*, a.nome as student_name, a.id_aluno as student_id
+                SELECT o.*, a.nome as student_name, a.id as student_id
                 FROM desktop_orientation o
-                LEFT JOIN aluno a ON o.student_id = a.id_aluno
+                LEFT JOIN aluno a ON o.student_id = a.id
                 WHERE o.id = %s
             """
             cursor.execute(query, (id_orientacao,))

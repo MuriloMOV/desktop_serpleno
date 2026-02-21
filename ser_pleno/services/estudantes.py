@@ -150,10 +150,11 @@ class ServicoEstudante:
             logger.info(f"Encontrados {total} estudantes no banco de dados local")
             
             # Mapear colunas do banco para o formato esperado pela UI
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
             students = []
             for r in rows:
                 students.append({
-                    'id': r.get('id_aluno'),
+                    'id': r.get('id'),  # PK conforme ser_pleno.sql
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -215,10 +216,11 @@ class ServicoEstudante:
             logger.info(f"Encontrados {len(rows)} estudantes no banco de dados local (fallback)")
             
             # Mapear colunas do banco para o formato esperado pela UI
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
             students = []
             for r in rows:
                 students.append({
-                    'id': r.get('id_aluno'),
+                    'id': r.get('id'),  # PK conforme ser_pleno.sql
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -273,12 +275,13 @@ class ServicoEstudante:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
             # Buscar aluno com email (join em auth_user)
-            cursor.execute("SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE a.id_aluno = %s", (id_estudante,))
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
+            cursor.execute("SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE a.id = %s", (id_estudante,))
             r = cursor.fetchone()
             student = None
             if r:
                 student = {
-                    'id': r.get('id_aluno'),
+                    'id': r.get('id'),  # PK conforme ser_pleno.sql
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -453,7 +456,8 @@ class ServicoEstudante:
             
             connection = get_db_connection()
             cursor = connection.cursor()
-            query = "UPDATE aluno SET nome = %s, email = %s, has_medical_report = %s, requires_attention = %s WHERE id_aluno = %s"
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
+            query = "UPDATE aluno SET nome = %s, email = %s, has_medical_report = %s, requires_attention = %s WHERE id = %s"
             cursor.execute(query, (dados.get('name') or dados.get('nome'), dados.get('contact') or dados.get('email'), dados.get('has_medical_report', False), dados.get('requires_attention', False), id_estudante))
             connection.commit()
             connection.close()
@@ -502,7 +506,8 @@ class ServicoEstudante:
             
             connection = get_db_connection()
             cursor = connection.cursor()
-            cursor.execute("DELETE FROM aluno WHERE id_aluno = %s", (id_estudante,))
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
+            cursor.execute("DELETE FROM aluno WHERE id = %s", (id_estudante,))
             connection.commit()
             connection.close()
             return {"success": True, "message": "Estudante deletado com sucesso"}

@@ -56,12 +56,13 @@ class ServicoBemEstar:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         # Buscar alunos com marcação de atenção e agrupar por prioridade
-        cursor.execute("SELECT id_aluno, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
+        # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
+        cursor.execute("SELECT id, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
         rows = cursor.fetchall()
         groups = {'critical': [], 'high': [], 'medium': [], 'low': []}
         for r in rows:
             priority = r.get('priority_level') or 0
-            student = {'id': r.get('id_aluno'), 'name': r.get('nome'), 'reasons': [r.get('attention_reason') or 'Requer atenção']}
+            student = {'id': r.get('id'), 'name': r.get('nome'), 'reasons': [r.get('attention_reason') or 'Requer atenção']}
             if priority >= 4:
                 groups['critical'].append(student)
             elif priority == 3:

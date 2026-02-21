@@ -146,7 +146,8 @@ class ServicoAgendamento:
             status = self._convert_status_frontend_to_backend(dados.get('status', 'Agendado'))
             
             # Obter nome do aluno para o campo obrigatório 'nome'
-            cursor.execute("SELECT nome FROM aluno WHERE id_aluno = %s", (id_aluno,))
+            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
+            cursor.execute("SELECT nome FROM aluno WHERE id = %s", (id_aluno,))
             aluno_result = cursor.fetchone()
             nome_aluno = aluno_result[0] if aluno_result else f"Aluno {id_aluno}"
             
@@ -230,7 +231,7 @@ class ServicoAgendamento:
             cursor = conn.cursor()
             
             time_obj = datetime.strptime(hora_str, "%H:%M").time()
-            cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
+            cursor.execute("SELECT id FROM disponibilidade WHERE Horario = %s", (time_obj,))
             result = cursor.fetchone()
             
             cursor.close()
@@ -303,9 +304,9 @@ class ServicoAgendamento:
             cursor = conn.cursor(dictionary=True)
             
             query = """
-                SELECT a.id, al.nome, al.id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
+                SELECT a.id, al.nome, al.id as id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
                 FROM agendamento a
-                INNER JOIN aluno al ON a.student_id = al.id_aluno
+                INNER JOIN aluno al ON a.student_id = al.id
             """
             
             params = []
@@ -477,7 +478,7 @@ class ServicoAgendamento:
             cursor = conn.cursor()
             
             # Verificar se horário já existe
-            cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
+            cursor.execute("SELECT id FROM disponibilidade WHERE Horario = %s", (time_obj,))
             if cursor.fetchone():
                 cursor.close()
                 conn.close()
@@ -554,7 +555,7 @@ class ServicoAgendamento:
             cursor = conn.cursor()
             
             # Obter o time_id correspondente ao horário
-            cursor.execute("SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s", (time_obj,))
+            cursor.execute("SELECT id FROM disponibilidade WHERE Horario = %s", (time_obj,))
             time_result = cursor.fetchone()
             if not time_result:
                 cursor.close()
@@ -574,7 +575,7 @@ class ServicoAgendamento:
                 return {"success": False, "message": "Não é possível remover horário com agendamentos associados"}
             
             # Remover horário
-            cursor.execute("DELETE FROM disponibilidade WHERE id_disponibilidade = %s", (time_id,))
+            cursor.execute("DELETE FROM disponibilidade WHERE id = %s", (time_id,))
             conn.commit()
             
             cursor.close()
@@ -599,7 +600,7 @@ class ServicoAgendamento:
                 SELECT a.id, a.student_id, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem,
                        al.nome as nome_aluno
                 FROM agendamento a
-                INNER JOIN aluno al ON a.student_id = al.id_aluno
+                INNER JOIN aluno al ON a.student_id = al.id
                 WHERE a.id = %s
             """, (appointment_id,))
             

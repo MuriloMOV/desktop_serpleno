@@ -651,7 +651,7 @@ class ServicoImportacao:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
             
-            query = "SELECT id_aluno as id, nome, email FROM aluno WHERE "
+            query = "SELECT id, nome, email FROM aluno WHERE "
             params = []
             
             if nome and email:
@@ -679,7 +679,7 @@ class ServicoImportacao:
         try:
             connection = get_db_connection()
             cursor = connection.cursor()
-            cursor.execute("SELECT 1 FROM aluno WHERE id_aluno = %s", (student_id,))
+            cursor.execute("SELECT 1 FROM aluno WHERE id = %s", (student_id,))
             result = cursor.fetchone()
             connection.close()
             return result is not None
@@ -746,7 +746,7 @@ class ServicoImportacao:
                 return {"success": True, "message": "Nenhum campo para atualizar"}
             
             params.append(student_id)
-            query = f"UPDATE aluno SET {', '.join(updates)} WHERE id_aluno = %s"
+            query = f"UPDATE aluno SET {', '.join(updates)} WHERE id = %s"
             
             cursor.execute(query, params)
             connection.commit()
