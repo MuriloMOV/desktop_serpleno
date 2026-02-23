@@ -1,6 +1,8 @@
 import customtkinter as ctk
+from matplotlib import container
 
 from ui_theme import THEME, SPACING, RADIUS, font
+
 
 from views.dashboard import DashboardFrame
 from views.estudantes import EstudantesFrame
@@ -170,7 +172,21 @@ class App(ctk.CTk):
 
     def mostrar_relatorio(self):
         self.atualizar_menu("relatorios")
-        self.trocar_frame(RelatorioFrame)
+        
+        # 1. Limpa o conteúdo atual
+        for widget in self.content.winfo_children():
+            widget.destroy()
+
+        # 2. Instancia o Controller
+        from controllers.relatorio import RelatorioController
+        controller = RelatorioController()
+
+        # 3. Instancia a View passando o controller
+        frame = RelatorioFrame(self.content, controller)
+        frame.pack(fill="both", expand=True)
+
+        # 4. Conecta a View de volta ao Controller
+        controller.set_view(frame)
 
     def mostrar_configuracoes(self):
         self.atualizar_menu("configuracoes")
@@ -187,7 +203,6 @@ class App(ctk.CTk):
     def limpar_tela(self):
         for widget in self.container.winfo_children():
             widget.destroy()
-
 
 if __name__ == "__main__":
     App().mainloop()

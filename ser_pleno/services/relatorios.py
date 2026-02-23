@@ -1,3 +1,4 @@
+import json
 from config.db_config import get_db_connection
 
 class ServicoRelatorio:
@@ -5,10 +6,11 @@ class ServicoRelatorio:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         
+        # Corrigindo para retornar no formato que o Controller espera: {"reports": [...]}
         query = "SELECT * FROM desktop_report WHERE 1=1"
         params = []
         
-        if tipo:
+        if tipo and tipo != "Todos os tipos":
             query += " AND report_type = %s"
             params.append(tipo)
         if data_inicio:
@@ -27,94 +29,86 @@ class ServicoRelatorio:
             relatorios.append({
                 'id': r.get('id'),
                 'name': r.get('name'),
-                'report_type': r.get('report_type'),
+                'type': r.get('report_type'), # 'type' para a View
                 'format': r.get('format'),
                 'generated_at': str(r.get('generated_at')),
-                'file_path': r.get('file_path'),
-                'file_size': r.get('file_size'),
-                'is_public': bool(r.get('is_public')),
-                'expires_at': str(r.get('expires_at')) if r.get('expires_at') else None
+                'file_path': r.get('file_path')
             })
             
         connection.close()
-        return {"success": True, "data": relatorios}
+        # Envolvendo em 'reports' para o update_view do Controller ler corretamente
+        return {"success": True, "data": {"reports": relatorios}}
 
     def obter_estatisticas(self, periodo='month'):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         
-        # Estatísticas básicas
-        cursor.execute("SELECT COUNT(*) as total_students FROM aluno")
-        total_students = cursor.fetchone()['total_students']
+        # Mapeando os nomes das colunas exatamente como a View espera no dicionário 'summary'
+        stats_query = {
+            'students_total': "SELECT COUNT(*) as total FROM aluno",
+            'appointments_total': "SELECT COUNT(*) as total FROM agendamento WHERE status = 'completed'",
+            'interventions_total': "SELECT COUNT(*) as total FROM agendamento WHERE status = 'scheduled'", # Exemplo
+            'screenings_total': "SELECT COUNT(*) as total FROM desktop_screening"
+        }
         
-        cursor.execute("SELECT COUNT(*) as active_appointments FROM agendamento WHERE status = 'completed'")
-        active_appointments = cursor.fetchone()['active_appointments']
-        
-        cursor.execute("SELECT COUNT(*) as pending_screenings FROM desktop_screening WHERE status = 'pending'")
-        pending_screenings = cursor.fetchone()['pending_screenings']
-        
-        cursor.execute("SELECT AVG(score) as average_score FROM desktop_screening WHERE score IS NOT NULL")
-        avg_score = cursor.fetchone()['average_score']
+        resumo = {}
+        for key, sql in stats_query.items():
+            cursor.execute(sql)
+            resumo[key] = cursor.fetchone()['total']
         
         connection.close()
         
-        return {"success": True, "data": {
-            'total_students': total_students,
-            'active_appointments': active_appointments,
-            'pending_screenings': pending_screenings,
-            'average_score': round(avg_score, 1) if avg_score else 0
-        }}
+        return {"success": True, "data": {"summary": resumo}}
 
-    def gerar_relatorio(self, dados):
+    def criar_relatorio(self, dados):
+        """
+        Renomeado para criar_relatorio para bater com o Controller.
+        Insere no banco seguindo a estrutura do Django.
+        """
         connection = get_db_connection()
         cursor = connection.cursor()
         
+        # Preparando JSONs (Django armazena como JSON no banco)
+        parameters = json.dumps(dados.get('parameters', {}))
+        report_data = json.dumps(dados.get('data', {}))
+
         query = """
             INSERT INTO desktop_report (
                 name, report_type, format, generated_at, parameters, data,
-                file_path, file_size, is_public, expires_at, generated_by_id
-            ) VALUES (%s, %s, %s, NOW(), %s, %s, %s, %s, %s, %s, %s)
+                file_path, file_size, is_public, generated_by_id
+            ) VALUES (%s, %s, %s, NOW(), %s, %s, %s, %s, %s, %s)
         """
+        
+        # generated_by_id pode ser None se não houver login no desktop ainda
+        user_id = dados.get('generated_by_id', None) 
+
         cursor.execute(query, (
-            dados['name'], dados['report_type'], dados.get('format', 'pdf'),
-            dados.get('parameters', '{}'), dados.get('data', '{}'),
-            dados.get('file_path', ''), dados.get('file_size', 0),
-            dados.get('is_public', False), dados.get('expires_at'),
-            dados.get('generated_by_id')
+            dados['name'], 
+            dados['report_type'], 
+            dados.get('format', 'pdf'),
+            parameters, 
+            report_data,
+            dados.get('file_path', ''), 
+            dados.get('file_size', 0),
+            dados.get('is_public', False), 
+            user_id
         ))
+        
         connection.commit()
         relatorio_id = cursor.lastrowid
         connection.close()
         
         return {"success": True, "data": {"id": relatorio_id}}
 
-    def baixar_relatorio(self, id_relatorio):
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT file_path, file_name FROM desktop_report WHERE id = %s", (id_relatorio,))
-        row = cursor.fetchone()
-        connection.close()
-        
-        if row:
-            return {"success": True, "data": {"file_path": row['file_path']}}
-        return {"success": False, "message": "Relatório não encontrado"}
-
-    def deletar_relatorio(self, id_relatorio):
-        connection = get_db_connection()
-        cursor = connection.cursor()
-        cursor.execute("DELETE FROM desktop_report WHERE id = %s", (id_relatorio,))
-        connection.commit()
-        connection.close()
-        
-        return {"success": True, "message": "Relatório deletado com sucesso"}
-
+    # --- Métodos de Exportação (Mantidos iguais, apenas garantindo o retorno) ---
     def exportar_estudantes(self):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         cursor.execute("SELECT * FROM aluno ORDER BY nome ASC")
         rows = cursor.fetchall()
         connection.close()
-        
+        # Aqui você pode adicionar a lógica de gerar o Excel/CSV fisicamente
+        print("Exportando estudantes...")
         return {"success": True, "data": list(rows)}
 
     def exportar_agendamentos(self):

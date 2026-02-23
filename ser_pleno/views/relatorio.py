@@ -1,193 +1,164 @@
 import customtkinter as ctk
-from PIL import Image
-import threading
-from services.relatorios import ServicoRelatorio
-
 from ui_theme import THEME, SPACING, RADIUS, font
 
 class RelatorioFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_relatorio = ServicoRelatorio()
+        self.THEME = THEME  # Necessário para o controller configurar o gráfico
         
-        # Reference mapping for card widgets to update them later
         self.card_widgets = {}
+        self.summary_labels = {} # Para atualizar o resumo lateral dinamicamente
 
-        # --- CONFIGURAÇÃO DE RESPONSIVIDADE (GRID) ---
-        self.grid_columnconfigure(0, weight=1) # Coluna principal expande
-        
-        # Linhas: 0 e 1 (Header/Cards) são fixas. 2 e 3 (Gráfico/Lista) expandem.
-        self.grid_rowconfigure(0, weight=0) 
-        self.grid_rowconfigure(1, weight=0) 
-        self.grid_rowconfigure(2, weight=1) # Espaço para o gráfico/resumo
-        self.grid_rowconfigure(3, weight=2) # Espaço maior para a lista de relatórios
-
+        self._configurar_grid()
         self.criar_layout()
-        self.load_data()
-
-    def load_data(self):
-        def fetch():
-            stats = self.servico_relatorio.obter_estatisticas()
-            reports = self.servico_relatorio.listar_relatorios()
-            self.after(0, lambda: self.update_view(stats, reports))
-        threading.Thread(target=fetch, daemon=True).start()
-
-    def update_view(self, stats_res, reports_res):
-        if stats_res.get('success'):
-            data = stats_res.get('data', {})
-            summary = data.get('summary', {})
-            
-            # Update Cards
-            self.update_card("Relatório Geral", str(summary.get('students_total', 0)))
-            self.update_card("Agendamentos", str(summary.get('appointments_total', 0)))
-            self.update_card("Intervenções", str(summary.get('interventions_total', 0)))
-            self.update_card("Triagens", str(summary.get('screenings_total', 0)))
-
-        if reports_res.get('success'):
-            data = reports_res.get('data', {})
-            if isinstance(data, dict):
-                items = data.get('reports', []) or data.get('results', [])
-            else:
-                items = data if isinstance(data, list) else []
-            self.populate_reports_list(items)
-
-    def populate_reports_list(self, reports):
-        # Clear existing
-        if hasattr(self, 'reports_container'):
-            for w in self.reports_container.winfo_children():
-                w.destroy()
-
-        if not reports:
-            ctk.CTkLabel(self.reports_container, text="Nenhum relatório encontrado.", text_color=THEME["text_muted"], font=font(13)).pack(pady=20)
-            return
-
-        for r in reports:
-            self.create_report_row(r)
-
-    def create_report_row(self, report):
-        row = ctk.CTkFrame(self.reports_container, fg_color=THEME["card"], corner_radius=RADIUS["button"], height=56, border_width=1, border_color=THEME["border"])
-        row.pack(fill="x", pady=4, padx=5)
-        row.pack_propagate(False)
-
-        ctk.CTkLabel(row, text="📄", font=font(16)).pack(side="left", padx=(15, 10))
-        ctk.CTkLabel(row, text=report.get('name', 'Relatório'), font=font(13, "bold"), text_color=THEME["text"]).pack(side="left")
         
-        created = report.get('generated_at') or report.get('created_at') or 'Hoje'
-        ctk.CTkLabel(row, text=created, font=font(12), text_color=THEME["text_muted"]).pack(side="right", padx=15)
-        
-        ctk.CTkLabel(row, text=report.get('type', 'Geral'), font=font(12), text_color=THEME["text_muted"]).pack(side="right", padx=10)
+        # Conexão com o Controller
+        self.controller.set_view(self)
+        self.controller.inicializar_dashboard()
+
+    def _configurar_grid(self):
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0) # Header
+        self.grid_rowconfigure(1, weight=0) # Cards
+        self.grid_rowconfigure(2, weight=1) # Gráfico/Resumo (Expansível)
+        self.grid_rowconfigure(3, weight=2) # Lista de Relatórios (Mais espaço)
+        self.grid_rowconfigure(4, weight=0) # Exportação
 
     def criar_layout(self):
-        # --- BLOCO 1: CABEÇALHO ---
+        # --- HEADER ---
         header = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
         header.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 14))
 
         inner = ctk.CTkFrame(header, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=16)
 
-        icon_box = ctk.CTkFrame(inner, width=48, height=48, corner_radius=12, fg_color=THEME["primary_light"])
-        icon_box.pack(side="left", padx=(0, 16))
-        icon_box.pack_propagate(False)
-        ctk.CTkLabel(icon_box, text="📄", font=font(20), text_color=THEME["primary"]).place(relx=0.5, rely=0.5, anchor="center")
-
-        text_box = ctk.CTkFrame(inner, fg_color="transparent")
-        text_box.pack(side="left")
-        ctk.CTkLabel(text_box, text="Relatórios", font=font(20, "bold"), text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(text_box, text="Visão gerencial e indicadores", font=font(12), text_color=THEME["text_muted"]).pack(anchor="w")
+        lbl_box = ctk.CTkFrame(inner, fg_color="transparent")
+        lbl_box.pack(side="left")
+        ctk.CTkLabel(lbl_box, text="Relatórios", font=font(20, "bold"), text_color=THEME["text"]).pack(anchor="w")
+        ctk.CTkLabel(lbl_box, text="Visão gerencial e indicadores", font=font(12), text_color=THEME["text_muted"]).pack(anchor="w")
 
         ctk.CTkButton(
-            inner,
-            text="Gerar Relatório",
-            fg_color=THEME["primary"],
-            hover_color=THEME["primary_hover"],
-            font=font(12, "bold"),
-            height=36,
-            corner_radius=RADIUS["button"]
+            inner, text="+ Novo Relatório", fg_color=THEME["primary"],
+            hover_color=THEME["primary_hover"], font=font(12, "bold"),
+            height=36, corner_radius=RADIUS["button"],
+            command=self.controller.gerar_novo_relatorio
         ).pack(side="right")
 
-        self.criar_cards()
-        self.criar_secao_inferior()
-        self.criar_secao_exportacao()
-        self.criar_lista_relatorios()
+        # --- CONTEÚDO ---
+        self._criar_cards()
+        self._criar_dashboard_area() # Contém Gráfico + Resumo
+        self._criar_lista_relatorios()
+        self._criar_secao_exportacao()
 
-    def criar_secao_exportacao(self):
+    def _criar_cards(self):
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.grid(row=1, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 20))
+        for i in range(4): container.grid_columnconfigure(i, weight=1)
+
+        configs = [
+            ("Relatório Geral", "Geral", "#D0E1FD"),
+            ("Agendamentos", "Consultas", "#D1FADF"),
+            ("Intervenções", "Ações", "#EBE9FE"),
+            ("Triagens", "Triagens", "#FEF0C7")
+        ]
+
+        for i, (titulo, cat, cor) in enumerate(configs):
+            card = self.render_card(container, titulo, cat, cor)
+            card.grid(row=0, column=i, padx=8, sticky="ew")
+
+    def render_card(self, parent, titulo, categoria, cor_icone):
+        frame = ctk.CTkFrame(parent, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"], height=90)
+        frame.pack_propagate(False)
+        
+        icon_box = ctk.CTkFrame(frame, width=42, height=42, fg_color=cor_icone, corner_radius=8)
+        icon_box.place(x=15, y=24)
+        
+        ctk.CTkLabel(frame, text=titulo, font=font(11), text_color=THEME["text_muted"]).place(x=70, y=20)
+        val_lbl = ctk.CTkLabel(frame, text="--", font=font(22, "bold"), text_color=THEME["text"])
+        val_lbl.place(x=70, y=40)
+        
+        self.card_widgets[titulo] = val_lbl
+        return frame
+
+    def _criar_dashboard_area(self):
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.grid(row=2, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, 20))
+        container.grid_columnconfigure(0, weight=3) # Gráfico maior
+        container.grid_columnconfigure(1, weight=1) # Resumo menor
+
+        # Box do Gráfico (O Controller injetará o canvas aqui)
+        self.chart_box = ctk.CTkFrame(container, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
+        self.chart_box.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        ctk.CTkLabel(self.chart_box, text="Atividades Nos Últimos 30 dias", font=font(14, "bold")).pack(anchor="nw", padx=20, pady=15)
+
+        # Box de Resumo
+        summary_box = ctk.CTkFrame(container, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
+        summary_box.grid(row=0, column=1, sticky="nsew")
+        ctk.CTkLabel(summary_box, text="Resumo Mensal", font=font(14, "bold")).pack(anchor="nw", padx=20, pady=15)
+
+        self.summary_labels["Total Estudantes"] = self._add_item_resumo(summary_box, "Total Estudantes", "0")
+        self.summary_labels["Consultas"] = self._add_item_resumo(summary_box, "Consultas (30d)", "0")
+        self.summary_labels["Intervenções"] = self._add_item_resumo(summary_box, "Intervenções (30d)", "0")
+        
+        ctk.CTkFrame(summary_box, fg_color=THEME["border"], height=1).pack(fill="x", padx=20, pady=10)
+        self.summary_labels["Taxa"] = self._add_item_resumo(summary_box, "Taxa Comparecimento", "0%", THEME["success"])
+
+    def _add_item_resumo(self, parent, texto, valor, cor_valor=None):
+        f = ctk.CTkFrame(parent, fg_color="transparent")
+        f.pack(fill="x", padx=20, pady=4)
+        ctk.CTkLabel(f, text=texto, text_color=THEME["text_muted"], font=font(12)).pack(side="left")
+        lbl = ctk.CTkLabel(f, text=valor, text_color=cor_valor or THEME["text"], font=font(12, "bold"))
+        lbl.pack(side="right")
+        return lbl
+
+    def _criar_lista_relatorios(self):
+        container = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
+        container.grid(row=3, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, 20))
+        
+        header = ctk.CTkFrame(container, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(header, text="Relatórios Gerados", font=font(15, "bold")).pack(side="left")
+
+        self.reports_container = ctk.CTkScrollableFrame(container, fg_color="transparent")
+        self.reports_container.pack(expand=True, fill="both", padx=5, pady=5)
+
+    def _criar_secao_exportacao(self):
         export_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
         export_frame.grid(row=4, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 20))
         
         inner = ctk.CTkFrame(export_frame, fg_color="transparent")
-        inner.pack(fill="x", padx=20, pady=15)
+        inner.pack(fill="x", padx=20, pady=10)
+        ctk.CTkLabel(inner, text="📥 Exportação:", font=font(12, "bold")).pack(side="left", padx=(0, 15))
         
-        ctk.CTkLabel(inner, text="📥 Exportação de Dados", font=font(14, "bold")).pack(side="left", padx=(0, 20))
-        
-        btn_style = {"height": 32, "corner_radius": RADIUS["button"], "font": font(11, "bold")}
-        
-        ctk.CTkButton(inner, text="Exportar Estudantes (CSV)", fg_color=THEME["bg_alt"], text_color=THEME["text"], hover_color=THEME["border"], command=self.servico_relatorio.exportar_estudantes, **btn_style).pack(side="left", padx=5)
-        ctk.CTkButton(inner, text="Exportar Agenda (CSV)", fg_color=THEME["bg_alt"], text_color=THEME["text"], hover_color=THEME["border"], command=self.servico_relatorio.exportar_agendamentos, **btn_style).pack(side="left", padx=5)
-        ctk.CTkButton(inner, text="Exportar Triagens (CSV)", fg_color=THEME["bg_alt"], text_color=THEME["text"], hover_color=THEME["border"], command=self.servico_relatorio.exportar_triagens, **btn_style).pack(side="left", padx=5)
+        for label, tipo in [("Estudantes", "estudantes"), ("Agenda", "agenda"), ("Triagens", "triagens")]:
+            ctk.CTkButton(inner, text=label, width=90, height=28, fg_color=THEME["bg_alt"], 
+                          text_color=THEME["text"], command=lambda t=tipo: self.controller.exportar(t)).pack(side="left", padx=5)
 
-    def criar_cards(self):
-        """Cria a fileira de 4 cards responsivos"""
-        container_cards = ctk.CTkFrame(self, fg_color="transparent")
-        container_cards.grid(row=1, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 20))
+    # --- MÉTODOS CHAMADOS PELO CONTROLLER ---
 
-        # Configura as 4 colunas dos cards para expandirem igualmente
-        for i in range(4):
-            container_cards.grid_columnconfigure(i, weight=1)
+    def update_view(self, stats_res, reports_res):
+        """Atualiza todos os dados da tela"""
+        if stats_res.get('success'):
+            data = stats_res.get('data', {}).get('summary', {})
+            # Atualiza Cards
+            self.card_widgets["Relatório Geral"].configure(text=data.get('students_total', '0'))
+            self.card_widgets["Agendamentos"].configure(text=data.get('appointments_total', '0'))
+            self.card_widgets["Intervenções"].configure(text=data.get('interventions_total', '0'))
+            self.card_widgets["Triagens"].configure(text=data.get('screenings_total', '0'))
+            # Atualiza Resumo Lateral
+            self.summary_labels["Total Estudantes"].configure(text=data.get('students_total', '0'))
+            self.summary_labels["Consultas"].configure(text=data.get('appointments_total', '0'))
 
-        # sticky="ew" garante que o card preencha a largura da sua coluna
-        self.card(container_cards, "Relatório Geral", "Visão completa", "Geral", "#D0E1FD").grid(row=0, column=0, padx=8, sticky="ew")
-        self.card(container_cards, "Agendamentos", "Análise de consultas", "Agendamentos", "#D1FADF").grid(row=0, column=1, padx=8, sticky="ew")
-        self.card(container_cards, "Intervenções", "Acompanhamentos", "Intervenções", "#EBE9FE").grid(row=0, column=2, padx=8, sticky="ew")
-        self.card(container_cards, "Triagens", "Análise de triagens", "Triagens", "#FEF0C7").grid(row=0, column=3, padx=8, sticky="ew")
-
-    def card(self, parent, titulo, subtitulo, categoria, cor_fundo_icone):
-        frame = ctk.CTkFrame(parent, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
-        frame.grid_columnconfigure(1, weight=1)
-
-        icon_box = ctk.CTkFrame(frame, width=42, height=42, fg_color=cor_fundo_icone, corner_radius=8)
-        icon_box.grid(row=0, column=0, rowspan=3, padx=(15, 12), pady=15)
-        icon_box.grid_propagate(False)
-
-        ctk.CTkLabel(
-            frame, text=categoria, text_color="#9DA1A7",
-            font=ctk.CTkFont(family="Arial", size=11)
-        ).grid(row=0, column=1, sticky="ne", padx=15, pady=10) 
-
-        # Store label to update later
-        value_lbl = ctk.CTkLabel(
-            frame, text="--", text_color="#1A1C1E",
-            font=ctk.CTkFont(family="Arial", size=18, weight="bold")
-        )
-        value_lbl.grid(row=1, column=1, sticky="w", padx=(0, 25))
-        self.card_widgets[titulo] = value_lbl
-        
-        # Keep title visuals but maybe move them? 
-        # Actually the original code had title = Value usually in dashboards.
-        # But here 'titulo' is "Relatório Geral". 
-        # Let's re-arrange: Title top left, Value big middle.
-        
-        # Overwrite previous layout slightly for better data display
-        # "titulo" var passed is "Relatório Geral".
-        
-        # Reset grid for this frame to matching design
-        for w in frame.winfo_children(): w.destroy()
-        
-        icon_box = ctk.CTkFrame(frame, width=42, height=42, fg_color=cor_fundo_icone, corner_radius=8)
-        icon_box.place(x=15, y=15)
-        
-        ctk.CTkLabel(frame, text=titulo, font=font(12, "normal"), text_color=THEME["text_muted"]).place(x=70, y=15)
-        
-        val = ctk.CTkLabel(frame, text="--", font=font(20, "bold"), text_color=THEME["text"])
-        val.place(x=70, y=38)
-        self.card_widgets[titulo] = val
-        
-        return frame
-
-    def update_card(self, key, value):
-        if key in self.card_widgets:
-            self.card_widgets[key].configure(text=value)
-
+        if reports_res.get('success'):
+            items = reports_res.get('data', {}).get('reports', [])
+            for w in self.reports_container.winfo_children(): w.destroy()
+            
+            for r in items:
+                row = ctk.CTkFrame(self.reports_container, fg_color=THEME["bg_alt"], height=40)
+                row.pack(fill="x", pady=2, padx=5)
+                ctk.CTkLabel(row, text=f"📄 {r.get('name', 'Relatório')}", font=font(12)).pack(side="left", padx=15)
+                ctk.CTkLabel(row, text=r.get('type', 'Geral'), font=font(11), text_color=THEME["text_muted"]).pack(side="right", padx=15)
 
 
     def criar_secao_inferior(self):
@@ -217,10 +188,10 @@ class RelatorioFrame(ctk.CTkFrame):
         ).pack(anchor="nw", padx=25, pady=(20, 10))
 
         itens = [
-            ("Total de Estudantes", "-"),
-            ("Consultas (30d)", "-"),
-            ("Intervenções (30d)", "-"),
-            ("Triagens (30d)", "-"),
+            ("Total de Estudantes", "300"),
+            ("Consultas (30d)", "15"),
+            ("Intervenções (30d)", "9"),
+            ("Triagens (30d)", "7"),
         ]
 
         for texto, valor in itens:
@@ -229,7 +200,7 @@ class RelatorioFrame(ctk.CTkFrame):
         divisor = ctk.CTkFrame(summary_box, fg_color=THEME["border"], height=1)
         divisor.pack(fill="x", padx=25, pady=15)
 
-        self.item_resumo(summary_box, "Taxa de Comparecimento", "-", cor_valor=THEME["success"])
+        self.item_resumo(summary_box, "Taxa de Comparecimento", "85%", cor_valor=THEME["success"])
 
     def item_resumo(self, parent, texto, valor, cor_valor=None):
         f = ctk.CTkFrame(parent, fg_color="transparent")
