@@ -4,7 +4,7 @@ import mysql.connector
 DB_CONFIG = {
     'host': '127.0.0.1',
     'user': 'root',
-    'password': 'MySQL3691@26',
+    'password': '',
     'database': 'ser_pleno',
     'port': 3306
 }
