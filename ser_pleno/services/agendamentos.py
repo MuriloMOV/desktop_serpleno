@@ -146,8 +146,8 @@ class ServicoAgendamento:
             status = self._convert_status_frontend_to_backend(dados.get('status', 'Agendado'))
             
             # Obter nome do aluno para o campo obrigatório 'nome'
-            # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
-            cursor.execute("SELECT nome FROM aluno WHERE id = %s", (id_aluno,))
+            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
+            cursor.execute("SELECT nome FROM aluno WHERE id_aluno = %s", (id_aluno,))
             aluno_result = cursor.fetchone()
             nome_aluno = aluno_result[0] if aluno_result else f"Aluno {id_aluno}"
             
@@ -304,9 +304,9 @@ class ServicoAgendamento:
             cursor = conn.cursor(dictionary=True)
             
             query = """
-                SELECT a.id, al.nome, al.id as id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
+                SELECT a.id, al.nome, al.id_aluno as id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
                 FROM agendamento a
-                INNER JOIN aluno al ON a.student_id = al.id
+                INNER JOIN aluno al ON a.student_id = al.id_aluno
             """
             
             params = []
@@ -600,7 +600,7 @@ class ServicoAgendamento:
                 SELECT a.id, a.student_id, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem,
                        al.nome as nome_aluno
                 FROM agendamento a
-                INNER JOIN aluno al ON a.student_id = al.id
+                INNER JOIN aluno al ON a.student_id = al.id_aluno
                 WHERE a.id = %s
             """, (appointment_id,))
             

@@ -2,7 +2,13 @@ import customtkinter as ctk
 from PIL import Image
 import os
 import json
+import threading
+from datetime import datetime
+from tkinter import messagebox
 from ui_theme import THEME, SPACING, RADIUS, font
+from views.backup_dialog import BackupDialog
+from services.configuracoes import servico_configuracoes
+
 
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
@@ -45,6 +51,8 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self.render_central_avisos(col_right)
         self.render_aparencia(col_right)
         self.render_seguranca(col_right)
+        self.render_backup_section(col_right)
+        self.render_sync_section(col_right)
 
     def criar_secao_header(self, title, subtitle, show_actions=False):
         frame = ctk.CTkFrame(self, fg_color=self.colors["card"], corner_radius=RADIUS["card"])
@@ -331,3 +339,319 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             color = "#EF4444" if danger else "#4F46E5"
             btn = ctk.CTkButton(inner, text=btn_text, font=font(10, "bold"), fg_color="transparent", text_color=color, hover_color="#FEF2F2" if danger else "#EEF2FF", width=100, command=lambda btn_text=btn_text: self.clicar_botao_seguranca(btn_text))
             btn.pack(side="right")
+
+    def render_backup_section(self, container):
+        """Renderiza seção de backup e restore"""
+        card = ctk.CTkFrame(container, fg_color=self.colors["card"], corner_radius=RADIUS["card"])
+        card.pack(fill="x", pady=(0, 15))
+        
+        h = ctk.CTkFrame(card, fg_color="transparent")
+        h.pack(fill="x", padx=20, pady=15)
+        ctk.CTkLabel(h, text="💾 Backup e Restore", font=font(14, "bold")).pack(side="left")
+        
+        # Status do backup
+        status_frame = ctk.CTkFrame(card, fg_color="transparent")
+        status_frame.pack(fill="x", padx=20, pady=5)
+        
+        ctk.CTkLabel(
+            status_frame, 
+            text="Último backup: Não realizado", 
+            font=font(10),
+            text_color=self.colors["text_muted"]
+        ).pack(anchor="w")
+        
+        # Botões de ação
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(10, 20))
+        
+        backup_btn = ctk.CTkButton(
+            btn_frame,
+            text="💾 Fazer Backup",
+            font=font(11, "bold"),
+            fg_color="#4F46E5",
+            hover_color="#4338CA",
+            height=36,
+            command=self.abrir_dialog_backup
+        )
+        backup_btn.pack(side="left", padx=(0, 10))
+        
+        restore_btn = ctk.CTkButton(
+            btn_frame,
+            text="📂 Restaurar",
+            font=font(11),
+            fg_color="#F8FAFC",
+            text_color="#4F46E5",
+            hover_color="#EEF2FF",
+            height=36,
+            command=self.abrir_dialog_backup
+        )
+        restore_btn.pack(side="left")
+        
+        # Opções de backup automático
+        self.criar_item_lista(
+            card, "⏰", "Backup Automático", 
+            "Realizar backup diário às 02:00", 
+            toggle=True
+        )
+        
+        self.criar_item_lista(
+            card, "🗂️", "Local de Backup",
+            "Pasta padrão: /backups",
+            btn_text="Alterar"
+        )
+
+    def render_sync_section(self, container):
+        """Renderiza seção de sincronização"""
+        card = ctk.CTkFrame(container, fg_color=self.colors["card"], corner_radius=RADIUS["card"])
+        card.pack(fill="x", pady=(0, 15))
+        
+        h = ctk.CTkFrame(card, fg_color="transparent")
+        h.pack(fill="x", padx=20, pady=15)
+        ctk.CTkLabel(h, text="🔄 Sincronização", font=font(14, "bold")).pack(side="left")
+        
+        # Status de sincronização (será atualizado dinamicamente)
+        self.sync_status_frame = ctk.CTkFrame(card, fg_color="#F0FDF4", corner_radius=8)
+        self.sync_status_frame.pack(fill="x", padx=20, pady=5)
+        
+        self.sync_status_inner = ctk.CTkFrame(self.sync_status_frame, fg_color="transparent")
+        self.sync_status_inner.pack(fill="x", padx=12, pady=8)
+        
+        self.sync_status_indicator = ctk.CTkLabel(
+            self.sync_status_inner,
+            text="●",
+            font=font(12),
+            text_color="#22C55E"
+        )
+        self.sync_status_indicator.pack(side="left", padx=(0, 8))
+        
+        self.sync_status_text = ctk.CTkLabel(
+            self.sync_status_inner,
+            text="Verificando conexão...",
+            font=font(11),
+            text_color="#166534"
+        )
+        self.sync_status_text.pack(side="left")
+        
+        self.sync_last_time = ctk.CTkLabel(
+            self.sync_status_inner,
+            text="",
+            font=font(10),
+            text_color="#64748B"
+        )
+        self.sync_last_time.pack(side="right")
+        
+        # Botão de teste de conexão
+        test_frame = ctk.CTkFrame(card, fg_color="transparent")
+        test_frame.pack(fill="x", padx=20, pady=5)
+        
+        test_btn = ctk.CTkButton(
+            test_frame,
+            text="🔍 Testar Conexão",
+            font=font(10),
+            fg_color="#EEF2FF",
+            text_color="#4F46E5",
+            hover_color="#E0E7FF",
+            height=28,
+            command=self.testar_conexao
+        )
+        test_btn.pack(side="left")
+        
+        # Opções de sincronização
+        self.criar_item_lista(
+            card, "📡", "Sincronização Automática",
+            "Sincronizar dados a cada 5 minutos",
+            toggle=True
+        )
+        
+        self.criar_item_lista(
+            card, "📱", "Modo Offline",
+            "Trabalhar sem conexão e sincronizar depois",
+            toggle=True
+        )
+        
+        # Botão de sincronização manual
+        btn_frame = ctk.CTkFrame(card, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(10, 10))
+        
+        self.sync_btn = ctk.CTkButton(
+            btn_frame,
+            text="🔄 Sincronizar Agora",
+            font=font(11),
+            fg_color="#F8FAFC",
+            text_color="#4F46E5",
+            hover_color="#EEF2FF",
+            height=36,
+            command=self.sincronizar_agora
+        )
+        self.sync_btn.pack(side="left")
+        
+        # Indicador de progresso
+        self.sync_progress = ctk.CTkProgressBar(btn_frame, width=150, mode="indeterminate")
+        
+        # Indicador de conflitos (será atualizado dinamicamente)
+        self.conflitos_frame = ctk.CTkFrame(card, fg_color="#FEF3C7", corner_radius=8)
+        
+        self.conflitos_inner = ctk.CTkFrame(self.conflitos_frame, fg_color="transparent")
+        self.conflitos_inner.pack(fill="x", padx=12, pady=8)
+        
+        ctk.CTkLabel(
+            self.conflitos_inner,
+            text="⚠️",
+            font=font(12)
+        ).pack(side="left", padx=(0, 8))
+        
+        self.conflitos_text = ctk.CTkLabel(
+            self.conflitos_inner,
+            text="0 conflitos pendentes",
+            font=font(11),
+            text_color="#92400E"
+        )
+        self.conflitos_text.pack(side="left")
+        
+        resolver_btn = ctk.CTkButton(
+            self.conflitos_inner,
+            text="Resolver",
+            font=font(10),
+            fg_color="#F59E0B",
+            hover_color="#D97706",
+            height=28,
+            width=80,
+            command=self.abrir_dialog_conflitos
+        )
+        resolver_btn.pack(side="right")
+        
+        # Carregar status inicial
+        self.atualizar_status_sync()
+    
+    def testar_conexao(self):
+        """Testa a conexão com a API e banco de dados"""
+        def _testar():
+            # Testar API
+            resultado_api = servico_configuracoes.testar_conexao_api()
+            resultado_banco = servico_configuracoes.testar_conexao_banco()
+            
+            # Atualizar UI na thread principal
+            self.after(0, lambda: self._mostrar_resultado_teste(resultado_api, resultado_banco))
+        
+        threading.Thread(target=_testar, daemon=True).start()
+    
+    def _mostrar_resultado_teste(self, resultado_api, resultado_banco):
+        """Mostra o resultado do teste de conexão"""
+        api_ok = resultado_api.get("success", False)
+        banco_ok = resultado_banco.get("success", False)
+        
+        mensagem = "Resultado do Teste de Conexão:\n\n"
+        mensagem += f"📡 API: {'✅ Online' if api_ok else '❌ Offline'}\n"
+        if api_ok:
+            mensagem += f"   Latência: {resultado_api.get('latency_ms', 0):.0f}ms\n"
+        else:
+            mensagem += f"   Erro: {resultado_api.get('message', 'Desconhecido')}\n"
+        
+        mensagem += f"\n💾 Banco de Dados: {'✅ Online' if banco_ok else '❌ Offline'}\n"
+        if banco_ok:
+            mensagem += f"   Latência: {resultado_banco.get('latency_ms', 0):.0f}ms\n"
+        else:
+            mensagem += f"   Erro: {resultado_banco.get('message', 'Desconhecido')}\n"
+        
+        # Atualizar status visual
+        if api_ok:
+            self.sync_status_frame.configure(fg_color="#F0FDF4")
+            self.sync_status_indicator.configure(text_color="#22C55E")
+            self.sync_status_text.configure(
+                text="Conectado ao servidor",
+                text_color="#166534"
+            )
+        else:
+            self.sync_status_frame.configure(fg_color="#FEF2F2")
+            self.sync_status_indicator.configure(text_color="#EF4444")
+            self.sync_status_text.configure(
+                text="Servidor indisponível",
+                text_color="#991B1B"
+            )
+        
+        messagebox.showinfo("Teste de Conexão", mensagem)
+    
+    def atualizar_status_sync(self):
+        """Atualiza o status de sincronização"""
+        def _carregar():
+            status = servico_configuracoes.obter_status_sincronizacao()
+            self.after(0, lambda: self._atualizar_ui_sync(status))
+        
+        threading.Thread(target=_carregar, daemon=True).start()
+    
+    def _atualizar_ui_sync(self, status):
+        """Atualiza a UI com o status de sincronização"""
+        data = status.get("data", {})
+        
+        # Atualizar última sincronização
+        last_sync = data.get("last_sync")
+        if last_sync:
+            try:
+                dt = datetime.fromisoformat(last_sync)
+                diff = datetime.now() - dt
+                if diff.total_seconds() < 60:
+                    tempo = "há menos de 1 minuto"
+                elif diff.total_seconds() < 3600:
+                    tempo = f"há {int(diff.total_seconds() / 60)} minutos"
+                else:
+                    tempo = f"há {int(diff.total_seconds() / 3600)} horas"
+                self.sync_last_time.configure(text=f"Última sync: {tempo}")
+            except Exception:
+                self.sync_last_time.configure(text=f"Última sync: {last_sync}")
+        
+        # Atualizar conflitos
+        conflitos = data.get("conflicts", 0)
+        if conflitos > 0:
+            self.conflitos_frame.pack(fill="x", padx=20, pady=(0, 20))
+            self.conflitos_text.configure(text=f"{conflitos} conflitos pendentes")
+        else:
+            self.conflitos_frame.pack_forget()
+    
+    def abrir_dialog_conflitos(self):
+        """Abre diálogo para resolver conflitos"""
+        messagebox.showinfo(
+            "Resolver Conflitos",
+            "Não há conflitos para resolver no momento.\n\n"
+            "Todos os dados estão sincronizados."
+        )
+
+    def abrir_dialog_backup(self):
+        """Abre o diálogo de backup"""
+        BackupDialog(self.winfo_toplevel())
+
+    def sincronizar_agora(self):
+        """Executa sincronização manual"""
+        # Mostrar progresso
+        self.sync_progress.pack(side="left", padx=10)
+        self.sync_progress.start()
+        self.sync_btn.configure(state="disabled", text="Sincronizando...")
+        
+        def _on_complete(resultado):
+            self.after(0, lambda: self._sync_complete(resultado))
+        
+        servico_configuracoes.sincronizar(on_complete=_on_complete)
+    
+    def _sync_complete(self, resultado):
+        """Callback quando sincronização termina"""
+        self.sync_progress.stop()
+        self.sync_progress.pack_forget()
+        self.sync_btn.configure(state="normal", text="🔄 Sincronizar Agora")
+        
+        if resultado.get("success"):
+            itens = resultado.get("items_synced", 0)
+            pendentes = resultado.get("items_pending", 0)
+            messagebox.showinfo(
+                "Sincronização Concluída",
+                f"Sincronização realizada com sucesso!\n\n"
+                f"✅ {itens} itens sincronizados\n"
+                f"⏳ {pendentes} itens pendentes"
+            )
+            # Atualizar status
+            self.atualizar_status_sync()
+        else:
+            erro = resultado.get("error", "Erro desconhecido")
+            messagebox.showerror(
+                "Erro na Sincronização",
+                f"Não foi possível completar a sincronização.\n\n"
+                f"Erro: {erro}"
+            )

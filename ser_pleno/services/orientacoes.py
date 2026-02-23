@@ -527,9 +527,9 @@ class ServicoOrientacoes:
             cursor = connection.cursor(dictionary=True)
             
             query = """
-                SELECT o.*, a.nome as student_name, a.id as student_id
+                SELECT o.*, a.nome as student_name, a.id_aluno as student_id
                 FROM desktop_orientation o
-                LEFT JOIN aluno a ON o.student_id = a.id
+                LEFT JOIN aluno a ON o.student_id = a.id_aluno
                 WHERE 1=1
             """
             params = []
@@ -722,9 +722,9 @@ class ServicoOrientacoes:
             cursor = connection.cursor(dictionary=True)
             
             query = """
-                SELECT o.*, a.nome as student_name, a.id as student_id
+                SELECT o.*, a.nome as student_name, a.id_aluno as student_id
                 FROM desktop_orientation o
-                LEFT JOIN aluno a ON o.student_id = a.id
+                LEFT JOIN aluno a ON o.student_id = a.id_aluno
                 WHERE o.id = %s
             """
             cursor.execute(query, (id_orientacao,))
@@ -752,6 +752,302 @@ class ServicoOrientacoes:
             return {"success": True, "data": orientacao}
         except Exception as e:
             logger.error(f"Erro ao obter orientação local: {e}")
+            return {"success": False, "message": str(e)}
+    
+    def upload_anexos(self, id_orientacao: int, arquivos: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Faz upload de anexos para uma orientação
+        
+        Args:
+            id_orientacao: ID da orientação
+            arquivos: Lista de dicts com 'name', 'data' (bytes), e opcionalmente 'path'
+            
+        Returns:
+            Dict com success, message, data (lista de anexos)
+        """
+        # Verificar se deve usar o banco local
+        if not self._should_use_api():
+            return self._local_upload_anexos(id_orientacao, arquivos)
+        
+        try:
+            url = f"{self.base_url}/orientations/{id_orientacao}/attachments/"
+            session = self._get_session()
+            
+            if session and requests:
+                # Preparar multipart/form-data
+                files = {}
+                for i, arquivo in enumerate(arquivos):
+                    filename = arquivo.get('name', f'file_{i}')
+                    file_data = arquivo.get('data', b'')
+                    # Detectar tipo MIME básico
+                    content_type = 'application/octet-stream'
+                    if filename.endswith('.pdf'):
+                        content_type = 'application/pdf'
+                    elif filename.endswith(('.png', '.jpg', '.jpeg')):
+                        content_type = 'image/jpeg' if 'jpg' in filename.lower() else 'image/png'
+                    elif filename.endswith(('.doc', '.docx')):
+                        content_type = 'application/msword'
+                    
+                    files[f'file_{i}'] = (filename, file_data, content_type)
+                
+                response = session.post(
+                    url,
+                    files=files,
+                    timeout=30  # Timeout maior para uploads
+                )
+                
+                if response.ok:
+                    try:
+                        result = response.json()
+                        logger.info(f"Anexos enviados com sucesso via API: {result}")
+                        return result
+                    except Exception as json_err:
+                        logger.debug(f"Resposta não é JSON válido: {json_err}")
+                        # Fallback para banco local
+                        return self._local_upload_anexos(id_orientacao, arquivos)
+                else:
+                    logger.warning(f"Erro ao enviar anexos via API: {response.status_code}")
+                    # Fallback para banco local
+                    return self._local_upload_anexos(id_orientacao, arquivos)
+            
+            # Fallback para banco local
+            return self._local_upload_anexos(id_orientacao, arquivos)
+            
+        except Exception as e:
+            logger.exception(f"Erro ao fazer upload de anexos: {e}")
+            # Fallback para banco local
+            return self._local_upload_anexos(id_orientacao, arquivos)
+    
+    def _local_upload_anexos(self, id_orientacao: int, arquivos: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Salva anexos localmente no banco de dados
+        
+        Args:
+            id_orientacao: ID da orientação
+            arquivos: Lista de dicts com 'name', 'data' (bytes), e opcionalmente 'path'
+            
+        Returns:
+            Dict com success, message, data (lista de anexos)
+        """
+        import os
+        import hashlib
+        
+        try:
+            connection = get_db_connection()
+            cursor = connection.cursor()
+            
+            anexos_salvos = []
+            
+            for arquivo in arquivos:
+                filename = arquivo.get('name', 'arquivo')
+                file_data = arquivo.get('data', b'')
+                file_path = arquivo.get('path', '')
+                
+                # Calcular hash do arquivo para integridade
+                file_hash = hashlib.sha256(file_data).hexdigest()[:16]
+                
+                # Determinar tipo de arquivo
+                ext = os.path.splitext(filename)[1].lower()
+                file_type = 'document'
+                if ext in ['.png', '.jpg', '.jpeg', '.gif']:
+                    file_type = 'image'
+                elif ext == '.pdf':
+                    file_type = 'pdf'
+                
+                # Inserir na tabela de anexos (criar se não existir)
+                try:
+                    # Verificar se a tabela existe
+                    cursor.execute("""
+                        SELECT COUNT(*) FROM information_schema.tables 
+                        WHERE table_schema = DATABASE() AND table_name = 'desktop_orientationattachment'
+                    """)
+                    table_exists = cursor.fetchone()[0] > 0
+                    
+                    if not table_exists:
+                        # Criar tabela de anexos
+                        cursor.execute("""
+                            CREATE TABLE desktop_orientationattachment (
+                                id INT AUTO_INCREMENT PRIMARY KEY,
+                                orientation_id INT NOT NULL,
+                                filename VARCHAR(255) NOT NULL,
+                                file_type VARCHAR(50),
+                                file_size INT,
+                                file_hash VARCHAR(64),
+                                file_data LONGBLOB,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (orientation_id) REFERENCES desktop_orientation(id) ON DELETE CASCADE
+                            )
+                        """)
+                        connection.commit()
+                    
+                    # Inserir anexo
+                    cursor.execute("""
+                        INSERT INTO desktop_orientationattachment 
+                        (orientation_id, filename, file_type, file_size, file_hash, file_data, created_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW())
+                    """, (
+                        id_orientacao,
+                        filename,
+                        file_type,
+                        len(file_data),
+                        file_hash,
+                        file_data
+                    ))
+                    
+                    anexo_id = cursor.lastrowid
+                    anexos_salvos.append({
+                        'id': anexo_id,
+                        'filename': filename,
+                        'file_type': file_type,
+                        'file_size': len(file_data)
+                    })
+                    
+                except Exception as insert_err:
+                    logger.error(f"Erro ao inserir anexo {filename}: {insert_err}")
+                    continue
+            
+            connection.commit()
+            connection.close()
+            
+            # Adiciona à fila de sincronização
+            try:
+                from services.sync_service import queue_sync
+                queue_sync('upload', 'attachments', id_orientacao, {'files': len(anexos_salvos)})
+            except Exception:
+                pass
+            
+            return {
+                "success": True, 
+                "message": f"{len(anexos_salvos)} anexo(s) salvo(s) com sucesso",
+                "data": {"attachments": anexos_salvos}
+            }
+            
+        except Exception as e:
+            logger.error(f"Erro ao salvar anexos localmente: {e}")
+            return {"success": False, "message": str(e)}
+    
+    def listar_anexos(self, id_orientacao: int) -> Dict[str, Any]:
+        """
+        Lista anexos de uma orientação
+        
+        Args:
+            id_orientacao: ID da orientação
+            
+        Returns:
+            Dict com success, data (lista de anexos)
+        """
+        if not self._should_use_api():
+            return self._local_listar_anexos(id_orientacao)
+        
+        try:
+            url = f"{self.base_url}/orientations/{id_orientacao}/attachments/"
+            session = self._get_session()
+            
+            if session and requests:
+                response = session.get(url, timeout=10)
+                if response.ok:
+                    try:
+                        return response.json()
+                    except Exception:
+                        return self._local_listar_anexos(id_orientacao)
+                else:
+                    return self._local_listar_anexos(id_orientacao)
+            
+            return self._local_listar_anexos(id_orientacao)
+            
+        except Exception as e:
+            logger.exception(f"Erro ao listar anexos: {e}")
+            return self._local_listar_anexos(id_orientacao)
+    
+    def _local_listar_anexos(self, id_orientacao: int) -> Dict[str, Any]:
+        """Lista anexos do banco local"""
+        try:
+            connection = get_db_connection()
+            cursor = connection.cursor(dictionary=True)
+            
+            # Verificar se a tabela existe
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.tables 
+                WHERE table_schema = DATABASE() AND table_name = 'desktop_orientationattachment'
+            """)
+            table_exists = cursor.fetchone()['COUNT(*)'] > 0
+            
+            if not table_exists:
+                connection.close()
+                return {"success": True, "data": {"attachments": []}}
+            
+            cursor.execute("""
+                SELECT id, filename, file_type, file_size, file_hash, created_at
+                FROM desktop_orientationattachment
+                WHERE orientation_id = %s
+                ORDER BY created_at DESC
+            """, (id_orientacao,))
+            
+            anexos = []
+            for r in cursor.fetchall():
+                anexos.append({
+                    'id': r['id'],
+                    'filename': r['filename'],
+                    'file_type': r['file_type'],
+                    'file_size': r['file_size'],
+                    'file_hash': r['file_hash'],
+                    'created_at': str(r['created_at']) if r['created_at'] else None
+                })
+            
+            connection.close()
+            
+            return {"success": True, "data": {"attachments": anexos}}
+            
+        except Exception as e:
+            logger.error(f"Erro ao listar anexos locais: {e}")
+            return {"success": True, "data": {"attachments": []}}
+    
+    def deletar_anexo(self, id_anexo: int) -> Dict[str, Any]:
+        """
+        Deleta um anexo
+        
+        Args:
+            id_anexo: ID do anexo
+            
+        Returns:
+            Dict com success, message
+        """
+        if not self._should_use_api():
+            return self._local_deletar_anexo(id_anexo)
+        
+        try:
+            url = f"{self.base_url}/attachments/{id_anexo}/"
+            session = self._get_session()
+            headers = self._get_headers()
+            
+            if session and requests:
+                response = session.delete(url, headers=headers, timeout=10)
+                if response.ok:
+                    try:
+                        return response.json()
+                    except Exception:
+                        return self._local_deletar_anexo(id_anexo)
+                else:
+                    return self._local_deletar_anexo(id_anexo)
+            
+            return self._local_deletar_anexo(id_anexo)
+            
+        except Exception as e:
+            logger.exception(f"Erro ao deletar anexo: {e}")
+            return self._local_deletar_anexo(id_anexo)
+    
+    def _local_deletar_anexo(self, id_anexo: int) -> Dict[str, Any]:
+        """Deleta anexo do banco local"""
+        try:
+            connection = get_db_connection()
+            cursor = connection.cursor()
+            cursor.execute("DELETE FROM desktop_orientationattachment WHERE id = %s", (id_anexo,))
+            connection.commit()
+            connection.close()
+            
+            return {"success": True, "message": "Anexo deletado com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao deletar anexo local: {e}")
             return {"success": False, "message": str(e)}
 
 

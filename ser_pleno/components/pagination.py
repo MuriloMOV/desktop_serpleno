@@ -196,8 +196,19 @@ class PaginationControl(ctk.CTkFrame):
         
         self._update_buttons_state()
     
+    def _widget_exists(self, widget) -> bool:
+        """Verifica se um widget ainda existe e é válido"""
+        try:
+            return widget is not None and widget.winfo_exists()
+        except Exception:
+            return False
+
     def _update_buttons_state(self):
         """Atualiza o estado dos botões de navegação"""
+        # Verifica se os widgets ainda existem antes de manipulá-los
+        if not self._widget_exists(self._first_btn):
+            return
+        
         # Desabilita botões quando na primeira página
         if self._current_page <= 1:
             self._first_btn.configure(state="disabled", fg_color=THEME["border"])
@@ -215,9 +226,13 @@ class PaginationControl(ctk.CTkFrame):
             self._last_btn.configure(state="normal", fg_color=THEME["bg_alt"])
         
         # Atualiza label
-        self._page_label.configure(text=f" {self._current_page} / {self._total_pages} ")
+        if self._widget_exists(self._page_label):
+            self._page_label.configure(text=f" {self._current_page} / {self._total_pages} ")
         
         # Atualiza info
+        if not self._widget_exists(self._info_label):
+            return
+            
         start_item = (self._current_page - 1) * self._items_per_page + 1
         end_item = min(self._current_page * self._items_per_page, self._total_items)
         

@@ -8,7 +8,7 @@ class ServicoTriagem:
         query = """
             SELECT ds.*, a.nome AS student_name, df.name AS form_name
             FROM desktop_screening ds
-            LEFT JOIN aluno a ON ds.student_id = a.id
+            LEFT JOIN aluno a ON ds.student_id = a.id_aluno
             LEFT JOIN desktop_screeningform df ON ds.form_id = df.id
             WHERE 1=1
         """
@@ -60,7 +60,7 @@ class ServicoTriagem:
         query = """
             SELECT ds.*, a.nome AS student_name, df.name AS form_name, df.questions
             FROM desktop_screening ds
-            LEFT JOIN aluno a ON ds.student_id = a.id
+            LEFT JOIN aluno a ON ds.student_id = a.id_aluno
             LEFT JOIN desktop_screeningform df ON ds.form_id = df.id
             WHERE ds.id = %s
         """

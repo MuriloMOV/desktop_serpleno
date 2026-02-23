@@ -679,7 +679,7 @@ class ServicoImportacao:
         try:
             connection = get_db_connection()
             cursor = connection.cursor()
-            cursor.execute("SELECT 1 FROM aluno WHERE id = %s", (student_id,))
+            cursor.execute("SELECT 1 FROM aluno WHERE id_aluno = %s", (student_id,))
             result = cursor.fetchone()
             connection.close()
             return result is not None

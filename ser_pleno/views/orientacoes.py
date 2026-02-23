@@ -6,7 +6,10 @@ import customtkinter as ctk
 from datetime import datetime
 import threading
 import json
+import logging
 from typing import Optional, List, Dict, Any, Callable
+
+logger = logging.getLogger(__name__)
 
 from services.estudantes import ServicoEstudante
 from services.orientacoes import ServicoOrientacoes, servico_orientacoes
@@ -1229,16 +1232,42 @@ class OrientacoesFrame(ctk.CTkFrame):
     def _on_save_result(self, res: Dict):
         """Callback após salvar"""
         if res.get('success'):
-            if self.is_editing:
-                self._show_message("Orientação atualizada com sucesso!")
+            # Obter ID da orientação criada/atualizada
+            orientation_id = res.get('data', {}).get('id') or self.editing_orientation_id
+            
+            # Fazer upload dos arquivos se houver
+            if hasattr(self, '_selected_files') and self._selected_files and orientation_id:
+                self._show_message("Salvando orientação e fazendo upload de anexos...")
+                
+                def upload_files():
+                    upload_result = self._upload_files(orientation_id)
+                    self.after(0, lambda: self._on_upload_complete(upload_result, res))
+                
+                threading.Thread(target=upload_files, daemon=True).start()
             else:
-                self._show_message("Orientação salva com sucesso!")
-            self._reset_form()
-            # Recarregar histórico se visível
-            if self.current_tab == "history":
-                self._load_history()
+                if self.is_editing:
+                    self._show_message("Orientação atualizada com sucesso!")
+                else:
+                    self._show_message("Orientação salva com sucesso!")
+                self._reset_form()
+                # Recarregar histórico se visível
+                if self.current_tab == "history":
+                    self._load_history()
         else:
             self._show_message(f"Erro ao salvar: {res.get('message', 'Erro desconhecido')}")
+    
+    def _on_upload_complete(self, upload_result: Dict, save_result: Dict):
+        """Callback após upload de anexos"""
+        if upload_result.get('success'):
+            msg = f"Orientação salva com {upload_result.get('message', 'anexos enviados')}"
+            self._show_message(msg)
+        else:
+            self._show_message(f"Orientação salva, mas erro no upload: {upload_result.get('message', 'Erro')}")
+        
+        self._reset_form()
+        # Recarregar histórico se visível
+        if self.current_tab == "history":
+            self._load_history()
     
     def _delete_orientation(self, orientation_id: int):
         """Deleta uma orientação"""
@@ -1434,7 +1463,129 @@ class OrientacoesFrame(ctk.CTkFrame):
         
         if files:
             self.label_files.configure(text=f"{len(files)} arquivo(s) selecionado(s)")
-            self._selected_files = files
+            # Converter tupla para lista para permitir remoção
+            self._selected_files = list(files)
+            # Mostrar lista de arquivos selecionados
+            self._render_selected_files()
+    
+    def _render_selected_files(self):
+        """Renderiza a lista de arquivos selecionados"""
+        if not hasattr(self, '_selected_files') or not self._selected_files:
+            return
+        
+        # Criar ou limpar container de arquivos
+        if not hasattr(self, 'files_container') or not self.files_container:
+            self.files_container = ctk.CTkFrame(self.tab_new_frame, fg_color="transparent")
+            self.files_container.pack(fill="x", pady=(8, 0))
+        else:
+            # Limpar container existente
+            for w in self.files_container.winfo_children():
+                w.destroy()
+        
+        # Adicionar cada arquivo como um item
+        for i, file_path in enumerate(self._selected_files):
+            import os
+            filename = os.path.basename(file_path)
+            file_size = os.path.getsize(file_path) / 1024  # KB
+            
+            file_row = ctk.CTkFrame(self.files_container, fg_color=self.colors["bg_alt"], corner_radius=6)
+            file_row.pack(fill="x", pady=2)
+            
+            inner = ctk.CTkFrame(file_row, fg_color="transparent")
+            inner.pack(fill="x", padx=8, pady=6)
+            
+            # Ícone baseado na extensão
+            ext = os.path.splitext(filename)[1].lower()
+            icon = "📄"
+            if ext == '.pdf':
+                icon = "📕"
+            elif ext in ['.png', '.jpg', '.jpeg']:
+                icon = "🖼️"
+            elif ext in ['.doc', '.docx']:
+                icon = "📘"
+            
+            ctk.CTkLabel(inner, text=icon, font=font(14)).pack(side="left")
+            
+            # Nome do arquivo
+            ctk.CTkLabel(inner, text=filename, font=font(11), 
+                        text_color=self.colors["text"]).pack(side="left", padx=(6, 0))
+            
+            # Tamanho
+            ctk.CTkLabel(inner, text=f"({file_size:.1f} KB)", font=font(10),
+                        text_color=self.colors["text_muted"]).pack(side="left", padx=(6, 0))
+            
+            # Botão remover
+            btn_remove = ctk.CTkButton(
+                inner, text="✕", width=24, height=24,
+                fg_color="transparent", text_color="red",
+                font=font(10),
+                command=lambda idx=i: self._remove_selected_file(idx)
+            )
+            btn_remove.pack(side="right")
+    
+    def _remove_selected_file(self, index: int):
+        """Remove um arquivo da lista de selecionados"""
+        if hasattr(self, '_selected_files') and 0 <= index < len(self._selected_files):
+            self._selected_files.pop(index)
+            if self._selected_files:
+                self.label_files.configure(text=f"{len(self._selected_files)} arquivo(s) selecionado(s)")
+                self._render_selected_files()
+            else:
+                self.label_files.configure(text="Nenhum arquivo selecionado")
+                if hasattr(self, 'files_container') and self.files_container:
+                    for w in self.files_container.winfo_children():
+                        w.destroy()
+    
+    def _upload_files(self, orientation_id: int) -> Dict[str, Any]:
+        """
+        Faz upload dos arquivos selecionados para uma orientação
+        
+        Args:
+            orientation_id: ID da orientação criada/atualizada
+            
+        Returns:
+            Dict com success e message
+        """
+        if not hasattr(self, '_selected_files') or not self._selected_files:
+            return {"success": True, "message": "Nenhum arquivo para upload"}
+        
+        import os
+        try:
+            # Preparar arquivos para upload
+            files_to_upload = []
+            for file_path in self._selected_files:
+                try:
+                    with open(file_path, 'rb') as f:
+                        file_data = f.read()
+                        filename = os.path.basename(file_path)
+                        files_to_upload.append({
+                            'name': filename,
+                            'data': file_data,
+                            'path': file_path
+                        })
+                except Exception as e:
+                    logger.error(f"Erro ao ler arquivo {file_path}: {e}")
+                    continue
+            
+            if not files_to_upload:
+                return {"success": True, "message": "Nenhum arquivo válido para upload"}
+            
+            # Fazer upload via serviço
+            result = self.servico_orientacoes.upload_anexos(orientation_id, files_to_upload)
+            
+            if result.get('success'):
+                # Limpar arquivos selecionados após upload bem-sucedido
+                self._selected_files = []
+                self.label_files.configure(text="Nenhum arquivo selecionado")
+                if hasattr(self, 'files_container') and self.files_container:
+                    for w in self.files_container.winfo_children():
+                        w.destroy()
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Erro no upload de arquivos: {e}")
+            return {"success": False, "message": str(e)}
     
     def _show_message(self, message: str):
         """Mostra uma mensagem para o usuário"""

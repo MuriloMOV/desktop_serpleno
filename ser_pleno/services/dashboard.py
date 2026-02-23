@@ -92,13 +92,13 @@ class ServicoDashboard:
             attendance_rate = None
 
         # Obter estudantes em atenção (mapear campos esperados pela UI)
-        # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
-        cursor.execute("SELECT id, nome, attention_reason, priority_level FROM aluno WHERE requires_attention = 1")
+        # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
+        cursor.execute("SELECT id_aluno, nome, attention_reason, priority_level FROM aluno WHERE requires_attention = 1")
         rows = cursor.fetchall()
         attention_students = []
         for r in rows:
             attention_students.append({
-                'id': r.get('id'),
+                'id': r.get('id_aluno'),
                 'name': r.get('nome'),
                 'attention_reason': r.get('attention_reason') or r.get('attention_notes') or 'Requer atenção',
                 'priority_level': r.get('priority_level') or 0
@@ -108,7 +108,7 @@ class ServicoDashboard:
         cursor.execute("""
             SELECT a.id, a.data_hora, a.status, al.nome AS student_name, al.curso
             FROM agendamento a
-            LEFT JOIN aluno al ON a.student_id = al.id
+            LEFT JOIN aluno al ON a.student_id = al.id_aluno
             WHERE a.data_hora > NOW() AND a.status != 'cancelled'
             ORDER BY a.data_hora ASC
             LIMIT 5

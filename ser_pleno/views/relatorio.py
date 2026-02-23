@@ -1,6 +1,8 @@
 import customtkinter as ctk
+from tkinter import messagebox, filedialog
 from PIL import Image
 import threading
+from datetime import datetime, timedelta
 from services.relatorios import ServicoRelatorio
 
 from ui_theme import THEME, SPACING, RADIUS, font
@@ -13,6 +15,9 @@ class RelatorioFrame(ctk.CTkFrame):
         
         # Reference mapping for card widgets to update them later
         self.card_widgets = {}
+        
+        # Cache para dados
+        self._relatorios_cache = []
 
         # --- CONFIGURAÇÃO DE RESPONSIVIDADE (GRID) ---
         self.grid_columnconfigure(0, weight=1) # Coluna principal expande
@@ -103,7 +108,8 @@ class RelatorioFrame(ctk.CTkFrame):
             hover_color=THEME["primary_hover"],
             font=font(12, "bold"),
             height=36,
-            corner_radius=RADIUS["button"]
+            corner_radius=RADIUS["button"],
+            command=self.abrir_dialog_gerar_relatorio
         ).pack(side="right")
 
         self.criar_cards()
@@ -271,3 +277,249 @@ class RelatorioFrame(ctk.CTkFrame):
         # Container para a lista de relatórios (Preenche o restante do espaço)
         self.reports_container = ctk.CTkScrollableFrame(container_lista, fg_color="transparent")
         self.reports_container.pack(expand=True, fill="both")
+    
+    def abrir_dialog_gerar_relatorio(self):
+        """Abre dialog para gerar novo relatório"""
+        dialog = DialogGerarRelatorio(self)
+        dialog.grab_set()
+    
+    def on_relatorio_gerado(self):
+        """Callback após gerar relatório"""
+        self.load_data()
+    
+    def aplicar_filtro(self, tipo):
+        """Aplica filtro na lista de relatórios"""
+        if not self._relatorios_cache:
+            return
+        
+        if tipo == "Todos os tipos":
+            filtrados = self._relatorios_cache
+        else:
+            tipo_map = {
+                "Geral": "general",
+                "Estudante": "student",
+                "Agendamentos": "appointments",
+                "Intervenções": "interventions",
+                "Triagens": "screenings",
+                "Estatísticas": "statistics"
+            }
+            tipo_api = tipo_map.get(tipo, tipo.lower() if tipo else "")
+            filtrados = [r for r in self._relatorios_cache 
+                        if r.get('report_type', '').lower() == (tipo_api or "").lower()]
+        
+        self.populate_reports_list(filtrados)
+
+
+class DialogGerarRelatorio(ctk.CTkToplevel):
+    """Dialog para gerar novo relatório com preview"""
+    
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.parent = parent
+        self.servico = ServicoRelatorio()
+        
+        self.title("Gerar Relatório")
+        self.geometry("600x700")
+        self.resizable(False, False)
+        
+        # Centraliza
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - 600) // 2
+        y = (self.winfo_screenheight() - 700) // 2
+        self.geometry(f"+{x}+{y}")
+        
+        self._preview_data = None
+        
+        self._build_ui()
+    
+    def _build_ui(self):
+        main = ctk.CTkFrame(self, fg_color=THEME["bg"])
+        main.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        ctk.CTkLabel(main, text="📄 Gerar Novo Relatório", font=font(18, "bold"), text_color=THEME["text"]).pack(anchor="w", pady=(0, 20))
+        
+        # Tipo de relatório
+        ctk.CTkLabel(main, text="Tipo de Relatório:", font=font(12), text_color=THEME["text"]).pack(anchor="w")
+        self.tipo_var = ctk.StringVar(value="Geral")
+        tipo_frame = ctk.CTkFrame(main, fg_color="transparent")
+        tipo_frame.pack(fill="x", pady=(4, 12))
+        
+        tipos = ["Geral", "Estudantes", "Agendamentos", "Intervenções", "Triagens", "Estatísticas"]
+        self.tipo_combo = ctk.CTkComboBox(tipo_frame, variable=self.tipo_var, values=tipos, 
+                                          height=36, command=self._on_tipo_change)
+        self.tipo_combo.pack(fill="x")
+        
+        # Filtros
+        filtros_frame = ctk.CTkFrame(main, fg_color=THEME["card"], corner_radius=RADIUS["card"])
+        filtros_frame.pack(fill="x", pady=(0, 12))
+        
+        inner_filtros = ctk.CTkFrame(filtros_frame, fg_color="transparent")
+        inner_filtros.pack(fill="x", padx=15, pady=15)
+        
+        ctk.CTkLabel(inner_filtros, text="Filtros", font=font(14, "bold")).pack(anchor="w", pady=(0, 10))
+        
+        # Período
+        periodo_frame = ctk.CTkFrame(inner_filtros, fg_color="transparent")
+        periodo_frame.pack(fill="x", pady=4)
+        
+        ctk.CTkLabel(periodo_frame, text="Período:", font=font(11)).pack(side="left")
+        
+        self.periodo_var = ctk.StringVar(value="Últimos 30 dias")
+        periodos = ["Hoje", "Últimos 7 dias", "Últimos 30 dias", "Últimos 90 dias", "Este ano", "Personalizado"]
+        ctk.CTkOptionMenu(periodo_frame, variable=self.periodo_var, values=periodos, 
+                         height=28, width=150).pack(side="left", padx=(10, 0))
+        
+        # Formato
+        formato_frame = ctk.CTkFrame(inner_filtros, fg_color="transparent")
+        formato_frame.pack(fill="x", pady=4)
+        
+        ctk.CTkLabel(formato_frame, text="Formato:", font=font(11)).pack(side="left")
+        
+        self.formato_var = ctk.StringVar(value="PDF")
+        formatos = ["PDF", "CSV", "Excel", "JSON"]
+        ctk.CTkOptionMenu(formato_frame, variable=self.formato_var, values=formatos,
+                         height=28, width=100).pack(side="left", padx=(10, 0))
+        
+        # Nome do relatório
+        ctk.CTkLabel(inner_filtros, text="Nome do Relatório:", font=font(11)).pack(anchor="w", pady=(10, 4))
+        self.nome_entry = ctk.CTkEntry(inner_filtros, placeholder_text="Ex: Relatório Mensal - Janeiro/2026", height=36)
+        self.nome_entry.pack(fill="x")
+        
+        # Botão Preview
+        preview_btn = ctk.CTkButton(main, text="🔍 Visualizar Preview", fg_color=THEME["info"],
+                                   hover_color="#2563EB", height=36, command=self._gerar_preview)
+        preview_btn.pack(fill="x", pady=(0, 12))
+        
+        # Área de Preview
+        preview_container = ctk.CTkFrame(main, fg_color=THEME["card"], corner_radius=RADIUS["card"])
+        preview_container.pack(fill="both", expand=True, pady=(0, 12))
+        
+        ctk.CTkLabel(preview_container, text="Preview", font=font(14, "bold")).pack(anchor="w", padx=15, pady=(15, 10))
+        
+        self.preview_frame = ctk.CTkScrollableFrame(preview_container, fg_color=THEME["bg_alt"])
+        self.preview_frame.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        
+        ctk.CTkLabel(self.preview_frame, text="Clique em 'Visualizar Preview' para ver os dados", 
+                    font=font(12), text_color=THEME["text_muted"]).pack(pady=40)
+        
+        # Botões
+        btn_frame = ctk.CTkFrame(main, fg_color="transparent")
+        btn_frame.pack(fill="x")
+        
+        ctk.CTkButton(btn_frame, text="Cancelar", fg_color=THEME["bg_alt"], text_color=THEME["text"],
+                      hover_color=THEME["border"], command=self.destroy).pack(side="right", padx=(8, 0))
+        
+        self.gerar_btn = ctk.CTkButton(btn_frame, text="Gerar Relatório", fg_color=THEME["success"],
+                                       hover_color="#0EA472", command=self._gerar_relatorio)
+        self.gerar_btn.pack(side="right")
+    
+    def _on_tipo_change(self, value):
+        """Atualiza nome sugerido quando tipo muda"""
+        tipo = self.tipo_var.get()
+        data_str = datetime.now().strftime("%m/%Y")
+        self.nome_entry.delete(0, "end")
+        self.nome_entry.insert(0, f"Relatório {tipo} - {data_str}")
+    
+    def _gerar_preview(self):
+        """Gera preview do relatório"""
+        self.preview_frame.configure(fg_color=THEME["bg_alt"])
+        for w in self.preview_frame.winfo_children():
+            w.destroy()
+        
+        # Mostra loading
+        loading = ctk.CTkLabel(self.preview_frame, text="Carregando preview...", 
+                              font=font(12), text_color=THEME["text_muted"])
+        loading.pack(pady=40)
+        
+        def fetch():
+            tipo = self.tipo_var.get()
+            
+            if tipo == "Estudantes":
+                result = self.servico.exportar_estudantes()
+            elif tipo == "Agendamentos":
+                result = self.servico.exportar_agendamentos()
+            elif tipo == "Triagens":
+                result = self.servico.exportar_triagens()
+            else:
+                result = self.servico.obter_estatisticas()
+            
+            self.after(0, lambda: self._mostrar_preview(result))
+        
+        threading.Thread(target=fetch, daemon=True).start()
+    
+    def _mostrar_preview(self, result):
+        """Exibe preview dos dados"""
+        for w in self.preview_frame.winfo_children():
+            w.destroy()
+        
+        if not result.get('success'):
+            ctk.CTkLabel(self.preview_frame, text="Erro ao carregar dados", 
+                        text_color=THEME["danger"]).pack(pady=20)
+            return
+        
+        data = result.get('data', {})
+        
+        if isinstance(data, list):
+            # Dados em lista
+            total = len(data)
+            ctk.CTkLabel(self.preview_frame, text=f"Total de registros: {total}", 
+                        font=font(12, "bold")).pack(anchor="w", pady=(0, 10))
+            
+            # Mostra primeiros 5 registros
+            for i, item in enumerate(data[:5]):
+                if isinstance(item, dict):
+                    item_frame = ctk.CTkFrame(self.preview_frame, fg_color=THEME["card"])
+                    item_frame.pack(fill="x", pady=2)
+                    
+                    # Mostra alguns campos
+                    campos = list(item.items())[:3]
+                    for key, value in campos:
+                        ctk.CTkLabel(item_frame, text=f"{key}: {value}", 
+                                    font=font(10), anchor="w").pack(anchor="w", padx=10, pady=2)
+            
+            if total > 5:
+                ctk.CTkLabel(self.preview_frame, text=f"... e mais {total - 5} registros", 
+                            font=font(10), text_color=THEME["text_muted"]).pack(pady=5)
+        else:
+            # Dados em dict (estatísticas)
+            for key, value in data.items():
+                item_frame = ctk.CTkFrame(self.preview_frame, fg_color=THEME["card"])
+                item_frame.pack(fill="x", pady=2)
+                
+                ctk.CTkLabel(item_frame, text=f"{key}:", font=font(11)).pack(side="left", padx=10)
+                ctk.CTkLabel(item_frame, text=str(value), font=font(11, "bold")).pack(side="right", padx=10)
+        
+        self._preview_data = result
+    
+    def _gerar_relatorio(self):
+        """Gera o relatório final"""
+        nome = self.nome_entry.get()
+        if not nome:
+            nome = f"Relatório {self.tipo_var.get()} - {datetime.now().strftime('%d/%m/%Y')}"
+        
+        tipo_map = {
+            "Geral": "general",
+            "Estudantes": "student",
+            "Agendamentos": "appointments",
+            "Intervenções": "interventions",
+            "Triagens": "screenings",
+            "Estatísticas": "statistics"
+        }
+        
+        dados = {
+            'name': nome,
+            'report_type': tipo_map.get(self.tipo_var.get(), 'general'),
+            'format': self.formato_var.get().lower(),
+            'parameters': {'periodo': self.periodo_var.get()},
+            'data': self._preview_data.get('data', {}) if self._preview_data else {}
+        }
+        
+        result = self.servico.gerar_relatorio(dados)
+        
+        if result.get('success'):
+            messagebox.showinfo("Sucesso", f"Relatório '{nome}' gerado com sucesso!")
+            self.parent.on_relatorio_gerado()
+            self.destroy()
+        else:
+            messagebox.showerror("Erro", "Erro ao gerar relatório")

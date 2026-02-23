@@ -5,6 +5,9 @@ import threading
 from datetime import datetime
 from services.estudantes import ServicoEstudante
 from ui_theme import THEME, SPACING, RADIUS, font
+from components.pagination import PaginationControl
+from views.importacao_dialog import ImportButton
+
 
 class EstudantesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -12,6 +15,12 @@ class EstudantesFrame(ctk.CTkFrame):
         self.controller = controller
         self.servico_estudante = ServicoEstudante()
         self.colors = THEME
+        
+        # Estado de paginação
+        self._current_page = 1
+        self._items_per_page = 20
+        self._total_items = 0
+        self._all_students = []
         
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(2, weight=1)
@@ -66,6 +75,20 @@ class EstudantesFrame(ctk.CTkFrame):
             corner_radius=RADIUS["button"],
             command=self.novo_estudante_click
         ).pack(side="right")
+        
+        # Botão de importação
+        import_btn = ImportButton(
+            inner,
+            entity_type="estudantes",
+            on_complete=self._on_import_complete,
+            text="📥 Importar",
+            width=100,
+            height=40,
+            font=font(12),
+            fg_color=self.colors["success"],
+            hover_color="#0EA472"
+        )
+        import_btn.pack(side="right", padx=(0, 10))
 
     def novo_estudante_click(self):
         from tkinter import messagebox
@@ -142,6 +165,15 @@ class EstudantesFrame(ctk.CTkFrame):
 
         self.scroll_list = ctk.CTkScrollableFrame(sidebar, fg_color="transparent")
         self.scroll_list.pack(fill="both", expand=True, padx=5, pady=10)
+        
+        # Paginação na sidebar
+        self._pagination = PaginationControl(
+            sidebar,
+            total_items=0,
+            items_per_page=self._items_per_page,
+            on_page_change=self._on_page_change
+        )
+        self._pagination.pack(fill="x", padx=15, pady=(0, 15))
 
     def criar_detalhes(self):
         self.detail_card = ctk.CTkFrame(self.content_container, fg_color=self.colors["card"], corner_radius=RADIUS["card"], border_width=1, border_color=self.colors["border"])
@@ -194,15 +226,26 @@ class EstudantesFrame(ctk.CTkFrame):
         lbl.pack(side="left")
         return lbl
 
+    def _widget_exists(self) -> bool:
+        """Verifica se o widget ainda existe e é válido"""
+        try:
+            return self.winfo_exists()
+        except Exception:
+            return False
+
     def load_data(self):
         def fetch():
             res = self.servico_estudante.listar_estudantes()
-            self.after(0, lambda: self.render_list(res))
+            # Verifica se o widget ainda existe antes de agendar o callback
+            if self._widget_exists():
+                self.after(0, lambda: self.render_list(res))
         threading.Thread(target=fetch, daemon=True).start()
 
     def render_list(self, result):
-        for widget in self.scroll_list.winfo_children(): widget.destroy()
-        
+        # Verifica se o widget ainda existe antes de prosseguir
+        if not self._widget_exists():
+            return
+            
         # Processar resposta da API
         students = []
         if result.get('success'):
@@ -213,8 +256,55 @@ class EstudantesFrame(ctk.CTkFrame):
             elif isinstance(data, list):
                 students = data
         
-        for st in students:
-            # Verificar se st é um dicionário
+        # Armazena todos os estudantes
+        self._all_students = students
+        self._total_items = len(students)
+        
+        # Atualiza paginação (com verificação interna)
+        try:
+            if self._pagination is not None and hasattr(self._pagination, 'winfo_exists'):
+                if self._pagination.winfo_exists():
+                    self._pagination.update_total(self._total_items)
+        except Exception:
+            pass  # Widget já foi destruído
+        
+        # Renderiza página atual
+        self._render_current_page()
+
+    def selecionar_estudante(self, st):
+        self.lbl_nome_det.configure(text=st.get('name', 'N/A'))
+        self.lbl_curso_det.configure(text=st.get('course', 'N/A'))
+        self.lbl_avatar_big.configure(text=st.get('name', '??')[:2].upper())
+        
+        self.card_email.configure(text=st.get('contact', '--'))
+        self.card_idade.configure(text=f"{st.get('age', '--')} anos")
+        self.card_curso.configure(text=st.get('course', '--'))
+        self.card_laudo.configure(text="Sim" if st.get('has_medical_report') else "Não")
+    
+    def _on_page_change(self, page: int, items_per_page: int):
+        """Callback para mudança de página"""
+        self._current_page = page
+        self._items_per_page = items_per_page
+        self._render_current_page()
+    
+    def _on_import_complete(self, result: dict):
+        """Callback após importação"""
+        if result.get('success_count', 0) > 0:
+            self.load_data()
+    
+    def _render_current_page(self):
+        """Renderiza a página atual"""
+        for widget in self.scroll_list.winfo_children():
+            widget.destroy()
+        
+        # Calcula índices de início e fim
+        start_idx = (self._current_page - 1) * self._items_per_page
+        end_idx = start_idx + self._items_per_page
+        
+        # Pega os estudantes da página atual
+        page_students = self._all_students[start_idx:end_idx]
+        
+        for st in page_students:
             if not isinstance(st, dict):
                 continue
                 
@@ -227,13 +317,3 @@ class EstudantesFrame(ctk.CTkFrame):
             lbl_c.pack(anchor="w", padx=15)
             
             item.bind("<Button-1>", lambda e, s=st: self.selecionar_estudante(s))
-
-    def selecionar_estudante(self, st):
-        self.lbl_nome_det.configure(text=st.get('name', 'N/A'))
-        self.lbl_curso_det.configure(text=st.get('course', 'N/A'))
-        self.lbl_avatar_big.configure(text=st.get('name', '??')[:2].upper())
-        
-        self.card_email.configure(text=st.get('contact', '--'))
-        self.card_idade.configure(text=f"{st.get('age', '--')} anos")
-        self.card_curso.configure(text=st.get('course', '--'))
-        self.card_laudo.configure(text="Sim" if st.get('has_medical_report') else "Não")
