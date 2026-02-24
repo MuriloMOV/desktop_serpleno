@@ -1,5 +1,6 @@
 import customtkinter as ctk
 from ui_theme import THEME, SPACING, RADIUS, font
+from tkcalendar import DateEntry
 
 class RelatorioFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
@@ -113,15 +114,105 @@ class RelatorioFrame(ctk.CTkFrame):
         return lbl
 
     def _criar_lista_relatorios(self):
-        container = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
-        container.grid(row=3, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, 20))
+        container_lista = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
+        container_lista.grid(row=3, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(10, 24))
         
-        header = ctk.CTkFrame(container, fg_color="transparent")
-        header.pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(header, text="Relatórios Gerados", font=font(15, "bold")).pack(side="left")
+        filter_bar = ctk.CTkFrame(container_lista, fg_color="transparent")
+        filter_bar.pack(fill="x", padx=20, pady=15)
 
-        self.reports_container = ctk.CTkScrollableFrame(container, fg_color="transparent")
+        # 1. Dropdown de Tipos (Em vez de busca por texto)
+        ctk.CTkLabel(filter_bar, text="Tipo:", font=font(12, "bold")).pack(side="left", padx=(0, 5))
+        self.filtro_tipo = ctk.CTkOptionMenu(
+            filter_bar,
+            values=["Todos", "Geral", "Estudante", "Agendamentos", "Intervenções", "Triagens"],
+            width=140, height=32,
+            fg_color=THEME["bg_alt"], text_color=THEME["text"],
+            button_color=THEME["border"], button_hover_color=THEME["primary_light"]
+        )
+        self.filtro_tipo.pack(side="left", padx=(0, 20))
+
+        # 2. Seleção de Datas com Botões/Calendário
+        ctk.CTkLabel(filter_bar, text="Período:", font=font(12, "bold")).pack(side="left", padx=(0, 5))
+        
+        # Botões que abrem o seletor
+        self.btn_data_ini = ctk.CTkButton(filter_bar, text="Data Início", width=100, height=32, 
+                                          fg_color=THEME["bg_alt"], text_color=THEME["text"],
+                                          command=lambda: self.abrir_calendario("inicio"))
+        self.btn_data_ini.pack(side="left", padx=5)
+
+        ctk.CTkLabel(filter_bar, text="até").pack(side="left", padx=2)
+
+        self.btn_data_fim = ctk.CTkButton(filter_bar, text="Data Fim", width=100, height=32, 
+                                          fg_color=THEME["bg_alt"], text_color=THEME["text"],
+                                          command=lambda: self.abrir_calendario("fim"))
+        self.btn_data_fim.pack(side="left", padx=5)
+
+        # Botões de Ação
+        ctk.CTkButton(filter_bar, text="Filtrar", width=90, height=32, 
+                      command=self.controller.aplicar_filtros).pack(side="left", padx=(20, 10))
+        
+        ctk.CTkButton(filter_bar, text="Limpar", width=80, height=32, fg_color="transparent", 
+                      border_width=1, text_color=THEME["text"],
+                      command=self.controller.limpar_filtros).pack(side="left")
+
+        self.reports_container = ctk.CTkScrollableFrame(container_lista, fg_color="transparent")
         self.reports_container.pack(expand=True, fill="both", padx=5, pady=5)
+
+    def abrir_calendario(self, alvo):
+        """Abre o calendário exatamente sob o botão clicado"""
+        # Identifica qual botão foi clicado para pegar a posição
+        botao = self.btn_data_ini if alvo == "inicio" else self.btn_data_fim
+        
+        # Calcula a posição do botão na tela
+        # winfo_rootx/y pega a posição absoluta na tela
+        x = botao.winfo_rootx()
+        y = botao.winfo_rooty() + botao.winfo_height() + 5 # 5px de margem abaixo
+
+        # Cria a janela flutuante
+        janela_cal = ctk.CTkToplevel(self)
+        janela_cal.withdraw() # Esconde a janela enquanto configura para evitar "pulo" visual
+        janela_cal.title("")
+        janela_cal.overrideredirect(True) # Remove a barra de título (estilo popup)
+        janela_cal.attributes("-topmost", True)
+        janela_cal.configure(fg_color=THEME["card"])
+        
+        # Define a posição calculada
+        janela_cal.geometry(f"250x280+{x}+{y}")
+
+        # Frame de borda para parecer um menu
+        frame_borda = ctk.CTkFrame(janela_cal, fg_color=THEME["card"], 
+                                   border_width=2, border_color=THEME["primary"])
+        frame_borda.pack(fill="both", expand=True)
+
+        from tkcalendar import Calendar
+        cal = Calendar(frame_borda, selectmode='day', locale='pt_BR', 
+                       date_pattern='dd/mm/yyyy', 
+                       background=THEME["primary"], 
+                       foreground='white', 
+                       headersbackground=THEME["bg_alt"])
+        cal.pack(pady=10, padx=10, fill="both", expand=True)
+
+        def confirmar_data():
+            data_selecionada = cal.get_date()
+            if alvo == "inicio":
+                self.btn_data_ini.configure(text=data_selecionada, fg_color=THEME["primary"], text_color="white")
+            else:
+                self.btn_data_fim.configure(text=data_selecionada, fg_color=THEME["primary"], text_color="white")
+            janela_cal.destroy()
+
+        # Botão para fechar sem selecionar
+        btn_container = ctk.CTkFrame(frame_borda, fg_color="transparent")
+        btn_container.pack(fill="x", pady=5)
+        
+        ctk.CTkButton(btn_container, text="Cancelar", width=80, fg_color="gray", 
+                      command=janela_cal.destroy).pack(side="left", padx=10)
+        ctk.CTkButton(btn_container, text="Selecionar", width=120, 
+                      command=confirmar_data).pack(side="right", padx=10)
+
+        janela_cal.deiconify() # Mostra a janela já posicionada
+        
+        # Fecha a janela se o usuário clicar fora dela (opcional)
+        janela_cal.bind("<FocusOut>", lambda e: janela_cal.destroy())
 
     def _criar_secao_exportacao(self):
         export_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
@@ -129,9 +220,9 @@ class RelatorioFrame(ctk.CTkFrame):
         
         inner = ctk.CTkFrame(export_frame, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(inner, text="📥 Exportação:", font=font(12, "bold")).pack(side="left", padx=(0, 15))
+        ctk.CTkLabel(inner, text="📥 Exportar Dados:", font=font(12, "bold")).pack(side="left", padx=(0, 15))
         
-        for label, tipo in [("Estudantes", "estudantes"), ("Agenda", "agenda"), ("Triagens", "triagens")]:
+        for label, tipo in [("Estudantes", "estudantes"), ("Agenda ", "agenda"), ("Triagens", "triagens")]:
             ctk.CTkButton(inner, text=label, width=90, height=28, fg_color=THEME["bg_alt"], 
                           text_color=THEME["text"], command=lambda t=tipo: self.controller.exportar(t)).pack(side="left", padx=5)
 

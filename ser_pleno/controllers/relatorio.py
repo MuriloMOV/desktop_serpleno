@@ -2,6 +2,8 @@ import threading
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg 
 from models.relatorio import NovoRelatorioModal
+import datetime
+from ui_theme import THEME
 
 class RelatorioController:
     def __init__(self):
@@ -57,16 +59,12 @@ class RelatorioController:
 
         if not self.view or not hasattr(self.view, 'chart_box'): return
 
-        # --- ADICIONE ESTA LINHA ---
-        # Remove widgets antigos (canvas anteriores) para evitar duplicação
-        for widget in self.view.chart_box.winfo_children():
-            # Mantemos apenas o Label de título, se houver
-            if isinstance(widget, ctk.CTkCanvas) or "canvas" in str(widget).lower():
-                widget.destroy()
-        # ---------------------------
 
-        # ... seu código de criação da Figure ...
-        
+        for widget in self.view.chart_box.winfo_children():
+            
+            if isinstance(widget, FigureCanvasTkAgg) or "canvas" in str(widget).lower():
+                widget.destroy()
+
         canvas = FigureCanvasTkAgg(fig, master=self.view.chart_box)
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         canvas.draw()
@@ -109,3 +107,43 @@ class RelatorioController:
                 print(f"Erro ao salvar: {e}")
 
         threading.Thread(target=salvar, daemon=True).start()
+
+    def aplicar_filtros(self):
+        # Captura os valores da View
+        tipo_selecionado = self.view.filtro_tipo.get()
+        data_ini_str = self.view.btn_data_ini.cget("text")
+        data_fim_str = self.view.btn_data_fim.cget("text")
+
+        relatorios_filtrados = self.todos_relatorios
+
+        # 1. Filtro por Tipo (Dropdown)
+        if tipo_selecionado != "Todos":
+            relatorios_filtrados = [r for r in relatorios_filtrados if r.get('type') == tipo_selecionado]
+
+        # 2. Filtro por Data
+        try:
+            # Verifica se os botões não estão com o texto padrão
+            if data_ini_str != "Data Início" and data_fim_str != "Data Fim":
+                d_ini = datetime.strptime(data_ini_str, "%d/%m/%Y")
+                d_fim = datetime.strptime(data_fim_str, "%d/%m/%Y")
+                
+                temp = []
+                for r in relatorios_filtrados:
+                    data_r_str = r.get('generated_at') or r.get('created_at')
+                    if data_r_str:
+                        # Tratando data ISO (YYYY-MM-DD)
+                        data_r = datetime.fromisoformat(data_r_str.split('T')[0])
+                        if d_ini <= data_r <= d_fim:
+                            temp.append(r)
+                relatorios_filtrados = temp
+        except Exception as e:
+            print(f"Erro ao processar datas do filtro: {e}")
+
+        # Atualiza a lista
+        self.view.populate_reports_list(relatorios_filtrados)
+
+    def limpar_filtros(self):
+        self.view.filtro_tipo.set("Todos")
+        self.view.btn_data_ini.configure(text="Data Início", fg_color=THEME["bg_alt"], text_color=THEME["text"])
+        self.view.btn_data_fim.configure(text="Data Fim", fg_color=THEME["bg_alt"], text_color=THEME["text"])
+        self.view.populate_reports_list(self.todos_relatorios)
