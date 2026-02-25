@@ -1,4 +1,5 @@
 import threading
+from tkinter import messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg 
 from models.relatorio import NovoRelatorioModal
@@ -69,17 +70,56 @@ class RelatorioController:
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         canvas.draw()
 
-    def exportar(self, tipo):
-        try:
-            metodos = {
-                "estudantes": self.servico.exportar_estudantes,
-                "agenda": self.servico.exportar_agendamentos,
-                "triagens": self.servico.exportar_triagens
-            }
-            if tipo in metodos:
-                metodos[tipo]()
-        except Exception as e:
-            print(f"Erro na exportação: {e}")
+    def exportar(self, tipo, formato):
+        """
+        Coordena a exportação usando Threads para não travar a interface.
+        """
+        # 1. Feedback visual imediato
+        self.view.mostrar_loading_exportacao(True)
+
+        def thread_exportacao():
+            try:
+                # Dicionário de métodos do serviço
+                metodos = {
+                    "estudantes": self.servico.exportar_estudantes,
+                    "agenda": self.servico.exportar_agendamentos,
+                    "triagens": self.servico.exportar_triagens
+                }
+
+                if tipo not in metodos:
+                    raise ValueError(f"Tipo '{tipo}' não suportado.")
+
+                # Executa a exportação (demorada) no serviço
+                # O retorno agora é True/False baseado no que fizemos no Service
+                resultado = metodos[tipo](formato=formato)
+                
+                # Se for um dicionário (como estava no seu service original), 
+                # extraímos o sucesso. Se for booleano, usamos direto.
+                sucesso = resultado.get("success", False) if isinstance(resultado, dict) else resultado
+
+                # 2. Volta para a thread principal para atualizar a UI
+                self.view.after(0, lambda: self.finalizar_exportacao(sucesso, tipo, formato))
+
+            except PermissionError:
+                self.view.after(0, lambda: self.finalizar_exportacao(False, tipo, formato, 
+                    erro="O arquivo está aberto em outro programa. Feche-o e tente novamente."))
+            except Exception as e:
+                self.view.after(0, lambda: self.finalizar_exportacao(False, tipo, formato, erro=str(e)))
+
+        # Inicia o processamento em background
+        threading.Thread(target=thread_exportacao, daemon=True).start()
+
+    def finalizar_exportacao(self, sucesso, tipo, formato, erro=None):
+        """Fecha o loading e mostra a mensagem final"""
+        self.view.mostrar_loading_exportacao(False)
+        
+        if sucesso:
+            messagebox.showinfo("Sucesso", f"O relatório de {tipo.capitalize()} foi exportado para {formato.upper()} com sucesso!")
+        elif erro:
+            messagebox.showerror("Erro na Exportação", f"Ocorreu um problema: {erro}")
+        else:
+            # Caso onde o usuário apenas cancelou a janela de salvar
+            pass
 
     # No RelatorioController
     def gerar_novo_relatorio(self):

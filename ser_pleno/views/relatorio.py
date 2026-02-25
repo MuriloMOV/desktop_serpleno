@@ -215,16 +215,104 @@ class RelatorioFrame(ctk.CTkFrame):
         janela_cal.bind("<FocusOut>", lambda e: janela_cal.destroy())
 
     def _criar_secao_exportacao(self):
+        """Cria a barra inferior com o botão de gatilho para o modal"""
         export_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
         export_frame.grid(row=4, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 20))
         
         inner = ctk.CTkFrame(export_frame, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=10)
-        ctk.CTkLabel(inner, text="📥 Exportar Dados:", font=font(12, "bold")).pack(side="left", padx=(0, 15))
+
+        # Botão principal que abre o Modal
+        self.btn_exportar_trigger = ctk.CTkButton(
+            inner, 
+            text="📥 Exportar Dados do Sistema", 
+            font=font(12, "bold"),
+            fg_color=THEME["bg_alt"],
+            text_color=THEME["text"],
+            hover_color=THEME["border"],
+            height=35,
+            command=self.abrir_modal_exportacao 
+        )
+        self.btn_exportar_trigger.pack(side="left")
         
-        for label, tipo in [("Estudantes", "estudantes"), ("Agenda ", "agenda"), ("Triagens", "triagens")]:
-            ctk.CTkButton(inner, text=label, width=90, height=28, fg_color=THEME["bg_alt"], 
-                          text_color=THEME["text"], command=lambda t=tipo: self.controller.exportar(t)).pack(side="left", padx=5)
+        ctk.CTkLabel(
+            inner, 
+            text="Selecione estudantes, agenda ou triagens para gerar arquivos PDF, Excel ou Word.", 
+            font=font(11), 
+            text_color=THEME["text_muted"]
+        ).pack(side="left", padx=15)
+
+    def abrir_modal_exportacao(self):
+        """Cria uma janela pop-up para configurar a exportação"""
+        modal = ctk.CTkToplevel(self)
+        modal.title("Exportar")
+        modal.geometry("350x380")
+        modal.attributes("-topmost", True)
+        modal.configure(fg_color=THEME["card"])
+        modal.resizable(False, False)
+        
+        # Centralizar o modal em relação à janela principal
+        modal.grab_set() # Impede interação com a janela principal até fechar o modal
+
+        ctk.CTkLabel(modal, text="Configurar Exportação", font=font(16, "bold")).pack(pady=20)
+
+        # Seleção de Tipo
+        ctk.CTkLabel(modal, text="O que deseja exportar?", font=font(12)).pack(anchor="w", padx=35)
+        combo_tipo = ctk.CTkOptionMenu(
+            modal, 
+            values=["Estudantes", "Agenda", "Triagens"],
+            fg_color=THEME["bg_alt"], text_color=THEME["text"],
+            button_color=THEME["border"], width=280
+        )
+        combo_tipo.pack(pady=(5, 15))
+
+        # Seleção de Formato
+        ctk.CTkLabel(modal, text="Formato do arquivo:", font=font(12)).pack(anchor="w", padx=35)
+        combo_formato = ctk.CTkOptionMenu(
+            modal, 
+            values=["Excel (.xlsx)", "PDF (.pdf)", "Word (.docx)"],
+            fg_color=THEME["bg_alt"], text_color=THEME["text"],
+            button_color=THEME["border"], width=280
+        )
+        combo_formato.pack(pady=(5, 25))
+
+        # Função interna para processar o clique
+        def confirmar():
+            mapa_tipos = {
+                "Estudantes": "estudantes",
+                "Agenda": "agenda",
+                "Triagens": "triagens"
+            }
+            mapa_formatos = {
+                "Excel (.xlsx)": "excel",
+                "PDF (.pdf)": "pdf",
+                "Word (.docx)": "word"
+            }
+
+            tipo = mapa_tipos[combo_tipo.get()]
+            formato = mapa_formatos[combo_formato.get()]
+            
+            # Chama o controller
+            self.controller.exportar(tipo, formato)
+            modal.destroy()
+
+        # Botão de Confirmação
+        ctk.CTkButton(
+            modal, text="Gerar e Salvar Arquivo", 
+            fg_color=THEME["primary"], 
+            hover_color=THEME["primary_hover"],
+            font=font(13, "bold"),
+            command=confirmar,
+            height=40, width=280
+        ).pack(pady=10)
+
+        # Botão Cancelar
+        ctk.CTkButton(
+            modal, text="Cancelar", 
+            fg_color="transparent", 
+            text_color=THEME["text_muted"],
+            command=modal.destroy
+        ).pack()
 
     # --- MÉTODOS CHAMADOS PELO CONTROLLER ---
 
@@ -333,3 +421,5 @@ class RelatorioFrame(ctk.CTkFrame):
         # Container para a lista de relatórios (Preenche o restante do espaço)
         self.reports_container = ctk.CTkScrollableFrame(container_lista, fg_color="transparent")
         self.reports_container.pack(expand=True, fill="both")
+
+    

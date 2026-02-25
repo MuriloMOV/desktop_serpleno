@@ -1,4 +1,9 @@
 import json
+import pandas as pd
+from docx import Document
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from tkinter import filedialog
 from config.db_config import get_db_connection
 
 class ServicoRelatorio:
@@ -100,31 +105,100 @@ class ServicoRelatorio:
         
         return {"success": True, "data": {"id": relatorio_id}}
 
-    # --- Métodos de Exportação (Mantidos iguais, apenas garantindo o retorno) ---
-    def exportar_estudantes(self):
+    # --- Métodos de Exportação  ---
+    def exportar_estudantes(self, formato):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM aluno ORDER BY nome ASC")
-        rows = cursor.fetchall()
-        connection.close()
-        # Aqui você pode adicionar a lógica de gerar o Excel/CSV fisicamente
-        print("Exportando estudantes...")
-        return {"success": True, "data": list(rows)}
-
-    def exportar_agendamentos(self):
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM agendamento ORDER BY data_hora DESC")
-        rows = cursor.fetchall()
+        cursor.execute("SELECT nome, sala, curso, professor_responsavel FROM aluno ORDER BY nome ASC")
+        dados = cursor.fetchall()
         connection.close()
         
-        return {"success": True, "data": list(rows)}
+        return self._gerar_arquivo_fisico(dados, "Relatorio_Estudantes", formato)
 
-    def exportar_triagens(self):
+    def exportar_agendamentos(self, formato):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM desktop_screening ORDER BY created_at DESC")
-        rows = cursor.fetchall()
+        # Ajuste as colunas conforme seu banco
+        cursor.execute("SELECT id, data_hora, status, aluno_id FROM agendamento ORDER BY data_hora DESC")
+        dados = cursor.fetchall()
         connection.close()
         
-        return {"success": True, "data": list(rows)}
+        return self._gerar_arquivo_fisico(dados, "Relatorio_Agenda", formato)
+
+    def exportar_triagens(self, formato):
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT status, priority, completed_date, observations FROM desktop_screening ORDER BY created_at DESC")
+        dados = cursor.fetchall()
+        connection.close()
+        
+        return self._gerar_arquivo_fisico(dados, "Relatorio_Triagens", formato)
+
+    def _gerar_arquivo_fisico(self, dados, nome_sugerido, formato):
+        """Método interno auxiliar para processar a criação dos arquivos"""
+        if not dados:
+            return False
+
+        # 1. Escolher local de salvamento
+        extensoes = {
+            "excel": (".xlsx", [("Excel files", "*.xlsx")]),
+            "pdf": (".pdf", [("PDF files", "*.pdf")]),
+            "word": (".docx", [("Word files", "*.docx")])
+        }
+        
+        ext, ft = extensoes.get(formato)
+        caminho = filedialog.asksaveasfilename(
+            initialfile=nome_sugerido + ext,
+            defaultextension=ext,
+            filetypes=ft
+        )
+
+        if not caminho:
+            return False # Usuário cancelou
+
+        try:
+            # 2. Lógica por Formato
+            if formato == "excel":
+                df = pd.DataFrame(dados)
+                df.to_excel(caminho, index=False)
+
+            elif formato == "word":
+                doc = Document()
+                doc.add_heading(nome_sugerido.replace("_", " "), 0)
+                
+                # Criar uma tabela simples no Word
+                if dados:
+                    table = doc.add_table(rows=1, cols=len(dados[0]))
+                    hdr_cells = table.rows[0].cells
+                    for i, col_name in enumerate(dados[0].keys()):
+                        hdr_cells[i].text = str(col_name).upper()
+                    
+                    for item in dados:
+                        row_cells = table.add_row().cells
+                        for i, value in enumerate(item.values()):
+                            row_cells[i].text = str(value)
+                doc.save(caminho)
+
+            elif formato == "pdf":
+                c = canvas.Canvas(caminho, pagesize=A4)
+                width, height = A4
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(50, height - 50, nome_sugerido.replace("_", " "))
+                
+                c.setFont("Helvetica", 10)
+                y = height - 80
+                for item in dados:
+                    texto = " | ".join([f"{k}: {v}" for k, v in item.items()])
+                    c.drawString(50, y, texto)
+                    y -= 20
+                    if y < 50: # Nova página se acabar o espaço
+                        c.showPage()
+                        y = height - 50
+                c.save()
+
+            return True
+        except Exception as e:
+            print(f"Erro ao salvar arquivo: {e}")
+            return False
+    
+    
