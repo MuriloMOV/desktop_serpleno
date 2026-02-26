@@ -61,8 +61,8 @@ class ServicoBemEstar:
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
         # Buscar alunos com marcação de atenção e agrupar por prioridade
-        # Conforme ser_pleno.sql, a PK da tabela aluno é 'id' (não 'id_aluno')
-        cursor.execute("SELECT id, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
+        # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
+        cursor.execute("SELECT id_aluno, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
         rows = cursor.fetchall()
         groups = {'critical': [], 'high': [], 'medium': [], 'low': []}
         for r in rows:
@@ -248,7 +248,7 @@ class ServicoBemEstar:
         try:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT id, nome as name, curso as course FROM aluno ORDER BY nome")
+            cursor.execute("SELECT id_aluno, nome as name, curso as course FROM aluno ORDER BY nome")
             result = cursor.fetchall()
             connection.close()
             return {"success": True, "data": result}

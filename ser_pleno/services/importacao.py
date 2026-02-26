@@ -651,7 +651,7 @@ class ServicoImportacao:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
             
-            query = "SELECT id, nome, email FROM aluno WHERE "
+            query = "SELECT id_aluno, nome, email FROM aluno WHERE "
             params = []
             
             if nome and email:

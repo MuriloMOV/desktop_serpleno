@@ -31,10 +31,10 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         try:
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id, nome FROM aluno ORDER BY nome ASC")
+            cursor.execute("SELECT id_aluno, nome FROM aluno ORDER BY nome ASC")
             rows = cursor.fetchall()
             # Criamos um dicionário para facilitar a busca do ID pelo Nome selecionado no ComboBox
-            self.mapa_estudantes = {r['nome']: r['id'] for r in rows}
+            self.mapa_estudantes = {r['nome']: r['id_aluno'] for r in rows}
             cursor.close()
             conn.close()
         except Exception as e:

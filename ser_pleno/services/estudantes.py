@@ -10,6 +10,11 @@ try:
 except Exception:
     requests = None  # type: ignore
 
+try:
+    import mysql.connector
+except Exception:
+    mysql = None  # type: ignore
+
 from config.db_config import get_db_connection
 from services.api import api, get_auth_service
 
@@ -125,8 +130,18 @@ class ServicoEstudante:
             cursor = connection.cursor(dictionary=True)
             logger.info("Conexão com banco local estabelecida com sucesso")
 
+            # Verificar se a tabela aluno tem a coluna 'id' ou 'id_aluno'
+            # Se não existir 'id', criar um alias temporário
+            try:
+                cursor.execute("SELECT id FROM aluno LIMIT 1")
+                id_column = 'id'
+            except mysql.connector.Error:
+                # Coluna 'id' não existe, usar 'id_aluno'
+                logger.info("Coluna 'id' não encontrada, usando 'id_aluno'")
+                id_column = 'id_aluno'
+
             # Join com auth_user para obter e-mail de contato
-            query = "SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE 1=1"
+            query = f"SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE 1=1"
             params: List[Any] = []
 
             if busca:
@@ -150,11 +165,12 @@ class ServicoEstudante:
             logger.info(f"Encontrados {total} estudantes no banco de dados local")
             
             # Mapear colunas do banco para o formato esperado pela UI
-            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
+            # Usa a coluna de ID correta detectada anteriormente
             students = []
             for r in rows:
+                student_id = r.get(id_column)
                 students.append({
-                    'id': r.get('id_aluno'),  # PK conforme modelo Django
+                    'id': student_id,  # ID do estudante
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -191,6 +207,13 @@ class ServicoEstudante:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
 
+            # Verificar se a tabela aluno tem a coluna 'id' ou 'id_aluno'
+            try:
+                cursor.execute("SELECT id FROM aluno LIMIT 1")
+                id_column = 'id'
+            except mysql.connector.Error:
+                id_column = 'id_aluno'
+
             # Join com auth_user para obter e-mail de contato
             query = "SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE 1=1"
             params = []
@@ -216,11 +239,12 @@ class ServicoEstudante:
             logger.info(f"Encontrados {len(rows)} estudantes no banco de dados local (fallback)")
             
             # Mapear colunas do banco para o formato esperado pela UI
-            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
+            # Usa a coluna de ID correta detectada anteriormente
             students = []
             for r in rows:
+                student_id = r.get(id_column)
                 students.append({
-                    'id': r.get('id_aluno'),  # PK conforme modelo Django
+                    'id': student_id,  # PK conforme modelo Django
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -274,14 +298,21 @@ class ServicoEstudante:
             
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
+            
+            # Verificar se a tabela aluno tem a coluna 'id' ou 'id_aluno'
+            try:
+                cursor.execute("SELECT id FROM aluno LIMIT 1")
+                id_column = 'id'
+            except mysql.connector.Error:
+                id_column = 'id_aluno'
+            
             # Buscar aluno com email (join em auth_user)
-            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
-            cursor.execute("SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE a.id_aluno = %s", (id_estudante,))
+            cursor.execute(f"SELECT a.*, u.email AS contact FROM aluno a LEFT JOIN auth_user u ON a.user_id = u.id WHERE a.{id_column} = %s", (id_estudante,))
             r = cursor.fetchone()
             student = None
             if r:
                 student = {
-                    'id': r.get('id_aluno'),  # PK conforme modelo Django
+                    'id': r.get(id_column),  # ID do estudante
                     'name': r.get('nome'),
                     'course': r.get('curso'),
                     'age': r.get('age') or r.get('idade'),
@@ -456,8 +487,15 @@ class ServicoEstudante:
             
             connection = get_db_connection()
             cursor = connection.cursor()
-            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
-            query = "UPDATE aluno SET nome = %s, email = %s, has_medical_report = %s, requires_attention = %s WHERE id_aluno = %s"
+            
+            # Verificar se a tabela aluno tem a coluna 'id' ou 'id_aluno'
+            try:
+                cursor.execute("SELECT id FROM aluno LIMIT 1")
+                id_column = 'id'
+            except mysql.connector.Error:
+                id_column = 'id_aluno'
+            
+            query = f"UPDATE aluno SET nome = %s, email = %s, has_medical_report = %s, requires_attention = %s WHERE {id_column} = %s"
             cursor.execute(query, (dados.get('name') or dados.get('nome'), dados.get('contact') or dados.get('email'), dados.get('has_medical_report', False), dados.get('requires_attention', False), id_estudante))
             connection.commit()
             connection.close()
@@ -506,8 +544,15 @@ class ServicoEstudante:
             
             connection = get_db_connection()
             cursor = connection.cursor()
-            # Conforme o modelo Django Aluno, a PK da tabela aluno é mapeada como 'id_aluno'
-            cursor.execute("DELETE FROM aluno WHERE id_aluno = %s", (id_estudante,))
+            
+            # Verificar se a tabela aluno tem a coluna 'id' ou 'id_aluno'
+            try:
+                cursor.execute("SELECT id FROM aluno LIMIT 1")
+                id_column = 'id'
+            except mysql.connector.Error:
+                id_column = 'id_aluno'
+            
+            cursor.execute(f"DELETE FROM aluno WHERE {id_column} = %s", (id_estudante,))
             connection.commit()
             connection.close()
             return {"success": True, "message": "Estudante deletado com sucesso"}
