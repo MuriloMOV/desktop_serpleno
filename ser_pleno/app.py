@@ -27,7 +27,7 @@ class App(ctk.CTk):
         self.minsize(800, 480)
         self.configure(fg_color=THEME["bg"])
 
-        self.usuario_logado = None  # Armazena os dados do usuário logado
+        self.usuario_logado = None  # Armazena os dados do usuário logados
         self.usuario_logado_id = None
 
         self.container = ctk.CTkFrame(self, fg_color=THEME["bg"])

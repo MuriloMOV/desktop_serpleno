@@ -22,6 +22,7 @@ USE `ser_pleno` ;
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `ser_pleno`.`agendamento` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `nome` VARCHAR(200) NULL DEFAULT NULL,
   `student_id` INT NOT NULL,
   `data_hora` DATETIME(6) NOT NULL,
   `motivo` LONGTEXT NOT NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`agendamento` (
   `profissional` VARCHAR(200) NULL DEFAULT NULL,
   `laudo` VARCHAR(45) NULL DEFAULT NULL,
   `origem` VARCHAR(20) NULL DEFAULT NULL,
+  `desktop_appointment_id` INT NULL DEFAULT NULL,
   `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
@@ -38,7 +40,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`agendamento` (
   INDEX `agendamento_status_idx` (`status` ASC) VISIBLE,
   INDEX `agendamento_data_status_idx` (`data_hora` ASC, `status` ASC) VISIBLE)
 ENGINE = InnoDB
-AUTO_INCREMENT = 12
+AUTO_INCREMENT = 17
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -70,8 +72,8 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`aluno` (
   `status` VARCHAR(20) NOT NULL,
   PRIMARY KEY (`id_aluno`),
   UNIQUE INDEX `user_id` (`user_id` ASC) VISIBLE)
-ENGINE = InnoDB
-AUTO_INCREMENT = 31
+ENGINE = MyISAM
+AUTO_INCREMENT = 33
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -286,7 +288,26 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_alert` (
   INDEX `desktop_ale_alert_t_e32351_idx` (`alert_type` ASC, `severity` ASC) VISIBLE,
   INDEX `desktop_ale_assigne_709829_idx` (`assigned_to_id` ASC, `is_resolved` ASC) VISIBLE)
 ENGINE = MyISAM
-AUTO_INCREMENT = 9
+AUTO_INCREMENT = 17
+DEFAULT CHARACTER SET = utf8mb4
+COLLATE = utf8mb4_0900_ai_ci;
+
+
+-- -----------------------------------------------------
+-- Table `ser_pleno`.`desktop_appointment`
+-- -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_appointment` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT,
+  `student_id` INT NOT NULL,
+  `time` INT NULL DEFAULT NULL,
+  `date` DATE NOT NULL,
+  `status` VARCHAR(20) NULL DEFAULT 'scheduled',
+  `notes` TEXT NULL DEFAULT NULL,
+  `created_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  `updated_at` DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (`id`))
+ENGINE = InnoDB
+AUTO_INCREMENT = 2
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -390,7 +411,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_intervention` (
   `is_confidential` TINYINT(1) NOT NULL,
   `outcome` VARCHAR(50) NOT NULL,
   `outcome_notes` LONGTEXT NOT NULL,
-  `tags` JSON NOT NULL,
+  `tags` JSON NOT NULL ,
   PRIMARY KEY (`id`),
   INDEX `desktop_intervention_student_id_27ec8a66` (`student_id` ASC) VISIBLE,
   INDEX `desktop_int_student_202c5a_idx` (`student_id` ASC, `date` ASC) VISIBLE,
@@ -399,7 +420,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`desktop_intervention` (
   INDEX `desktop_int_follow__b9866e_idx` (`follow_up_required` ASC, `follow_up_date` ASC) VISIBLE,
   INDEX `desktop_int_outcome_5cc100_idx` (`outcome` ASC) VISIBLE,
   INDEX `desktop_intervention_conducted_by_id_1a18fe97` (`conducted_by_id` ASC) VISIBLE)
-ENGINE = InnoDB
+ENGINE = MyISAM
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -676,7 +697,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`disponibilidade` (
   UNIQUE INDEX `disponibilidade_Horario_Analista_id_analista_1004465e_uniq` (`Horario` ASC, `Analista_id_analista` ASC) VISIBLE,
   INDEX `disponibilidade_Analista_id_analista_04058a77` (`Analista_id_analista` ASC) VISIBLE)
 ENGINE = MyISAM
-AUTO_INCREMENT = 9
+AUTO_INCREMENT = 10
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -726,7 +747,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`django_migrations` (
   `applied` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`))
 ENGINE = MyISAM
-AUTO_INCREMENT = 46
+AUTO_INCREMENT = 48
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -804,7 +825,7 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`help_requests` (
   PRIMARY KEY (`id`),
   INDEX `help_requests_aluno_id_b47fdf02` (`aluno_id` ASC) VISIBLE)
 ENGINE = MyISAM
-AUTO_INCREMENT = 2
+AUTO_INCREMENT = 6
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;
 
@@ -862,12 +883,12 @@ CREATE TABLE IF NOT EXISTS `ser_pleno`.`mural_posts` (
   `categoria` VARCHAR(20) NOT NULL,
   `data_agendamento` DATETIME(6) NULL DEFAULT NULL,
   `link_externo` VARCHAR(200) NULL DEFAULT NULL,
-  `blocos` JSON NOT NULL,
+  `blocos` JSON NOT NULL ,
   `layout` VARCHAR(20) NOT NULL,
   `horario_evento` DATETIME(6) NULL DEFAULT NULL,
   `local_fisico` VARCHAR(200) NULL DEFAULT NULL,
   PRIMARY KEY (`id`))
-ENGINE = InnoDB
+ENGINE = MyISAM
 AUTO_INCREMENT = 5
 DEFAULT CHARACTER SET = utf8mb4
 COLLATE = utf8mb4_0900_ai_ci;

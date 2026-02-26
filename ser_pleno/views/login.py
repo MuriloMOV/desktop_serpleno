@@ -3,6 +3,8 @@ import customtkinter as ctk
 import random
 import math
 from services.autenticacao import ServicoAutenticacao
+from services.agendamentos import set_auth_service as set_auth_service_agendamentos
+from services.api import set_auth_service as set_auth_service_api
 # Compat alias para testes que esperam o nome em inglês
 AuthService = ServicoAutenticacao
 import threading
@@ -24,6 +26,9 @@ class LoginFrame(ctk.CTkFrame):
 
         self.bolhas = []
         self.background_drawn = False
+
+        os.environ['SDL_AUDIODRIVER'] = 'directsound'
+        mixer.init()
 
         self.canvas = ctk.CTkCanvas(self, highlightthickness=0)
         self.canvas.place(relwidth=1, relheight=1)
@@ -76,7 +81,7 @@ class LoginFrame(ctk.CTkFrame):
             y = random.randint(100, 800)
             size = random.randint(40, 130)
 
-            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="#ffffff", width=1, tags="bubble")
+            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="#dfdada", width=1, tags="bubble")
 
             char = chars[i] if i < len(chars) else ""
             text_id = None
@@ -223,7 +228,7 @@ class LoginFrame(ctk.CTkFrame):
     # ================= TOGGLE DE MÚSICA =================
     def criar_music_toggle(self):
         # Container menor no canto inferior direito
-        self.music_frame = ctk.CTkFrame(self, fg_color=THEME["card"], corner_radius=20, border_width=1, border_color=THEME["border"], bg_color=THEME["brand_accent"])
+        self.music_frame = ctk.CTkFrame(self, fg_color=THEME["card_music"], corner_radius=20, border_width=2, border_color=THEME["border_music"], bg_color=THEME["brand_accent"])
         self.music_frame.place(relx=0.98, rely=0.98, anchor="se")
         
         self.music_var = ctk.StringVar(value="off")
@@ -239,7 +244,7 @@ class LoginFrame(ctk.CTkFrame):
             progress_color=THEME["primary"],
             button_color=THEME["bg_alt"],
             button_hover_color=THEME["border"],
-            fg_color=THEME["bg_alt"]
+            fg_color=THEME["info"]
         )
         self.music_switch.pack(padx=12, pady=12)
 
@@ -257,6 +262,9 @@ class LoginFrame(ctk.CTkFrame):
                 result = self.servico_autenticacao.login(username, password)
                 if result['success']:
                     self.lbl_erro.configure(text="")
+                    # Define o serviço de autenticação para uso nas requisições API
+                    set_auth_service_agendamentos(self.servico_autenticacao)
+                    set_auth_service_api(self.servico_autenticacao)
                     # Must schedule UI update on main thread
                     self.after(0, lambda: self.controller.iniciar_sistema(result['user']))
                 else:
@@ -276,17 +284,13 @@ class LoginFrame(ctk.CTkFrame):
 
     # Lógica de tocar música 
     def toggle_music(self):
-
         status = self.music_var.get()
-
+        
         if status == "on":
-            print("Music Playing...")
-            mixer.music.load("assets/Music/background-music.mp3") 
-          # Loop infinito
             try:
                 # 1. Verifica se o arquivo existe para não crashar o app
-                caminho_musica = "assets/Music/background-music.mp3"
-
+                caminho_musica = "assets/Music/background_music.mp3"
+                
                 if os.path.exists(caminho_musica):
                     print("Music Playing...")
                     mixer.music.load(caminho_musica)
@@ -298,7 +302,5 @@ class LoginFrame(ctk.CTkFrame):
             except Exception as e:
                 print(f"Erro ao tocar música: {e}")
         else:
-            print("Music Paused...")
             print("Music Stopped...")
             mixer.music.stop()
-

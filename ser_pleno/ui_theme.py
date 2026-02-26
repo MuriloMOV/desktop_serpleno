@@ -10,6 +10,8 @@ THEME = {
     "bg_alt": "#F3F4F6",
     "card": "#FFFFFF",
     "border": "#E5E7EB",
+    "card_music": "#6366F1",
+    "border_music": "#523C8F",
     # Texto
     "text": "#111827",
     "text_main": "#111827",
@@ -19,6 +21,7 @@ THEME = {
     "primary": "#6366F1",
     "primary_hover": "#4F46E5",
     "primary_light": "#EEF2FF",
+    "primary_music": "#8985B8",
     # Feedback
     "success": "#10B981",
     "success_light": "#D1FAE5",
