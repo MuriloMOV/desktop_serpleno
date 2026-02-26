@@ -3,83 +3,108 @@ from tkinter import messagebox
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg 
 from models.relatorio import NovoRelatorioModal
-import datetime
-from ui_theme import THEME
 
 class RelatorioController:
     def __init__(self):
         self.view = None
         self.servico = None
+        self._cache_relatorios = [] # Armazena os dados vindos do banco para filtros rápidos
 
     def set_view(self, view):
         self.view = view
         from services.relatorios import ServicoRelatorio
         self.servico = ServicoRelatorio()
 
+    def run_in_thread(self, target, *args):
+        """Helper para executar tarefas pesadas sem travar a UI"""
+        threading.Thread(target=target, args=args, daemon=True).start()
+
     def inicializar_dashboard(self):
+        """Carrega dados iniciais do banco e renderiza o gráfico"""
         if not self.view: return
         
         def carregar():
             try:
+                # Busca dados reais do banco via Service
                 stats = self.servico.obter_estatisticas()
                 reports = self.servico.listar_relatorios()
+                graph_data = self.servico.obter_dados_grafico() # NOVO: Método no service
                 
-                # Atualiza UI e Gráfico na thread principal
+                self._cache_relatorios = reports.get('data', {}).get('reports', [])
+
                 if self.view.winfo_exists():
+                    # Atualiza UI e Gráfico na thread principal
                     self.view.after(0, lambda: self.view.update_view(stats, reports))
-                    self.view.after(0, self.renderizar_grafico)
+                    self.view.after(0, lambda: self.renderizar_grafico(graph_data))
             except Exception as e:
                 print(f"Erro ao carregar dashboard: {e}")
 
-        threading.Thread(target=carregar, daemon=True).start()
+        self.run_in_thread(carregar)
 
-    def renderizar_grafico(self):
+    def renderizar_grafico(self, data_res):
+        """Renderiza o gráfico com dados dinâmicos vindos do banco"""
         if not self.view or not hasattr(self.view, 'chart_box'): return
 
-        # Dados
-        dias = ['01', '05', '10', '15', '20', '25', '30']
-        atendimentos = [5, 12, 8, 15, 10, 20, 18]
+        # Extrai dados do resultado do service ou usa fallback vazio
+        data = data_res.get('data', {})
+        eixo_x = data.get('labels', []) # Ex: ['01/02', '02/02'...]
+        eixo_y = data.get('values', []) # Ex: [5, 12, 8...]
 
-        # Estilização usando o tema da View
-        bg_color = self.view.THEME["card"]
-        text_color = self.view.THEME["text"]
-        primary_color = self.view.THEME["primary"]
-
-        fig = Figure(figsize=(5, 3), dpi=100, facecolor=bg_color)
+        # Configurações de Estilo baseadas no tema
+        theme = self.view.THEME
+        fig = Figure(figsize=(5, 3), dpi=100, facecolor=theme["card"])
         ax = fig.add_subplot(111)
-        ax.set_facecolor(bg_color)
+        ax.set_facecolor(theme["card"])
 
-        ax.plot(dias, atendimentos, color=primary_color, marker='o', linewidth=2)
+        # Plotagem dinâmica
+        ax.plot(eixo_x, eixo_y, color=theme["primary"], marker='o', linewidth=2, markersize=4)
         
-        # Remove bordas desnecessárias
-        for spine in ax.spines.values():
-            spine.set_visible(False)
-        
-        ax.tick_params(colors=text_color, labelsize=8)
-        ax.grid(True, alpha=0.1, color=text_color)
+        # Estilização do Plot
+        for spine in ax.spines.values(): spine.set_visible(False)
+        ax.tick_params(colors=theme["text_muted"], labelsize=8)
+        ax.grid(True, alpha=0.05, color=theme["text"])
 
-        if not self.view or not hasattr(self.view, 'chart_box'): return
-
-
+        # Limpeza de memória/widgets antigos
         for widget in self.view.chart_box.winfo_children():
-            
-            if isinstance(widget, FigureCanvasTkAgg) or "canvas" in str(widget).lower():
+            if "canvas" in str(widget).lower():
                 widget.destroy()
 
         canvas = FigureCanvasTkAgg(fig, master=self.view.chart_box)
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=10, pady=10)
         canvas.draw()
 
-    def exportar(self, tipo, formato):
-        """
-        Coordena a exportação usando Threads para não travar a interface.
-        """
-        # 1. Feedback visual imediato
-        self.view.mostrar_loading_exportacao(True)
+    # controllers/relatorio_controller.py
 
+    def aplicar_filtros(self):
+        """Filtra os dados comparando o valor selecionado com o banco"""
+        tipo_selecionado = self.view.filtro_tipo.get() # Pega "Estudante"
+        
+        # Mapeamento para garantir que o filtro entenda o valor técnico do banco
+        mapa_tipos = {
+            "Estudante": "student",
+            "Agendamentos": "appointments",
+            "Intervenções": "interventions",
+            "Geral": "general",
+            "Triagens": "screenings"
+        }
+
+        filtrados = self._cache_relatorios
+        
+        if tipo_selecionado != "Todos":
+            # Buscamos o valor técnico. Se não achar no mapa, usa o próprio texto
+            valor_tecnico = mapa_tipos.get(tipo_selecionado, tipo_selecionado)
+            
+            # Filtra comparando com o que veio do banco (r['type'])
+            filtrados = [r for r in self._cache_relatorios if r.get('type') == valor_tecnico]
+
+        # Atualiza a View (enviando stats vazios para não sobrescrever os cards)
+        res_formatado = {'success': True, 'data': {'reports': filtrados}}
+        self.view.update_view({'success': False}, res_formatado)
+
+    def exportar(self, tipo, formato):
         def thread_exportacao():
             try:
-                # Dicionário de métodos do serviço
+                # O mapeamento deve bater com os 'values' do RadioButton da View
                 metodos = {
                     "estudantes": self.servico.exportar_estudantes,
                     "agenda": self.servico.exportar_agendamentos,
@@ -87,103 +112,48 @@ class RelatorioController:
                 }
 
                 if tipo not in metodos:
-                    raise ValueError(f"Tipo '{tipo}' não suportado.")
+                    print(f"Tipo de exportação '{tipo}' não reconhecido.")
+                    return
 
-                # Executa a exportação (demorada) no serviço
-                # O retorno agora é True/False baseado no que fizemos no Service
-                resultado = metodos[tipo](formato=formato)
+                # Chama a função do service passando o formato
+                sucesso = metodos[tipo](formato=formato)
                 
-                # Se for um dicionário (como estava no seu service original), 
-                # extraímos o sucesso. Se for booleano, usamos direto.
-                sucesso = resultado.get("success", False) if isinstance(resultado, dict) else resultado
-
-                # 2. Volta para a thread principal para atualizar a UI
-                self.view.after(0, lambda: self.finalizar_exportacao(sucesso, tipo, formato))
-
-            except PermissionError:
-                self.view.after(0, lambda: self.finalizar_exportacao(False, tipo, formato, 
-                    erro="O arquivo está aberto em outro programa. Feche-o e tente novamente."))
+                self.view.after(0, lambda: self._finalizar_exportacao(sucesso, tipo, formato))
             except Exception as e:
-                self.view.after(0, lambda: self.finalizar_exportacao(False, tipo, formato, erro=str(e)))
+                print(f"Erro na thread de exportação: {e}")
+                self.view.after(0, lambda: messagebox.showerror("Erro", f"Falha ao exportar: {e}"))
 
-        # Inicia o processamento em background
-        threading.Thread(target=thread_exportacao, daemon=True).start()
-
-    def finalizar_exportacao(self, sucesso, tipo, formato, erro=None):
-        """Fecha o loading e mostra a mensagem final"""
-        self.view.mostrar_loading_exportacao(False)
+        self.run_in_thread(thread_exportacao)
         
+    def _finalizar_exportacao(self, sucesso, tipo, formato):
         if sucesso:
-            messagebox.showinfo("Sucesso", f"O relatório de {tipo.capitalize()} foi exportado para {formato.upper()} com sucesso!")
-        elif erro:
-            messagebox.showerror("Erro na Exportação", f"Ocorreu um problema: {erro}")
-        else:
-            # Caso onde o usuário apenas cancelou a janela de salvar
-            pass
+            messagebox.showinfo("Sucesso", f"Relatório de {tipo} gerado em {formato.upper()}.")
 
-    # No RelatorioController
     def gerar_novo_relatorio(self):
-        tipos_django = [
-            ('general', 'Relatório Geral'),
-            ('student', 'Relatório de Estudante'),
-            ('appointments', 'Relatório de Agendamentos'),
-            ('interventions', 'Relatório de Intervenções'),
-            ('screenings', 'Relatório de Triagens')
-        ]
-        # Instancia a modal passando a view como parent para o grab_set() funcionar
-        NovoRelatorioModal(self.view, tipos=tipos_django, callback=self._salvar_relatorio)
+        """Abre o modal e define o callback de retorno"""
+        tipos_disponiveis = self.servico.obter_tipos_relatorio() # Pega do Service/Banco
+        NovoRelatorioModal(self.view, tipos=tipos_disponiveis, callback=self._salvar_relatorio)
 
     def _salvar_relatorio(self, dados):
-        if not dados.get("name"):
-            print("Erro: Nome do relatório é obrigatório")
-            return
+        """Processa a criação do novo relatório"""
+        if not dados.get("name"): return
 
-        def salvar():
-            try:
-                self.servico.criar_relatorio(dados)
-                # Recarrega o dashboard para mostrar o novo item na lista
+        def task():
+            if self.servico.criar_relatorio(dados):
                 self.view.after(0, self.inicializar_dashboard)
-            except Exception as e:
-                print(f"Erro ao salvar: {e}")
-
-        threading.Thread(target=salvar, daemon=True).start()
-
-    def aplicar_filtros(self):
-        # Captura os valores da View
-        tipo_selecionado = self.view.filtro_tipo.get()
-        data_ini_str = self.view.btn_data_ini.cget("text")
-        data_fim_str = self.view.btn_data_fim.cget("text")
-
-        relatorios_filtrados = self.todos_relatorios
-
-        # 1. Filtro por Tipo (Dropdown)
-        if tipo_selecionado != "Todos":
-            relatorios_filtrados = [r for r in relatorios_filtrados if r.get('type') == tipo_selecionado]
-
-        # 2. Filtro por Data
-        try:
-            # Verifica se os botões não estão com o texto padrão
-            if data_ini_str != "Data Início" and data_fim_str != "Data Fim":
-                d_ini = datetime.strptime(data_ini_str, "%d/%m/%Y")
-                d_fim = datetime.strptime(data_fim_str, "%d/%m/%Y")
-                
-                temp = []
-                for r in relatorios_filtrados:
-                    data_r_str = r.get('generated_at') or r.get('created_at')
-                    if data_r_str:
-                        # Tratando data ISO (YYYY-MM-DD)
-                        data_r = datetime.fromisoformat(data_r_str.split('T')[0])
-                        if d_ini <= data_r <= d_fim:
-                            temp.append(r)
-                relatorios_filtrados = temp
-        except Exception as e:
-            print(f"Erro ao processar datas do filtro: {e}")
-
-        # Atualiza a lista
-        self.view.populate_reports_list(relatorios_filtrados)
-
-    def limpar_filtros(self):
-        self.view.filtro_tipo.set("Todos")
-        self.view.btn_data_ini.configure(text="Data Início", fg_color=THEME["bg_alt"], text_color=THEME["text"])
-        self.view.btn_data_fim.configure(text="Data Fim", fg_color=THEME["bg_alt"], text_color=THEME["text"])
-        self.view.populate_reports_list(self.todos_relatorios)
+        
+        self.run_in_thread(task)
+    
+    def solicitar_exclusao(self, relatorio_id):
+        """Pede confirmação e executa a exclusão"""
+        if messagebox.askyesno("Confirmar Exclusão", "Tem certeza que deseja apagar este relatório permanentemente?"):
+            
+            def task():
+                resultado = self.servico.excluir_relatorio(relatorio_id)
+                if resultado.get("success"):
+                    # Recarrega a lista para refletir a alteração
+                    self.view.after(0, self.inicializar_dashboard)
+                else:
+                    self.view.after(0, lambda: messagebox.showerror("Erro", "Não foi possível excluir o relatório."))
+            
+            self.run_in_thread(task)
