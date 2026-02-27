@@ -349,14 +349,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             self.criar_mensagem(msg)
 
     def criar_mensagem(self, msg):
-        """Cria uma mensagem na interface"""
+        """Cria uma mensagem na interface com design melhorado"""
         is_mine = msg["sender_id"] == self.usuario_logado_id
         
         # Obter nome do remetente
         remetente_nome = "Eu" if is_mine else self.obter_nome_remetente(msg["sender_id"])
         
         frame = ctk.CTkFrame(self.msg_area, fg_color="transparent")
-        frame.pack(fill="x", pady=8)
+        frame.pack(fill="x", pady=6)
         # Adiciona dados da mensagem ao widget para identificação
         frame.msg_data = msg
         
@@ -367,13 +367,13 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         
         # Outer wrapper for alignment
         wrapper = ctk.CTkFrame(frame, fg_color="transparent")
-        wrapper.pack(side=align, padx=10)
+        wrapper.pack(side=align, padx=12)
 
-        # Bubble
+        # Bubble com estilo melhorado
         bubble = ctk.CTkFrame(
             wrapper,
             fg_color=bubble_color,
-            corner_radius=18,
+            corner_radius=20,
             border_width=1 if not is_mine else 0,
             border_color=self.colors["border"]
         )
@@ -381,26 +381,53 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         
         # Nome do remetente (apenas para mensajes de grupo)
         if self.conversa_ativa and self.conversa_ativa["role"] == "group" and not is_mine:
-            ctk.CTkLabel(bubble, text=remetente_nome, font=font(11, "bold"), text_color=text_color, wraplength=400, justify="left").pack(padx=15, pady=(10, 0))
+            ctk.CTkLabel(
+                bubble, 
+                text=remetente_nome, 
+                font=font(11, "bold"), 
+                text_color=self.colors["primary"], 
+                wraplength=380, 
+                justify="left"
+            ).pack(padx=16, pady=(12, 4))
         
         # Verifica se é uma mensagem de arquivo
         if "caminho_arquivo" in msg:
             self.criar_mensagem_arquivo(bubble, msg, text_color)
         else:
-            lbl = ctk.CTkLabel(bubble, text=msg["text"], font=font(13), text_color=text_color, wraplength=400, justify="left")
-            lbl.pack(padx=15, pady=(0 if (self.conversa_ativa and self.conversa_ativa["role"] == "group" and not is_mine) else 10, 10))
+            lbl = ctk.CTkLabel(
+                bubble, 
+                text=msg["text"], 
+                font=font(14), 
+                text_color=text_color, 
+                wraplength=380, 
+                justify="left"
+            )
+            lbl.pack(padx=16, pady=(8 if (self.conversa_ativa and self.conversa_ativa["role"] == "group" and not is_mine) else 10, 10))
         
-        # Time and Status
+        # Time and Status - agora com design mais limpo
         info = ctk.CTkFrame(wrapper, fg_color="transparent")
-        info.pack(side="top", fill="x", pady=2)
+        info.pack(side="top", fill="x", pady=(2, 8))
         
         # Formata o timestamp
         timestamp = datetime.datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
         time_str = timestamp.strftime("%H:%M")
         
-        ctk.CTkLabel(info, text=time_str, font=font(10), text_color=self.colors["text_highlight"]).pack(side=align)
+        ctk.CTkLabel(
+            info, 
+            text=time_str, 
+            font=font(10), 
+            text_color=self.colors["text_highlight"]
+        ).pack(side=align)
         if is_mine:
-            ctk.CTkLabel(info, text="✓✓", font=font(10), text_color=self.colors["primary"]).pack(side=align, padx=5)
+            # Status de leitura com ícone único
+            status_icon = "✓✓" if msg.get("read", False) else "✓"
+            status_color = self.colors["primary"] if msg.get("read", False) else self.colors["text_highlight"]
+            ctk.CTkLabel(
+                info, 
+                text=status_icon, 
+                font=font(10), 
+                text_color=status_color
+            ).pack(side=align, padx=4)
     
     def criar_mensagem_arquivo(self, bubble, msg, text_color):
         """Cria uma mensagem de arquivo com visualização e download"""
@@ -591,13 +618,12 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.lbl_chat_status = ctk.CTkLabel(title_v, text="Online agora", font=font(12), text_color=self.colors["success"])
         self.lbl_chat_status.pack(anchor="w")
 
-        # Actions
+        # Actions - Botões de ação (apenas menu de opções)
         actions = ctk.CTkFrame(inner_h, fg_color="transparent")
         actions.pack(side="right")
         
         btn_style = {"width": 40, "height": 40, "corner_radius": 20, "fg_color": "transparent", "hover_color": self.colors["bg_alt"], "text_color": self.colors["text_muted"]}
-        ctk.CTkButton(actions, text="📷", **btn_style).pack(side="left", padx=2)
-        ctk.CTkButton(actions, text="📞", **btn_style).pack(side="left", padx=2)
+        # Removido: botão de câmera (📷) e botão de ligação (📞)
         ctk.CTkButton(actions, text="⋮", **btn_style).pack(side="left", padx=2)
 
         # --- 2. Mensagens ---
@@ -605,32 +631,70 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.msg_area.grid(row=1, column=0, sticky="nsew", padx=24, pady=12)
 
         # --- 3. Input Area ---
-        input_container = ctk.CTkFrame(container, fg_color=self.colors["card"], height=100, corner_radius=0, border_width=1, border_color=self.colors["border"])
+        input_container = ctk.CTkFrame(container, fg_color=self.colors["card"], height=90, corner_radius=0, border_width=1, border_color=self.colors["border"])
         input_container.grid(row=2, column=0, sticky="ew")
         input_container.grid_propagate(False)
         
-        box = ctk.CTkFrame(input_container, fg_color=self.colors["bg_alt"], height=55, corner_radius=28, border_width=1, border_color=self.colors["border"])
-        box.pack(fill="x", padx=25, pady=22)
+        # Box de mensagem com design melhorado - maior e mais espaçoso
+        box = ctk.CTkFrame(input_container, fg_color=self.colors["bg_alt"], height=52, corner_radius=26, border_width=1, border_color=self.colors["border"])
+        box.pack(fill="x", padx=20, pady=18)
         box.pack_propagate(False)
         
-        self.btn_clip = ctk.CTkButton(box, text="📎", width=40, height=40, corner_radius=20, fg_color="transparent", text_color=self.colors["text_muted"], hover_color=self.colors["border"], command=self.toggle_modal_arquivos)
-        self.btn_clip.pack(side="left", padx=10)
+        # Botão de clip mais visível e moderno
+        self.btn_clip = ctk.CTkButton(
+            box, 
+            text="📎", 
+            width=36, 
+            height=36, 
+            corner_radius=18, 
+            fg_color="transparent", 
+            text_color=self.colors["text_muted"], 
+            hover_color=self.colors["primary_light"],
+            command=self.toggle_modal_arquivos
+        )
+        self.btn_clip.pack(side="left", padx=8)
         
-        self.entry_mensagem = ctk.CTkEntry(box, placeholder_text="Digite sua mensagem...", fg_color="transparent", border_width=0, font=font(14))
-        self.entry_mensagem.pack(side="left", fill="both", expand=True)
+        # Campo de mensagem maior e mais bonito
+        self.entry_mensagem = ctk.CTkEntry(
+            box, 
+            placeholder_text="Digite uma mensagem...", 
+            fg_color="transparent", 
+            border_width=0, 
+            font=font(14),
+            placeholder_text_color=self.colors["text_highlight"]
+        )
+        self.entry_mensagem.pack(side="left", fill="both", expand=True, padx=5)
         
+        # Frame para botões de ação (emoji + enviar)
         actions_in = ctk.CTkFrame(box, fg_color="transparent")
-        actions_in.pack(side="right", padx=10)
+        actions_in.pack(side="right", padx=5)
         
-        ctk.CTkButton(actions_in, text="😊", width=40, height=40, corner_radius=20, fg_color="transparent", text_color=self.colors["text_muted"], hover_color=self.colors["border"]).pack(side="left")
+        # Botão de emoji
+        ctk.CTkButton(
+            actions_in, 
+            text="😊", 
+            width=36, 
+            height=36, 
+            corner_radius=18, 
+            fg_color="transparent", 
+            text_color=self.colors["text_muted"], 
+            hover_color=self.colors["primary_light"]
+        ).pack(side="left")
         
+        # Botão de enviar mais destacado
         self.btn_enviar = ctk.CTkButton(
-            actions_in, text="➤", width=42, height=42, corner_radius=21, 
-            fg_color=self.colors["primary"], hover_color=self.colors["primary_hover"], 
-            text_color="white", font=font(16, "bold"),
+            actions_in, 
+            text="➤", 
+            width=40, 
+            height=40, 
+            corner_radius=20, 
+            fg_color=self.colors["primary"], 
+            hover_color=self.colors["primary_hover"], 
+            text_color="white", 
+            font=font(16, "bold"),
             command=self.enviar_mensagem
         )
-        self.btn_enviar.pack(side="left", padx=(5, 0))
+        self.btn_enviar.pack(side="left", padx=(8, 0))
         
         # --- 4. Modal de Arquivos ---
         self.criar_modal_arquivos(container)
@@ -640,56 +704,112 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         if self.modal_arquivos.winfo_manager():
             self.modal_arquivos.grid_remove()
         else:
-            # Posiciona o modal diretamente sobre o ícone de clip, garantindo padding positivo
+            # Posiciona o modal ao lado do botão de clip
             btn_x = self.btn_clip.winfo_x()
-            btn_y = max(10, self.btn_clip.winfo_y() - 280)  # Garante que não fique negativo
-            self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=(btn_x + 25, 0), pady=(btn_y, 0))
+            btn_y = max(10, self.btn_clip.winfo_y() - 260)  # Ajusta a posição Y para o novo tamanho do modal
+            self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=(btn_x + 15, 0), pady=(btn_y, 0))
     
     def criar_modal_arquivos(self, parent):
-        """Cria o modal de seleção de arquivos por categoria em grid 3x3 muito compacto"""
-        self.modal_arquivos = ctk.CTkFrame(parent, fg_color=self.colors["card"], corner_radius=RADIUS["card"], border_width=1, border_color=self.colors["border"])
-        self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=25, pady=0)
+        """Cria o modal de seleção de arquivos estilo WhatsApp - mais bonito e organizado"""
+        self.modal_arquivos = ctk.CTkFrame(
+            parent, 
+            fg_color=self.colors["card"], 
+            corner_radius=RADIUS["card"], 
+            border_width=1, 
+            border_color=self.colors["border"],
+            width=320
+        )
+        self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=20, pady=0)
         self.modal_arquivos.grid_remove()  # Inicialmente oculta
         
-        # Categorias de arquivos - grid 3x3 (9 categorias)
+        # Título do modal
+        titulo = ctk.CTkFrame(self.modal_arquivos, fg_color="transparent")
+        titulo.pack(fill="x", padx=16, pady=(16, 12))
+        ctk.CTkLabel(
+            titulo, 
+            text="Enviar arquivo", 
+            font=font(16, "bold"), 
+            text_color=self.colors["text"]
+        ).pack(side="left")
+        
+        # Separador
+        sep = ctk.CTkFrame(self.modal_arquivos, fg_color=self.colors["border"], height=1)
+        sep.pack(fill="x", padx=0)
+        
+        # Container das opções em grid 2x4
+        opcoes_container = ctk.CTkFrame(self.modal_arquivos, fg_color="transparent")
+        opcoes_container.pack(fill="both", expand=True, padx=12, pady=12)
+        
+        # Categorias de arquivos - estilo WhatsApp
         categorias = [
-            {"nome": "Documentos", "icone": "📄", "extensao": [".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx"]},
-            {"nome": "Imagens", "icone": "🖼️", "extensao": [".jpg", ".jpeg", ".png", ".gif", ".bmp"]},
-            {"nome": "Videos", "icone": "🎥", "extensao": [".mp4", ".avi", ".mov", ".wmv"]},
-            {"nome": "Audio", "icone": "🎵", "extensao": [".mp3", ".wav", ".ogg"]},
-            {"nome": "Planilhas", "icone": "📊", "extensao": [".xls", ".xlsx", ".csv"]},
-            {"nome": "Presentações", "icone": "📽️", "extensao": [".ppt", ".pptx"]},
-            {"nome": "Arquivos Zip", "icone": "🗜️", "extensao": [".zip", ".rar", ".7z"]},
-            {"nome": "Code", "icone": "💻", "extensao": [".py", ".js", ".html", ".css"]},
-            {"nome": "Todos", "icone": "📁", "extensao": []}
+            {"nome": "Documento", "icone": "📄", "extensao": [".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx"], "cor": "#128C7E", "cor_light": "#E8F5F3"},
+            {"nome": "Fotos", "icone": "🖼️", "extensao": [".jpg", ".jpeg", ".png", ".gif", ".bmp"], "cor": "#25D366", "cor_light": "#E8F9EE"},
+            {"nome": "Vídeos", "icone": "🎥", "extensao": [".mp4", ".avi", ".mov", ".wmv"], "cor": "#F44336", "cor_light": "#FFEBEE"},
+            {"nome": "Áudio", "icone": "🎵", "extensao": [".mp3", ".wav", ".ogg"], "cor": "#9C27B0", "cor_light": "#F3E5F5"},
+            {"nome": "Planilhas", "icone": "📊", "extensao": [".xls", ".xlsx", ".csv"], "cor": "#4CAF50", "cor_light": "#E8F5E9"},
+            {"nome": "Apresentação", "icone": "📽️", "extensao": [".ppt", ".pptx"], "cor": "#FF9800", "cor_light": "#FFF3E0"},
+            {"nome": "Compactado", "icone": "🗜️", "extensao": [".zip", ".rar", ".7z"], "cor": "#607D8B", "cor_light": "#ECEFF1"},
+            {"nome": "Câmera", "icone": "📷", "extensao": [], "cor": "#E91E63", "cor_light": "#FCE4EC", "camera": True},
         ]
         
-        # Configura grid 3x3 muito compacto
-        for row in range(3):
-            self.modal_arquivos.grid_rowconfigure(row, minsize=60)
-        for col in range(3):
-            self.modal_arquivos.grid_columnconfigure(col, minsize=80)
+        # Grid 4x2 para as opções
+        for row in range(4):
+            opcoes_container.grid_rowconfigure(row, minsize=70)
+        for col in range(2):
+            opcoes_container.grid_columnconfigure(col, minsize=130)
             
         for i, cat in enumerate(categorias):
-            row = i // 3
-            col = i % 3
+            row = i // 2
+            col = i % 2
             
-            btn = ctk.CTkButton(
-                self.modal_arquivos,
-                text=f"{cat['icone']}\n{cat['nome']}",
-                font=font(10),
-                height=60,
-                corner_radius=8,
-                fg_color=self.colors["bg_alt"],
-                hover_color=self.colors["border"],
-                text_color=self.colors["text"],
-                command=lambda c=cat: self.selecionar_categoria(c)
+            # Container do botão com hover effect
+            btn_container = ctk.CTkFrame(
+                opcoes_container, 
+                fg_color="transparent",
+                corner_radius=12
             )
-            btn.grid(row=row, column=col, padx=5, pady=5)
+            btn_container.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+            btn_container.grid_propagate(False)
+            
+            # Ícone grande e colorido
+            icone_frame = ctk.CTkFrame(
+                btn_container,
+                fg_color=cat.get("cor_light", "transparent"),  # Usa cor clara sem transparência
+                corner_radius=16,
+                width=50,
+                height=50
+            )
+            icone_frame.pack(pady=(8, 4))
+            icone_frame.pack_propagate(False)
+            ctk.CTkLabel(
+                icone_frame, 
+                text=cat["icone"], 
+                font=font(24)
+            ).pack(expand=True)
+            
+            # Nome da categoria
+            ctk.CTkLabel(
+                btn_container, 
+                text=cat["nome"], 
+                font=font(11), 
+                text_color=self.colors["text"]
+            ).pack(pady=(0, 4))
+            
+            # Bind do clique
+            btn_container.bind("<Button-1>", lambda e, c=cat: self.selecionar_categoria(c))
+            for child in btn_container.winfo_children():
+                child.bind("<Button-1>", lambda e, c=cat: self.selecionar_categoria(c))
     
     def selecionar_categoria(self, categoria):
         """Abre o diálogo de seleção de arquivo com a categoria especificada"""
         import tkinter.filedialog as fd
+        
+        # Verifica se é a categoria câmera
+        if categoria.get("camera"):
+            # TODO: Implementar captura de câmera
+            print("Funcionalidade de câmera em desenvolvimento")
+            self.modal_arquivos.grid_remove()
+            return
         
         # Filtro de arquivos baseado na categoria
         if categoria["extensao"]:
