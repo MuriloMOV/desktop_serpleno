@@ -519,8 +519,22 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _render_students(self, res):
         """Renderiza a lista de estudantes"""
-        for w in self.scroll_alunos.winfo_children():
-            w.destroy()
+        # Verificar se o widget scroll_alunos ainda existe e é válido
+        try:
+            if not hasattr(self, 'scroll_alunos') or not self.scroll_alunos:
+                return
+            # Verificar se o widget ainda estáAttached
+            if not self.scroll_alunos.winfo_exists():
+                return
+        except Exception:
+            return
+        
+        try:
+            for w in self.scroll_alunos.winfo_children():
+                w.destroy()
+        except Exception:
+            # Widget pode ter sido destruído entre a verificação e o uso
+            return
         
         students = []
         if res.get('success'):
@@ -600,9 +614,13 @@ class OrientacoesFrame(ctk.CTkFrame):
         self.subtitle_label.configure(text=f"Criando orientação para: {nome}")
         
         # Atualizar visual
-        for w in self.scroll_alunos.winfo_children():
-            w.configure(fg_color=self.colors["card"])
-        card.configure(fg_color=self.colors["purple_light"])
+        try:
+            for w in self.scroll_alunos.winfo_children():
+                w.configure(fg_color=self.colors["card"])
+            card.configure(fg_color=self.colors["purple_light"])
+        except Exception:
+            # Widget pode ter sido destruído
+            pass
         
         # Carregar histórico se na tab de histórico
         if self.current_tab == "history":
@@ -610,13 +628,25 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _filter_students(self):
         """Filtra a lista de estudantes"""
+        # Verificar se o widget scroll_alunos ainda existe e é válido
+        try:
+            if not hasattr(self, 'scroll_alunos') or not self.scroll_alunos:
+                return
+            if not self.scroll_alunos.winfo_exists():
+                return
+        except Exception:
+            return
+        
         query = (self.entry_busca.get() or "").lower().strip()
         
         if not hasattr(self, '_students_list'):
             return
         
-        for w in self.scroll_alunos.winfo_children():
-            w.destroy()
+        try:
+            for w in self.scroll_alunos.winfo_children():
+                w.destroy()
+        except Exception:
+            return
         
         filtered = [s for s in self._students_list if query in (s.get('name', '')).lower()]
         
@@ -695,9 +725,21 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _render_preview(self):
         """Renderiza o preview dos campos dinâmicos"""
+        # Verificar se o widget preview_container ainda existe e é válido
+        try:
+            if not hasattr(self, 'preview_container') or not self.preview_container:
+                return
+            if not self.preview_container.winfo_exists():
+                return
+        except Exception:
+            return
+        
         # Limpar container
-        for w in self.preview_container.winfo_children():
-            w.destroy()
+        try:
+            for w in self.preview_container.winfo_children():
+                w.destroy()
+        except Exception:
+            return
         
         # Limpar referências de widgets anteriores
         self.dynamic_widgets = {}
@@ -823,11 +865,20 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _render_stats(self, res: Dict):
         """Renderiza o painel de estatísticas"""
-        if not self.stats_container:
+        # Verificar se o widget stats_container ainda existe e é válido
+        try:
+            if not hasattr(self, 'stats_container') or not self.stats_container:
+                return
+            if not self.stats_container.winfo_exists():
+                return
+        except Exception:
             return
         
-        for w in self.stats_container.winfo_children():
-            w.destroy()
+        try:
+            for w in self.stats_container.winfo_children():
+                w.destroy()
+        except Exception:
+            return
         
         if not res.get('success'):
             ctk.CTkLabel(self.stats_container, text="Erro ao carregar estatísticas", 
@@ -904,11 +955,20 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _render_history(self, res: Dict):
         """Renderiza o histórico de orientações"""
-        if not self.history_container:
+        # Verificar se o widget history_container ainda existe e é válido
+        try:
+            if not hasattr(self, 'history_container') or not self.history_container:
+                return
+            if not self.history_container.winfo_exists():
+                return
+        except Exception:
             return
         
-        for w in self.history_container.winfo_children():
-            w.destroy()
+        try:
+            for w in self.history_container.winfo_children():
+                w.destroy()
+        except Exception:
+            return
         
         if not res.get('success'):
             ctk.CTkLabel(self.history_container, text="Erro ao carregar histórico", font=font(12), text_color="red").pack(pady=20)
