@@ -2,11 +2,17 @@
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
-from services.api import api
 import datetime
 import html
 import threading
 import traceback
+import logging
+
+# Importa o serviço de mural
+from services.mural import servico_mural
+from services.api import api
+
+logger = logging.getLogger('apps.desktop')
 
 # simples escape html util
 def escape_html(s):
@@ -85,18 +91,17 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         t = threading.Thread(target=_worker, daemon=True)
         t.start()
 
-    # ----------------------- API (async wrappers) -----------------------
+    # ----------------------- API (async wrappers) - modo dual -----------------------
     def carregar_avisos_async(self):
         # mostra loading e dispara thread
         for w in self.lista.winfo_children():
             w.destroy()
         lbl = ctk.CTkLabel(self.lista, text="Carregando publicações...", text_color="#6b7280")
         lbl.pack(pady=12)
-        # Use URL absoluto para endpoint do mural (serpleno app)
-        url = "http://127.0.0.1:8000/api/mural/"
 
         def _fetch():
-            return api.get(url)
+            # Usa o serviço mural que automaticamente decide entre API e banco local
+            return servico_mural.listar_mensagens()
 
         def _on_result(res):
             # remove loading
@@ -104,33 +109,20 @@ class QuadroAvisosFrame(ctk.CTkFrame):
                 w.destroy()
             try:
                 posts = []
-                if isinstance(res, dict) and res.get("success") is False:
-                    message = res.get("message", "Erro ao carregar avisos")
-                    print("Erro ao carregar avisos:", message)
-                    lbl = ctk.CTkLabel(self.lista, text=f"Erro ao carregar avisos: {message}", text_color="#b91c1c")
-                    lbl.pack(pady=12)
-                    return
-                if isinstance(res, list):
-                    posts = res
-                elif isinstance(res, dict):
-                    # DRF pagination or nested
-                    if "results" in res and isinstance(res["results"], list):
-                        posts = res["results"]
-                    elif "data" in res and isinstance(res["data"], list):
+                if isinstance(res, dict):
+                    if res.get("success") is False:
+                        message = res.get("message", "Erro ao carregar avisos")
+                        print("Erro ao carregar avisos:", message)
+                        lbl = ctk.CTkLabel(self.lista, text=f"Erro ao carregar avisos: {message}", text_color="#b91c1c")
+                        lbl.pack(pady=12)
+                        return
+                    if "data" in res and isinstance(res["data"], list):
                         posts = res["data"]
                     elif res.get("id"):
                         posts = [res]
-                    else:
-                        # Unexpected shape
-                        print("Formato inesperado ao carregar mural:", type(res), list(res.keys()) if isinstance(res, dict) else res)
-                        lbl = ctk.CTkLabel(self.lista, text="Formato inesperado da resposta do servidor.", text_color="#b91c1c")
-                        lbl.pack(pady=12)
-                        return
-                else:
-                    lbl = ctk.CTkLabel(self.lista, text="Resposta inesperada do cliente API.", text_color="#b91c1c")
-                    lbl.pack(pady=12)
-                    return
-
+                elif isinstance(res, list):
+                    posts = res
+                
                 self.posts = posts
                 if not posts:
                     lbl = ctk.CTkLabel(self.lista, text="Nenhuma publicação encontrada.", text_color="#6b7280")
@@ -161,13 +153,12 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         self._run_in_thread(_fetch, callback=_on_result, err_callback=_on_err)
 
     def publicar_aviso_async(self, payload, on_success=None, on_error=None):
-        url = "http://127.0.0.1:8000/api/mural/"
-
         def _post():
+            # Usa o serviço mural que automaticamente decide entre API e banco local
             # garante publicado_em
             if not payload.get("publicado_em"):
                 payload["publicado_em"] = datetime.datetime.utcnow().isoformat()
-            return api.post(url, json=payload)
+            return servico_mural.criar_mensagem(payload)
 
         def _cb(res):
             if isinstance(res, dict) and res.get("success") is False:
@@ -188,12 +179,11 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         self._run_in_thread(_post, callback=_cb, err_callback=_err)
 
     def atualizar_aviso_async(self, post_id, payload, on_success=None, on_error=None):
-        url = f"http://127.0.0.1:8000/api/mural/{post_id}/"
-
         def _put():
             if not payload.get("publicado_em"):
                 payload["publicado_em"] = datetime.datetime.utcnow().isoformat()
-            return api.put(url, json=payload)
+            # Usa o serviço mural que automaticamente decide entre API e banco local
+            return servico_mural.atualizar_mensagem(post_id, payload)
 
         def _cb(res):
             if isinstance(res, dict) and res.get("success") is False:
@@ -214,10 +204,9 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         self._run_in_thread(_put, callback=_cb, err_callback=_err)
 
     def deletar_aviso_async(self, post_id, on_success=None, on_error=None):
-        url = f"http://127.0.0.1:8000/api/mural/{post_id}/"
-
         def _del():
-            return api.delete(url)
+            # Usa o serviço mural que automaticamente decide entre API e banco local
+            return servico_mural.deletar_mensagem(post_id)
 
         def _cb(res):
             # res pode ser dict success True ou similar
@@ -243,15 +232,15 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def publicar_aviso(self, payload):
         if not payload.get("publicado_em"):
             payload["publicado_em"] = datetime.datetime.utcnow().isoformat()
-        return api.post("http://127.0.0.1:8000/api/mural/", json=payload)
+        return servico_mural.criar_mensagem(payload)
 
     def atualizar_aviso(self, post_id, payload):
         if not payload.get("publicado_em"):
             payload["publicado_em"] = datetime.datetime.utcnow().isoformat()
-        return api.put(f"http://127.0.0.1:8000/api/mural/{post_id}/", json=payload)
+        return servico_mural.atualizar_mensagem(post_id, payload)
 
     def deletar_aviso(self, post_id):
-        return api.delete(f"http://127.0.0.1:8000/api/mural/{post_id}/")
+        return servico_mural.deletar_mensagem(post_id)
 
     # ----------------------- UI - Cards -----------------------
     def criar_card(self, aviso_id, titulo, descricao, autor, data):
@@ -287,8 +276,8 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     # ----------------------- Ações de editar / deletar -----------------------
     def _on_edit(self, post_id):
         def _fetch_and_open():
-            res = api.get(f"http://127.0.0.1:8000/api/mural/{post_id}/")
-            return res
+            # Usa o serviço mural que automaticamente decide entre API e banco local
+            return servico_mural.obter_mensagem(post_id)
 
         def _on_res(res):
             if isinstance(res, dict) and res.get("success") is False:

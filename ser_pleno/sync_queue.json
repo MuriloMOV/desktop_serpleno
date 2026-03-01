@@ -1,0 +1,75 @@
+[
+  {
+    "id": "create_mural_5_1772363681.841214",
+    "operation": "create",
+    "entity": "mural",
+    "entity_id": 5,
+    "data": {
+      "titulo": "Teste",
+      "conteudo": "Teste",
+      "autor": "Teste"
+    },
+    "created_at": "2026-03-01T08:14:41.841231",
+    "attempts": 0,
+    "last_attempt": null
+  },
+  {
+    "id": "update_mural_5_1772363691.041544",
+    "operation": "update",
+    "entity": "mural",
+    "entity_id": 5,
+    "data": {
+      "titulo": "Teste Atualizado",
+      "conteudo": "Conteudo atualizado",
+      "autor": "Teste",
+      "categoria": "aviso"
+    },
+    "created_at": "2026-03-01T08:14:51.041569",
+    "attempts": 0,
+    "last_attempt": null
+  },
+  {
+    "id": "delete_mural_5_1772363699.85457",
+    "operation": "delete",
+    "entity": "mural",
+    "entity_id": 5,
+    "data": {},
+    "created_at": "2026-03-01T08:14:59.854608",
+    "attempts": 0,
+    "last_attempt": null
+  },
+  {
+    "id": "create_mural_6_1772364105.316834",
+    "operation": "create",
+    "entity": "mural",
+    "entity_id": 6,
+    "data": {
+      "titulo": "teste",
+      "conteudo": "teste com teste",
+      "categoria": "informativo",
+      "autor": "Rafael Moraes",
+      "local_fisico": "Bloco B",
+      "link_externo": "https://www.google.com",
+      "data_agendamento": null,
+      "horario_evento": null,
+      "layout": "grid-2",
+      "blocos": [
+        {
+          "titulo": "a",
+          "conteudo": "aaa",
+          "icon": ""
+        },
+        {
+          "titulo": "b",
+          "conteudo": "bb",
+          "icon": ""
+        }
+      ],
+      "ativo": true,
+      "publicado_em": "2026-03-01T11:21:45.138433"
+    },
+    "created_at": "2026-03-01T08:21:45.316842",
+    "attempts": 0,
+    "last_attempt": null
+  }
+]
