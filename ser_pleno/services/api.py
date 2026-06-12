@@ -3,6 +3,8 @@ import os
 import datetime
 from typing import Dict, Any
 
+from config.config import DESKTOP_API_URL
+
 try:
     import requests
 except Exception:
@@ -23,8 +25,7 @@ def get_auth_service():
 class ClienteAPI:
 
     def __init__(self):
-        # base para endpoints "desktop" — endpoints absolutos ainda funcionarão.
-        self.base_url = "http://localhost:8000/api/v1/desktop"
+        self.base_url = DESKTOP_API_URL
         self._operation_config = None
         self._sync_service = None
 

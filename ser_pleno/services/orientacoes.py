@@ -13,6 +13,7 @@ except Exception:
     requests = None  # type: ignore
 
 from config.db_config import get_db_connection
+from config.config import DESKTOP_API_URL
 from services.api import api, get_auth_service
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ class ServicoOrientacoes:
     }
     
     def __init__(self):
-        self.base_url = "http://localhost:8000/api/v1/desktop"
+        self.base_url = DESKTOP_API_URL
         self._operation_config = None
     
     def _get_operation_config(self):
@@ -93,6 +94,7 @@ class ServicoOrientacoes:
     def listar_orientacoes(self, id_estudante: Optional[int] = None, tema: Optional[str] = None, pagina: int = 1) -> Dict[str, Any]:
         """
         Lista orientações com filtros opcionais
+        Prioriza banco local primeiro, API como fallback
         
         Args:
             id_estudante: ID do estudante para filtrar
@@ -102,10 +104,21 @@ class ServicoOrientacoes:
         Returns:
             Dict com success, data (orientations, pagination)
         """
-        # Em modo independente, usa diretamente o banco local
+        # Primeiro, tenta buscar no banco local (mais rápido)
+        try:
+            result = self._local_listar_orientacoes(id_estudante)
+            if result.get('success') and result.get('data', {}).get('orientations'):
+                logger.info("Orientações obtidas do banco local")
+                return result
+        except Exception as e:
+            logger.error(f"Erro ao buscar orientações no banco local: {e}")
+        
+        # Se não encontrou no banco local, tenta API como fallback
+        logger.info("Banco local vazio, tentando API como fallback")
+        
+        # Verificar se deve tentar a API
         if not self._should_use_api():
-            logger.info("Modo independente: usando banco local diretamente para orientações")
-            return self._mock_list_orientacoes(id_estudante)
+            return {"success": True, "data": {"orientations": [], "pagination": {"page": 1, "total": 0}}}
         
         try:
             params: Dict[str, Any] = {'page': pagina}
@@ -125,20 +138,15 @@ class ServicoOrientacoes:
                             return response.json()
                         except Exception as json_err:
                             logger.debug(f"Resposta não é JSON válido: {json_err}")
-                            logger.debug(f"Conteúdo da resposta: {response.text[:500] if response.text else 'vazio'}")
-                            return self._mock_list_orientacoes(id_estudante)
-                    else:
-                        logger.debug(f"API retornou status {response.status_code}, usando banco local")
-                        return self._mock_list_orientacoes(id_estudante)
+                            return {"success": True, "data": {"orientations": [], "pagination": {"page": 1, "total": 0}}}
                 except Exception as conn_err:
-                    logger.warning(f"Erro de conexão com API: {conn_err}, usando banco local")
-                    return self._mock_list_orientacoes(id_estudante)
+                    logger.warning(f"Erro de conexão com API: {conn_err}")
             
-            return self._mock_list_orientacoes(id_estudante)
+            return {"success": True, "data": {"orientations": [], "pagination": {"page": 1, "total": 0}}}
             
         except Exception as e:
             logger.exception(f"Erro ao listar orientações: {e}")
-            return self._mock_list_orientacoes(id_estudante)
+            return {"success": True, "data": {"orientations": [], "pagination": {"page": 1, "total": 0}}}
     
     def obter_orientacao(self, id_orientacao: int) -> Dict[str, Any]:
         """
@@ -183,77 +191,69 @@ class ServicoOrientacoes:
     def criar_orientacao(self, dados: Dict[str, Any], arquivos: Optional[List] = None) -> Dict[str, Any]:
         """
         Cria uma nova orientação
+        Prioriza banco local primeiro, API como fallback
         
         Args:
-            dados: Dict com os dados da orientação:
-                - student_id: ID do estudante (obrigatório)
-                - title: Título da orientação
-                - theme: Tema/categoria
-                - session_date: Data da sessão (YYYY-MM-DD)
-                - content: Conteúdo em texto/markdown
-                - is_markdown: Se o conteúdo é markdown
-                - motivational_message: Mensagem motivacional
-                - action_plan: Lista de tarefas (JSON)
+            dados: Dict com os dados da orientação
             arquivos: Lista de arquivos para anexar
             
         Returns:
             Dict com success, message, data (id da orientação criada)
         """
-        # Verificar se deve usar o banco local
-        if not self._should_use_api():
-            return self._local_criar_orientacao(dados)
+        # Primeiro, tenta criar no banco local (mais rápido)
+        try:
+            result = self._local_criar_orientacao(dados)
+            if result.get('success'):
+                logger.info(f"Orientação criada no banco local: {result.get('data', {}).get('id')}")
+                # Tenta sincronizar com API em background (não bloqueante)
+                self._sync_create_orientacao(result.get('data', {}).get('id'), dados)
+                return result
+        except Exception as e:
+            logger.error(f"Erro ao criar orientação no banco local: {e}")
         
+        # Fallback para API
+        if self._should_use_api():
+            try:
+                result = self._api_criar_orientacao(dados, arquivos)
+                if result.get('success'):
+                    return result
+            except Exception as e:
+                logger.warning(f"Erro ao criar orientação via API: {e}")
+        
+        return {"success": False, "message": "Falha ao criar orientação"}
+    
+    def _api_criar_orientacao(self, dados: Dict[str, Any], arquivos: Optional[List] = None) -> Dict[str, Any]:
+        """Cria orientação via API"""
         try:
             url = f"{self.base_url}/orientations/create/"
             session = self._get_session()
             headers = self._get_headers()
             
             if session and requests:
-                # Preparar dados para envio
                 if arquivos:
-                    # Multipart/form-data para upload de arquivos
                     files: Dict[str, tuple] = {}
                     for i, arquivo in enumerate(arquivos):
                         if hasattr(arquivo, 'read'):
                             files[f'file_{i}'] = (arquivo.name, arquivo.read(), 'application/octet-stream')
                     
-                    response = session.post(
-                        url, 
-                        data=dados, 
-                        files=files if files else None,
-                        headers=headers,
-                        timeout=15
-                    )
+                    response = session.post(url, data=dados, files=files if files else None, headers=headers, timeout=15)
                 else:
-                    # JSON simples
-                    response = session.post(
-                        url, 
-                        json=dados,
-                        headers=headers,
-                        timeout=10
-                    )
+                    response = session.post(url, json=dados, headers=headers, timeout=10)
                 
                 if response.ok:
-                    try:
-                        result = response.json()
-                        logger.info(f"Orientação criada com sucesso via API: {result}")
-                        return result
-                    except Exception as json_err:
-                        logger.debug(f"Resposta não é JSON válido: {json_err}")
-                        # Fallback para banco local
-                        return self._local_criar_orientacao(dados)
-                else:
-                    logger.warning(f"Erro ao criar orientação via API: {response.status_code} - {response.text}")
-                    # Fallback para banco local
-                    return self._local_criar_orientacao(dados)
-            
-            # Fallback para banco local
-            return self._local_criar_orientacao(dados)
-            
+                    return response.json()
         except Exception as e:
-            logger.exception(f"Erro ao criar orientação: {e}")
-            # Fallback para banco local
-            return self._local_criar_orientacao(dados)
+            logger.error(f"Erro na API ao criar orientação: {e}")
+        
+        return {"success": False}
+    
+    def _sync_create_orientacao(self, orientacao_id: int, dados: Dict[str, Any]):
+        """Sincroniza criação de orientação com API"""
+        try:
+            if self._should_use_api():
+                self._api_criar_orientacao(dados)
+        except Exception:
+            pass
     
     def atualizar_orientacao(self, id_orientacao: int, dados: Dict[str, Any], arquivos: Optional[List] = None) -> Dict[str, Any]:
         """
@@ -520,7 +520,7 @@ class ServicoOrientacoes:
                 }
             }
     
-    def _mock_list_orientacoes(self, id_estudante: Optional[int] = None) -> Dict[str, Any]:
+    def _local_listar_orientacoes(self, id_estudante: Optional[int] = None) -> Dict[str, Any]:
         """Retorna dados do banco local"""
         try:
             connection = get_db_connection()

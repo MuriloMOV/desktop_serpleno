@@ -1,12 +1,21 @@
+import os
+
 import mysql.connector
 
-# Configurações do banco de dados
+
+def _env_int(name, default):
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'user': 'root',
-    'password': 'MySQL3691@26',
-    'database': 'ser_pleno',
-    'port': 3306
+    'host': os.getenv('SERPLENO_DB_HOST', '127.0.0.1'),
+    'user': os.getenv('SERPLENO_DB_USER', 'root'),
+    'password': os.getenv('SERPLENO_DB_PASSWORD', ''),
+    'database': os.getenv('SERPLENO_DB_NAME', 'ser_pleno'),
+    'port': _env_int('SERPLENO_DB_PORT', 3306),
 }
 
 def get_db_connection():

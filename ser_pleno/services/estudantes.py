@@ -11,6 +11,7 @@ except Exception:
     requests = None  # type: ignore
 
 from config.db_config import get_db_connection
+from config.config import DESKTOP_API_URL
 from services.api import api, get_auth_service
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class ServicoEstudante:
     """Serviço para gerenciar estudantes - funciona de forma independente ou conectada"""
     
     def __init__(self):
-        self.base_url = "http://localhost:8000/api/v1/desktop"
+        self.base_url = DESKTOP_API_URL
         self._operation_config = None
     
     def _get_operation_config(self):

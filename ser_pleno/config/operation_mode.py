@@ -20,9 +20,10 @@ logger = logging.getLogger(__name__)
 
 class OperationMode(Enum):
     """Modos de operação do sistema"""
-    INDEPENDENT = "independent"  # Totalmente independente
+    INDEPENDENT = "independent"  # Totalmente independente (apenas banco local)
     HYBRID = "hybrid"            # Independente com sincronização opcional
     CONNECTED = "connected"      # Requer conexão (legado)
+    DB_PRIMARY = "db_primary"    # Banco primário, API como secundário (fallback)
 
 
 class OperationConfig:
@@ -33,8 +34,8 @@ class OperationConfig:
     
     # Configurações padrão
     DEFAULT_CONFIG = {
-        "mode": "hybrid",
-        "api_base_url": "http://127.0.0.1:8000",
+        "mode": "db_primary",
+        "api_base_url": os.getenv("SERPLENO_API_URL", "http://127.0.0.1:8000"),
         "api_timeout": 5,
         "sync_interval": 300,  # 5 minutos
         "auto_sync": True,
@@ -100,7 +101,10 @@ class OperationConfig:
     @property
     def api_base_url(self) -> str:
         """Retorna a URL base da API"""
-        return self._config.get("api_base_url", "http://127.0.0.1:8000")
+        return os.getenv(
+            "SERPLENO_API_URL",
+            self._config.get("api_base_url", "http://127.0.0.1:8000"),
+        ).rstrip("/")
     
     @property
     def api_timeout(self) -> int:
@@ -160,11 +164,22 @@ class OperationConfig:
         """Verifica se o sistema está em modo conectado"""
         return self.mode == OperationMode.CONNECTED
     
+    def is_db_primary(self) -> bool:
+        """Verifica se o sistema está em modo banco primário"""
+        return self.mode == OperationMode.DB_PRIMARY
+    
     def should_use_api(self) -> bool:
         """Verifica se deve tentar usar a API"""
         if self.is_independent():
             return False
+        if self.is_db_primary():
+            return True  # Permite API como fallback
         return True
+    
+    def should_use_db_first(self) -> bool:
+        """Verifica se deve usar banco de dados primeiro"""
+        # Em modo DB_PRIMARY, usa banco primeiro e API como fallback
+        return self.is_db_primary() or self.is_independent()
     
     def should_sync(self) -> bool:
         """Verifica se deve sincronizar com a API"""
@@ -203,3 +218,8 @@ def is_api_available() -> bool:
 def should_use_api() -> bool:
     """Verifica se deve usar a API"""
     return operation_config.should_use_api()
+
+
+def should_use_db_first() -> bool:
+    """Verifica se deve usar banco de dados primeiro"""
+    return operation_config.should_use_db_first()

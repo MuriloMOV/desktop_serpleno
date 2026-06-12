@@ -14,6 +14,7 @@ except Exception:
     requests = None  # type: ignore
 
 from config.db_config import get_db_connection
+from config.config import MURAL_API_URL
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class ServicoMural:
     """Serviço para gerenciar mural de avisos via API do SerPleno Web ou banco local"""
     
     def __init__(self):
-        self.base_url = "http://localhost:8000/api/mural"
+        self.base_url = MURAL_API_URL
         self._operation_config = None
     
     def _get_operation_config(self):

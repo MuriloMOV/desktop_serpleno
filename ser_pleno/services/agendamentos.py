@@ -78,7 +78,7 @@ class ServicoAgendamento:
             return False
 
     def criar_agendamento(self, dados):
-        """Cria um agendamento usando a API Desktop"""
+        """Cria um agendamento usando banco de dados local primeiro, API como fallback"""
         try:
             # Extrair data e hora
             data_hora = datetime.strptime(dados['data_hora'], "%Y-%m-%d %H:%M")
@@ -88,7 +88,59 @@ class ServicoAgendamento:
             # Garantir que id_aluno é um número inteiro
             id_aluno = int(dados['id_aluno'])
             
-            # Tenta criar via API Desktop primeiro
+            # Primeiro, tenta criar no banco local (mais rápido)
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                
+                # Preparar dados
+                status = self._convert_status_frontend_to_backend(dados.get('status', 'Agendado'))
+                
+                # Obter nome do aluno para o campo obrigatório 'nome'
+                cursor.execute("SELECT nome FROM aluno WHERE id_aluno = %s", (id_aluno,))
+                aluno_result = cursor.fetchone()
+                nome_aluno = aluno_result[0] if aluno_result else f"Aluno {id_aluno}"
+                
+                # Campo nome é obrigatório - formato: "Atendimento - Nome do Aluno"
+                nome_agendamento = f"Atendimento - {nome_aluno}"
+                
+                # Inserir agendamento com todos os campos obrigatórios
+                # IMPORTANTE: Usar status 'agendado' que é o status padrão esperado pelo Serpleno Web
+                cursor.execute("""
+                    INSERT INTO agendamento (student_id, data_hora, nome, motivo, status, local, profissional, laudo, origem)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    id_aluno,
+                    data_hora,
+                    nome_agendamento,
+                    dados.get('motivo', ''),
+                    'agendado',  # Status padrão para o Serpleno Web
+                    dados.get('local', 'Sala de Atendimento Psicológico'),
+                    dados.get('profissional', None),
+                    dados.get('laudo', 'N/A'),
+                    'desktop'
+                ))
+                
+                conn.commit()
+                appointment_id = cursor.lastrowid
+                
+                cursor.close()
+                conn.close()
+                
+                logging.info(f"Agendamento criado via banco local: {appointment_id}")
+                
+                # Tenta sincronizar com o Serpleno Web em background (não bloqueante)
+                try:
+                    self._sync_with_serpleno_web(appointment_id, id_aluno, data_hora, nome_agendamento, dados)
+                except Exception as sync_error:
+                    logging.warning(f"Erro ao sincronizar com Serpleno Web (não bloqueante): {sync_error}")
+                
+                return {"success": True, "id": appointment_id}
+                
+            except Exception as db_error:
+                logging.error(f"Erro ao criar agendamento no banco local: {db_error}")
+            
+            # Fallback para API Desktop
             try:
                 # Primeiro, obter o timeId correspondente ao horário
                 time_id = self._get_time_id(hora_str)
@@ -121,70 +173,23 @@ class ServicoAgendamento:
                     return {"success": True, "id": appointment_id}
                 elif response.status_code == 403:
                     logging.error(f"Erro 403 ao criar agendamento: autenticação necessária")
-                    # Tenta fallback para banco local
                 elif response.status_code == 409:
                     data = response.json() if response.text else {}
                     message = data.get('message', 'Conflito de horário')
                     return {"success": False, "message": message}
                 else:
-                    logging.warning(f"API Desktop retornou status {response.status_code}, usando banco local")
+                    logging.warning(f"API Desktop retornou status {response.status_code}")
                     
             except requests.exceptions.ConnectionError as api_error:
-                logging.warning(f"API Desktop indisponível, usando banco local: {api_error}")
+                logging.warning(f"API Desktop indisponível: {api_error}")
             except requests.exceptions.Timeout as api_error:
-                logging.warning(f"Timeout na API Desktop, usando banco local: {api_error}")
+                logging.warning(f"Timeout na API Desktop: {api_error}")
             except requests.exceptions.HTTPError as api_error:
                 logging.warning(f"Erro HTTP ao criar agendamento via API Desktop: {api_error}")
             except Exception as api_error:
                 logging.warning(f"Erro ao criar agendamento via API Desktop: {api_error}")
             
-            # Fallback para banco local
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            # Preparar dados
-            status = self._convert_status_frontend_to_backend(dados.get('status', 'Agendado'))
-            
-            # Obter nome do aluno para o campo obrigatório 'nome'
-            cursor.execute("SELECT nome FROM aluno WHERE id_aluno = %s", (id_aluno,))
-            aluno_result = cursor.fetchone()
-            nome_aluno = aluno_result[0] if aluno_result else f"Aluno {id_aluno}"
-            
-            # Campo nome é obrigatório - formato: "Atendimento - Nome do Aluno"
-            nome_agendamento = f"Atendimento - {nome_aluno}"
-            
-            # Inserir agendamento com todos os campos obrigatórios
-            # IMPORTANTE: Usar status 'agendado' que é o status padrão esperado pelo Serpleno Web
-            cursor.execute("""
-                INSERT INTO agendamento (student_id, data_hora, nome, motivo, status, local, profissional, laudo, origem)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (
-                id_aluno,
-                data_hora,
-                nome_agendamento,
-                dados.get('motivo', ''),
-                'agendado',  # Status padrão para o Serpleno Web
-                dados.get('local', 'Sala de Atendimento Psicológico'),
-                dados.get('profissional', None),
-                dados.get('laudo', 'N/A'),
-                'desktop'
-            ))
-            
-            conn.commit()
-            appointment_id = cursor.lastrowid
-            
-            cursor.close()
-            conn.close()
-            
-            logging.info(f"Agendamento criado via banco local: {appointment_id}")
-            
-            # Sincronizar com o Serpleno Web para garantir que o agendamento apareça para o aluno
-            try:
-                self._sync_with_serpleno_web(appointment_id, id_aluno, data_hora, nome_agendamento, dados)
-            except Exception as sync_error:
-                logging.warning(f"Erro ao sincronizar com Serpleno Web (não bloqueante): {sync_error}")
-            
-            return {"success": True, "id": appointment_id}
+            return {"success": False, "message": "Falha ao criar agendamento"}
         except Exception as e:
             logging.error(f"Erro ao criar agendamento: {e}")
             return {"success": False, "message": str(e)}
@@ -244,60 +249,8 @@ class ServicoAgendamento:
             return None
 
     def listar_agendamentos(self, data=None):
-        """Lista agendamentos usando a API Desktop ou banco de dados local"""
-        # Tenta buscar via API Desktop primeiro
-        try:
-            session = self._get_session()
-            params = {}
-            if data:
-                params['date'] = data
-            
-            response = session.get(
-                f"{self.API_DESKTOP_URL}/schedule/appointments/",
-                params=params,
-                headers=self._get_headers(),
-                timeout=5
-            )
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result.get('success') and result.get('data', {}).get('appointments'):
-                    agendamentos = []
-                    for apt in result['data']['appointments']:
-                        # Converter o formato da API para o formato esperado pelo frontend
-                        data_hora_str = apt.get('date', '')
-                        time_str = apt.get('time', '')
-                        if data_hora_str and time_str:
-                            data_hora = datetime.strptime(f"{data_hora_str} {time_str}", "%Y-%m-%d %H:%M")
-                        else:
-                            data_hora = None
-                        
-                        agendamentos.append({
-                            "id_agendamento": apt.get('id'),
-                            "nome": apt.get('student', {}).get('name', ''),
-                            "id_aluno": apt.get('student', {}).get('id'),
-                            "data_hora": data_hora,
-                            "motivo": apt.get('notes', ''),
-                            "status": apt.get('status', 'agendado'),
-                            "local": apt.get('local'),
-                            "profissional": apt.get('profissional'),
-                            "laudo": None,
-                            "origem": 'desktop_web'
-                        })
-                    logging.info(f"Agendamentos obtidos via API Desktop: {len(agendamentos)}")
-                    return agendamentos
-                elif response.status_code == 403:
-                    logging.warning("Erro 403 ao listar agendamentos via API, usando banco local")
-            else:
-                logging.warning(f"API Desktop retornou status {response.status_code}, usando banco local")
-        except requests.exceptions.ConnectionError as e:
-            logging.warning(f"API Desktop indisponível para listar agendamentos: {e}")
-        except requests.exceptions.Timeout as e:
-            logging.warning(f"Timeout ao listar agendamentos via API: {e}")
-        except Exception as e:
-            logging.warning(f"Erro ao listar agendamentos via API: {e}")
-        
-        # Fallback para banco local
+        """Lista agendamentos usando banco de dados local primeiro, API como fallback"""
+        # Primeiro, tenta buscar no banco local (mais rápido)
         try:
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
@@ -335,10 +288,61 @@ class ServicoAgendamento:
             
             cursor.close()
             conn.close()
-            return agendamentos
+            
+            if agendamentos:
+                logging.info(f"Agendamentos obtidos via banco local: {len(agendamentos)}")
+                return agendamentos
+            
+            # Se não há dados locais, tenta a API como fallback
+            logging.info("Banco local vazio, tentando API como fallback")
+            
         except Exception as e:
-            logging.error(f"Erro ao listar agendamentos: {e}")
-            return []
+            logging.error(f"Erro ao listar agendamentos do banco local: {e}")
+        
+        # Fallback para API
+        try:
+            session = self._get_session()
+            params = {}
+            if data:
+                params['date'] = data
+            
+            response = session.get(
+                f"{self.API_DESKTOP_URL}/schedule/appointments/",
+                params=params,
+                headers=self._get_headers(),
+                timeout=5
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success') and result.get('data', {}).get('appointments'):
+                    agendamentos = []
+                    for apt in result['data']['appointments']:
+                        data_hora_str = apt.get('date', '')
+                        time_str = apt.get('time', '')
+                        if data_hora_str and time_str:
+                            data_hora = datetime.strptime(f"{data_hora_str} {time_str}", "%Y-%m-%d %H:%M")
+                        else:
+                            data_hora = None
+                        
+                        agendamentos.append({
+                            "id_agendamento": apt.get('id'),
+                            "nome": apt.get('student', {}).get('name', ''),
+                            "id_aluno": apt.get('student', {}).get('id'),
+                            "data_hora": data_hora,
+                            "motivo": apt.get('notes', ''),
+                            "status": apt.get('status', 'agendado'),
+                            "local": apt.get('local'),
+                            "profissional": apt.get('profissional'),
+                            "laudo": None,
+                            "origem": 'desktop_web'
+                        })
+                    logging.info(f"Agendamentos obtidos via API Desktop: {len(agendamentos)}")
+                    return agendamentos
+        except Exception as e:
+            logging.error(f"Erro ao buscar agendamentos via API: {e}")
+        
+        return []
 
     def atualizar_agendamento(self, id_agendamento, dados):
         """Atualiza um agendamento usando o banco de dados"""
@@ -386,8 +390,30 @@ class ServicoAgendamento:
             return {"success": False, "message": str(e)}
 
     def deletar_agendamento(self, id_agendamento):
-        """Deleta um agendamento usando a API Desktop"""
-        # Tenta deletar via API Desktop primeiro
+        """Deleta um agendamento usando banco local primeiro, API como fallback"""
+        # Primeiro, tenta deletar no banco local
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("DELETE FROM agendamento WHERE id = %s", (id_agendamento,))
+            conn.commit()
+            affected = cursor.rowcount
+            
+            cursor.close()
+            conn.close()
+            
+            if affected > 0:
+                logging.info(f"Agendamento {id_agendamento} deletado via banco local")
+                return {"success": True}
+            
+            # Se não encontrou no banco local, tenta API
+            logging.info("Agendamento não encontrado no banco local, tentando API")
+            
+        except Exception as e:
+            logging.error(f"Erro ao deletar agendamento do banco local: {e}")
+        
+        # Fallback para API Desktop
         try:
             session = self._get_session()
             response = session.delete(
@@ -402,9 +428,9 @@ class ServicoAgendamento:
             elif response.status_code == 404:
                 logging.warning(f"Agendamento {id_agendamento} não encontrado na API Desktop")
             elif response.status_code == 403:
-                logging.warning("Erro 403 ao deletar agendamento via API, usando banco local")
+                logging.warning("Erro 403 ao deletar agendamento via API")
             else:
-                logging.warning(f"API Desktop retornou status {response.status_code}, usando banco local")
+                logging.warning(f"API Desktop retornou status {response.status_code}")
         except requests.exceptions.ConnectionError as e:
             logging.warning(f"API Desktop indisponível para deletar agendamento: {e}")
         except requests.exceptions.Timeout as e:
@@ -412,22 +438,7 @@ class ServicoAgendamento:
         except Exception as e:
             logging.warning(f"Erro ao deletar agendamento via API: {e}")
         
-        # Fallback para banco local
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            
-            cursor.execute("DELETE FROM agendamento WHERE id = %s", (id_agendamento,))
-            conn.commit()
-            
-            cursor.close()
-            conn.close()
-            
-            logging.info(f"Agendamento {id_agendamento} deletado via banco local")
-            return {"success": True}
-        except Exception as e:
-            logging.error(f"Erro ao deletar agendamento: {e}")
-            return {"success": False, "message": str(e)}
+        return {"success": False, "message": "Agendamento não encontrado"}
             
     def adicionar_horario_disponibilidade(self, horario):
         """Adiciona um novo horário à tabela de disponibilidade usando a API do Serpleno Web"""
