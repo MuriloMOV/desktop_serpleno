@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 import customtkinter as ctk
+from tkinter import TclError
 import sys
 import os
 
@@ -10,9 +11,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 @pytest.fixture(scope="session")
 def app():
     """Create the app instance for the entire session"""
-    # Mock customtkinter to avoid GUI rendering issues in CI/Headless
     ctk.set_appearance_mode("Dark")
-    app = ctk.CTk()
+    try:
+        app = ctk.CTk()
+    except TclError as error:
+        pytest.skip(f"Tcl/Tk indisponível para testes visuais: {error}")
     app.geometry("800x600")
     yield app
     app.destroy()
