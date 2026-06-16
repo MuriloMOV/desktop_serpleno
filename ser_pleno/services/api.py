@@ -10,6 +10,8 @@ try:
 except Exception:
     requests = None  # type: ignore
 
+from services.connectivity import marcar_api_indisponivel
+
 _auth_service = None
 
 
@@ -84,9 +86,17 @@ class ClienteAPI:
 
             return {"success": False, "message": f"Erro na requisição: {response.status_code}", "status_code": response.status_code}
 
+        except requests.exceptions.ConnectionError as e:
+            marcar_api_indisponivel()
+            return {"success": False, "message": "Servidor indisponível no momento"}
+        except requests.exceptions.Timeout as e:
+            marcar_api_indisponivel()
+            return {"success": False, "message": "Tempo de conexão esgotado"}
         except Exception as e:
-            logging.getLogger('apps.desktop.api').exception("Erro GET")
-            return {"success": False, "message": f"Erro de conexão: {str(e)}"}
+            logging.getLogger('apps.desktop.api').error(
+                "Erro GET inesperado: %s: %s", type(e).__name__, e
+            )
+            return {"success": False, "message": "Erro de conexão inesperado"}
 
     # ================= POST =================
 

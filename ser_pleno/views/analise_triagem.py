@@ -1,11 +1,25 @@
 import customtkinter as ctk
+from services.estudantes import ServicoEstudante
+from services.orientacoes import ServicoOrientacoes, servico_orientacoes
+from ui_theme import THEME, SPACING, RADIUS, font, themed_font
+from components.ui_components import (
+    PageHeader,
+    Card,
+    KPICard,
+    PrimaryButton,
+    GhostButton,
+    SearchField,
+    EmptyState,
+    Divider,
+    Pill,
+)
+
 
 class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color="#F3F4F6")
+        super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        
-        # Dados mestre (Para não repetir o código toda hora)
+
         self.data_master = [
             {"student": "Bruno Henrique", "date": "23/01/2026", "priority": "Alta", "status": "Pendente"},
             {"student": "Diego Martins", "date": "22/01/2026", "priority": "Média", "status": "Pendente"},
@@ -22,87 +36,107 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         self.criar_area_conteudo()
 
     def criar_cabecalho(self):
-        header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=20, pady=(20, 10))
-        ctk.CTkLabel(header, text="Análise de Triagem", font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"), text_color="#1F2937").pack(side="left")
-        ctk.CTkButton(header, text="+ Nova Triagem", font=ctk.CTkFont(family="Segoe UI", size=14, weight="bold"), fg_color="#3B82F6", hover_color="#2563EB", height=40, corner_radius=8, command=self.abrir_nova_triagem).pack(side="right")
+        header = PageHeader(
+            self,
+            title="Análise de Triagem",
+            subtitle="Acompanhamento de triagens e encaminhamentos",
+            actions=[PrimaryButton(None, text="+ Nova Triagem", command=self.abrir_nova_triagem, width=160, icon="＋")],
+        )
+        header.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 16))
 
     def criar_cards_metricas(self):
         cards_container = ctk.CTkFrame(self, fg_color="transparent")
-        cards_container.grid(row=1, column=0, sticky="ew", padx=20, pady=10)
-        for i in range(4): cards_container.grid_columnconfigure(i, weight=1)
+        cards_container.pack(fill="x", padx=SPACING["page_x"], pady=(0, 16))
+        for i in range(4):
+            cards_container.grid_columnconfigure(i, weight=1)
 
         metrics = [
-            {"label": "Total", "value": str(len(self.data_master)), "icon": "📋", "color": "#3B82F6"},
-            {"label": "Pendentes", "value": "3", "icon": "⏳", "color": "#F59E0B"},
-            {"label": "Concluídas", "value": "1", "icon": "✅", "color": "#10B981"},
-            {"label": "Alta Prioridade", "value": "2", "icon": "⚠️", "color": "#EF4444"}
+            {"label": "Total", "value": str(len(self.data_master)), "icon": "📋", "accent": THEME["info"], "trend": "Registros"},
+            {"label": "Pendentes", "value": "3", "icon": "⏳", "accent": THEME["warning"], "trend": "Aguardando"},
+            {"label": "Concluídas", "value": "1", "icon": "✅", "accent": THEME["success"], "trend": "Finalizadas"},
+            {"label": "Alta Prioridade", "value": "2", "icon": "⚠️", "accent": THEME["danger"], "trend": "Urgente"},
         ]
-        for i, m in enumerate(metrics): self.criar_card_metrica(cards_container, i, m)
 
-    def criar_card_metrica(self, parent, idx, metric):
-        card = ctk.CTkFrame(parent, fg_color="white", corner_radius=12)
-        card.grid(row=0, column=idx, sticky="ew", padx=5)
-        content = ctk.CTkFrame(card, fg_color="transparent")
-        content.pack(fill="both", padx=15, pady=15)
-        ctk.CTkLabel(ctk.CTkFrame(content, fg_color="transparent"), text=metric["icon"], font=ctk.CTkFont(size=24)).pack(side="right", anchor="n")
-        text_f = ctk.CTkFrame(content, fg_color="transparent")
-        text_f.pack(side="left", anchor="n", fill="both", expand=True)
-        ctk.CTkLabel(text_f, text=metric["label"], font=ctk.CTkFont(family="Segoe UI", size=13), text_color="#6B7280").pack(anchor="w")
-        ctk.CTkLabel(text_f, text=metric["value"], font=ctk.CTkFont(family="Segoe UI", size=24, weight="bold"), text_color=metric["color"]).pack(anchor="w")
+        for i, m in enumerate(metrics):
+            KPICard(
+                cards_container,
+                title=m["label"],
+                value=m["value"],
+                icon=m["icon"],
+                accent=m["accent"],
+                trend=m.get("trend", ""),
+            ).grid(row=0, column=i, sticky="ew", padx=6)
 
     def criar_filtros(self):
-        filtro_frame = ctk.CTkFrame(self, fg_color="white", corner_radius=12)
-        filtro_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=10)
-        filtro_frame.columnconfigure((0,1,2,3), weight=1)
-        
-        # Atribuindo os menus a variáveis da classe (self.)
+        filtro_card = Card(self)
+        filtro_card.pack(fill="x", padx=SPACING["page_x"], pady=(0, 16))
+
+        filtro_frame = ctk.CTkFrame(filtro_card.body, fg_color="transparent")
+        filtro_frame.pack(fill="x", pady=(0, 12))
+        for i in range(4):
+            filtro_frame.grid_columnconfigure(i, weight=1)
+
         self.filtro_status = self.criar_input_filtro(filtro_frame, 0, "Status", ["Todos", "Pendente", "Em Andamento", "Concluída", "Cancelada"])
         self.filtro_prioridade = self.criar_input_filtro(filtro_frame, 1, "Prioridade", ["Todas", "Baixa", "Média", "Alta", "Urgente"])
-        
         self.data_inicial = self.criar_date_input(filtro_frame, 2, "Data Inicial")
         self.data_final = self.criar_date_input(filtro_frame, 3, "Data Final")
 
-        btn_frame = ctk.CTkFrame(filtro_frame, fg_color="transparent")
-        btn_frame.grid(row=1, column=0, columnspan=4, sticky="e", padx=20, pady=(0, 20))
-
-        ctk.CTkButton(btn_frame, text="Limpar", command=self.limpar_filtros, fg_color="#E5E7EB", text_color="#374151", hover_color="#D1D5DB", width=100).pack(side="right", padx=5)
-        ctk.CTkButton(btn_frame, text="Aplicar Filtros", command=self.aplicar_filtros, fg_color="#3B82F6", text_color="white", hover_color="#2563EB", width=120).pack(side="right", padx=5)
+        btn_frame = ctk.CTkFrame(filtro_card.body, fg_color="transparent")
+        btn_frame.pack(fill="x")
+        GhostButton(btn_frame, text="Limpar", command=self.limpar_filtros, width=110).pack(side="right", padx=6)
+        PrimaryButton(btn_frame, text="Aplicar Filtros", command=self.aplicar_filtros, width=140).pack(side="right")
 
     def criar_input_filtro(self, parent, col, label, options):
         f = ctk.CTkFrame(parent, fg_color="transparent")
-        f.grid(row=0, column=col, sticky="ew", padx=15, pady=15)
-        ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=12, weight="bold"), text_color="#374151").pack(anchor="w", pady=(0, 5))
-        menu = ctk.CTkOptionMenu(f, values=options, fg_color="#F3F4F6", button_color="#E5E7EB", button_hover_color="#D1D5DB", text_color="#111827", dropdown_fg_color="white")
+        f.grid(row=0, column=col, sticky="ew", padx=6, pady=6)
+        ctk.CTkLabel(f, text=label, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(0, 4))
+        menu = ctk.CTkOptionMenu(
+            f,
+            values=options,
+            fg_color=THEME["bg_alt"],
+            button_color=THEME["border"],
+            button_hover_color=THEME["border_strong"],
+            text_color=THEME["text"],
+            dropdown_fg_color=THEME["card"],
+            height=34,
+        )
         menu.pack(fill="x")
-        return menu # Retorna para salvar na variável
+        return menu
 
     def criar_date_input(self, parent, col, label):
         f = ctk.CTkFrame(parent, fg_color="transparent")
-        f.grid(row=0, column=col, sticky="ew", padx=15, pady=15)
-        ctk.CTkLabel(f, text=label, font=ctk.CTkFont(size=12, weight="bold"), text_color="#374151").pack(anchor="w", pady=(0, 5))
-        entry = ctk.CTkEntry(f, placeholder_text="dd/mm/aaaa", fg_color="#F3F4F6", border_color="#E5E7EB", text_color="#111827")
+        f.grid(row=0, column=col, sticky="ew", padx=6, pady=6)
+        ctk.CTkLabel(f, text=label, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(0, 4))
+        entry = ctk.CTkEntry(
+            f,
+            placeholder_text="dd/mm/aaaa",
+            fg_color=THEME["bg_alt"],
+            border_color=THEME["border"],
+            text_color=THEME["text"],
+            height=34,
+            corner_radius=RADIUS["sm"],
+        )
         entry.pack(fill="x")
         return entry
 
     def criar_area_conteudo(self):
-        container = ctk.CTkFrame(self, fg_color="white", corner_radius=12)
-        container.grid(row=3, column=0, sticky="nsew", padx=20, pady=10)
-        self.lista_triagens = ctk.CTkFrame(container, fg_color="transparent")
-        self.lista_triagens.pack(fill="both", expand=True, padx=20, pady=20)
-        self.renderizar_tabela(self.data_master) # Começa mostrando tudo
+        card = Card(self, title="Lista de Triagens")
+        card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
+        self.lista_triagens = ctk.CTkFrame(card.body, fg_color="transparent")
+        self.lista_triagens.pack(fill="both", expand=True, pady=8)
+        self.renderizar_tabela(self.data_master)
 
     def aplicar_filtros(self):
         status_f = self.filtro_status.get()
         prioridade_f = self.filtro_prioridade.get()
-        
+
         filtered = []
         for d in self.data_master:
             match_status = (status_f == "Todos" or d["status"] == status_f)
             match_prioridade = (prioridade_f == "Todas" or d["priority"] == prioridade_f)
             if match_status and match_prioridade:
                 filtered.append(d)
-        
+
         self.renderizar_tabela(filtered)
 
     def limpar_filtros(self):
@@ -113,42 +147,40 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         self.renderizar_tabela(self.data_master)
 
     def renderizar_tabela(self, data_list):
-        # Limpa a lista atual
-        for w in self.lista_triagens.winfo_children(): w.destroy()
+        for w in self.lista_triagens.winfo_children():
+            w.destroy()
 
         if not data_list:
-            ctk.CTkLabel(self.lista_triagens, text="Nenhum item encontrado.", text_color="#9CA3AF").pack(pady=20)
+            EmptyState(self.lista_triagens, icon="📭", title="Nenhuma triagem encontrada", subtitle="Ajuste os filtros ou crie uma nova triagem").pack(pady=20)
             return
 
-        # Header
-        header = ctk.CTkFrame(self.lista_triagens, fg_color="#F9FAFB", height=40)
-        header.pack(fill="x", pady=(0, 5))
+        header = ctk.CTkFrame(self.lista_triagens, fg_color=THEME["bg_alt"], height=40, corner_radius=RADIUS["sm"])
+        header.pack(fill="x", pady=(0, 6))
         for c in ["Estudante", "Data", "Prioridade", "Status", "Ações"]:
             f = ctk.CTkFrame(header, fg_color="transparent")
             f.pack(side="left", fill="x", expand=True, padx=5)
-            ctk.CTkLabel(f, text=c, font=ctk.CTkFont(weight="bold", size=12), text_color="#374151").pack(anchor="w")
+            ctk.CTkLabel(f, text=c, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w")
 
-        # Rows
         for item in data_list:
-            row = ctk.CTkFrame(self.lista_triagens, fg_color="white")
-            row.pack(fill="x", pady=2)
+            row = ctk.CTkFrame(self.lista_triagens, fg_color=THEME["card"], corner_radius=RADIUS["sm"], border_width=1, border_color=THEME["border"])
+            row.pack(fill="x", pady=3)
             self.create_list_col(row, item["student"], bold=True)
             self.create_list_col(row, item["date"])
             self.create_list_col(row, item["priority"], color=self.get_priority_color(item["priority"]))
-            self.create_list_col(row, item["status"], color="#4B5563")
-            
+            self.create_list_col(row, item["status"], color=THEME["text_secondary"])
+
             act_f = ctk.CTkFrame(row, fg_color="transparent")
             act_f.pack(side="left", fill="x", expand=True, padx=5)
-            ctk.CTkButton(act_f, text="👁️", width=30, fg_color="#eff6ff", text_color="#2563EB", hover_color="#dbeafe").pack(side="left")
+            GhostButton(act_f, text="Ver", command=lambda i=item: None, width=70).pack(side="left")
 
     def create_list_col(self, parent, text, bold=False, color="#1F2937"):
         f = ctk.CTkFrame(parent, fg_color="transparent")
         f.pack(side="left", fill="x", expand=True, padx=5)
-        font = ctk.CTkFont(family="Segoe UI", size=13, weight="bold" if bold else "normal")
-        ctk.CTkLabel(f, text=text, font=font, text_color=color).pack(anchor="w")
+        ctk.CTkLabel(f, text=text, font=themed_font("body", "bold" if bold else "normal"), text_color=color).pack(anchor="w")
 
     def get_priority_color(self, p):
-        colors = {"Alta": "#EF4444", "Urgente": "#B91C1C", "Média": "#F59E0B", "Baixa": "#10B981"}
-        return colors.get(p, "#10B981")
+        colors = {"Alta": THEME["danger"], "Urgente": "#B91C1C", "Média": THEME["warning"], "Baixa": THEME["success"]}
+        return colors.get(p, THEME["success"])
 
-    def abrir_nova_triagem(self): print("Modal Nova Triagem")
+    def abrir_nova_triagem(self):
+        print("Modal Nova Triagem")

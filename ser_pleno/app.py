@@ -1,6 +1,21 @@
 import customtkinter as ctk
 
-from ui_theme import THEME, SPACING, RADIUS, font
+from services.connectivity import atualizar_disponibilidade_api_async
+
+from ui_theme import THEME, SPACING, RADIUS, ELEVATION, font, themed_font
+from components.ui_components import (
+    PageHeader,
+    SectionHeader,
+    Card,
+    KPICard,
+    PrimaryButton,
+    SecondaryButton,
+    GhostButton,
+    Badge,
+    EmptyState,
+    Divider,
+    blend_color,
+)
 
 from views.dashboard import DashboardFrame
 from views.estudantes import EstudantesFrame
@@ -14,6 +29,7 @@ from views.configuracoes import ConfiguracoesFrame
 from views.relatorio import RelatorioFrame
 from views.bem_estar import BemEstarFrame
 
+
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -22,7 +38,7 @@ class App(ctk.CTk):
 
         self.title("SerPleno")
         self.geometry("1280x720")
-        self.minsize(800, 480)
+        self.minsize(1024, 640)
         self.configure(fg_color=THEME["bg"])
 
         self.usuario_logado = None  # Armazena os dados do usuário logados
@@ -30,6 +46,12 @@ class App(ctk.CTk):
 
         self.container = ctk.CTkFrame(self, fg_color=THEME["bg"])
         self.container.pack(fill="both", expand=True)
+
+        # Verifica disponibilidade da API de forma não-bloqueante
+        try:
+            atualizar_disponibilidade_api_async()
+        except Exception:
+            pass
 
         self.mostrar_login()
 
@@ -53,84 +75,88 @@ class App(ctk.CTk):
     def criar_sidebar(self):
         self.sidebar = ctk.CTkFrame(
             self.container,
-            width=240,
+            width=260,
             fg_color=THEME["nav_bg"],
             corner_radius=0,
-            border_width=1,
-            border_color=THEME["border"]
+            border_width=0,
         )
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
         brand_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        brand_frame.pack(pady=(28, 18), padx=22, fill="x")
+        brand_frame.pack(pady=(28, 24), padx=22, fill="x")
 
-        ctk.CTkLabel(
+        icon_lbl = ctk.CTkLabel(
             brand_frame,
             text="🧠",
             font=font(22, "bold"),
-            text_color=THEME["brand_accent"]
-        ).pack(side="left", padx=(0, 10))
+            text_color=THEME["brand_accent"],
+        )
+        icon_lbl.pack(side="left", padx=(0, 10))
 
         ctk.CTkLabel(
             brand_frame,
             text="SerPleno",
             font=font(20, "bold"),
-            text_color=THEME["text"]
+            text_color=THEME["text"],
         ).pack(side="left")
 
-        divider = ctk.CTkFrame(self.sidebar, height=1, fg_color=THEME["border"])
-        divider.pack(fill="x", padx=18, pady=(0, 14))
-
+        Divider(self.sidebar).pack(fill="x", padx=18, pady=(0, 14))
 
         # ===== MENU =====
         self.menu_buttons = {}
-        self.menu_buttons["dashboard"] = self.botao_sidebar("🏠  Início", self.mostrar_dashboard, active=True)
-        self.menu_buttons["estudantes"] = self.botao_sidebar("👥  Estudantes", self.mostrar_estudantes)
-        self.menu_buttons["agenda"] = self.botao_sidebar("📅  Agenda", self.mostrar_agenda)
-        self.menu_buttons["bem_estar"] = self.botao_sidebar("🧡  Bem-Estar", self.mostrar_bem_estar)
-        self.menu_buttons["analise"] = self.botao_sidebar("📈  Análise de Triagem", self.mostrar_analise_triagem)
-        self.menu_buttons["relatorios"] = self.botao_sidebar("📋  Relatórios", self.mostrar_relatorio)
-        self.menu_buttons["comunicacao"] = self.botao_sidebar("💬  Comunicação Interna", self.mostrar_comunicacao_interna)
-        self.menu_buttons["orientacoes"] = self.botao_sidebar("🧡  Orientações", self.mostrar_orientacoes)
-        self.menu_buttons["avisos"] = self.botao_sidebar("📢  Quadro de Avisos", self.mostrar_quadro_avisos)
-        self.menu_buttons["configuracoes"] = self.botao_sidebar("⚙  Configurações", self.mostrar_configuracoes)
 
-    def botao_sidebar(self, texto, comando=None, active=False):
-        btn = ctk.CTkButton(
-            self.sidebar,
-            text=texto,
-            height=42,
-            fg_color=THEME["nav_active_bg"] if active else "transparent",
-            text_color=THEME["nav_active_text"] if active else THEME["nav_text"],
-            hover_color=THEME["nav_hover"],
-            corner_radius=RADIUS["button"],
-            font=font(14, "bold" if active else "normal"),
-            anchor="w",
-            command=comando
-        )
-        btn.pack(fill="x", padx=14, pady=4)
-        return btn
+        def add_menu(key: str, label: str, target, active: bool = False) -> None:
+            btn = GhostButton(
+                self.sidebar,
+                text=label,
+                command=target,
+                width=220,
+                height=42,
+            )
+            btn.pack(fill="x", padx=14, pady=4)
+            if active:
+                btn.configure(
+                    fg_color=THEME["nav_active_bg"],
+                    hover_color=THEME["nav_active_bg"],
+                    text_color=THEME["nav_active_text"],
+                    border_color=THEME["nav_active_text"],
+                    border_width=1,
+                )
+            self.menu_buttons[key] = btn
 
+        add_menu("dashboard", "🏠  Início", self.mostrar_dashboard, active=True)
+        add_menu("estudantes", "👥  Estudantes", self.mostrar_estudantes)
+        add_menu("agenda", "📅  Agenda", self.mostrar_agenda)
+        add_menu("bem_estar", "🧡  Bem-Estar", self.mostrar_bem_estar)
+        add_menu("analise", "📈  Análise de Triagem", self.mostrar_analise_triagem)
+        add_menu("relatorios", "📋  Relatórios", self.mostrar_relatorio)
+        add_menu("comunicacao", "💬  Comunicação Interna", self.mostrar_comunicacao_interna)
+        add_menu("orientacoes", "🧭  Orientações", self.mostrar_orientacoes)
+        add_menu("avisos", "📢  Quadro de Avisos", self.mostrar_quadro_avisos)
+        add_menu("configuracoes", "⚙  Configurações", self.mostrar_configuracoes)
 
     def criar_area_conteudo(self):
         self.content = ctk.CTkFrame(self.container, fg_color=THEME["bg"])
         self.content.pack(side="left", fill="both", expand=True)
 
     # ================= NAVEGAÇÃO =================
-    def atualizar_menu(self, active_key):
+    def atualizar_menu(self, active_key: str) -> None:
         for key, btn in self.menu_buttons.items():
             if key == active_key:
                 btn.configure(
                     fg_color=THEME["nav_active_bg"],
+                    hover_color=THEME["nav_active_bg"],
                     text_color=THEME["nav_active_text"],
-                    font=font(14, "bold")
+                    border_color=THEME["nav_active_text"],
+                    border_width=1,
                 )
             else:
                 btn.configure(
                     fg_color="transparent",
+                    hover_color=THEME["nav_hover"],
                     text_color=THEME["nav_text"],
-                    font=font(14, "normal")
+                    border_width=0,
                 )
 
     def mostrar_dashboard(self):
@@ -154,28 +180,24 @@ class App(ctk.CTk):
         self.trocar_frame(AnaliseTriagemFrame)
 
     def mostrar_relatorio(self):
+        self.atualizar_menu("relatorios")
         self.trocar_frame(RelatorioFrame)
-    
+
     def mostrar_comunicacao_interna(self):
         self.atualizar_menu("comunicacao")
         self.trocar_frame(ComunicacaoInternaFrame)
-    
+
     def mostrar_orientacoes(self):
         self.atualizar_menu("orientacoes")
         self.trocar_frame(OrientacoesFrame)
-    
+
     def mostrar_quadro_avisos(self):
         self.atualizar_menu("avisos")
         self.trocar_frame(QuadroAvisosFrame)
 
-    def mostrar_relatorio(self):
-        self.atualizar_menu("relatorios")
-        self.trocar_frame(RelatorioFrame)
-
     def mostrar_configuracoes(self):
         self.atualizar_menu("configuracoes")
         self.trocar_frame(ConfiguracoesFrame)
-
 
     def trocar_frame(self, FrameClasse):
         for widget in self.content.winfo_children():

@@ -10,7 +10,8 @@ from typing import Optional, List, Dict, Any, Callable
 
 from services.estudantes import ServicoEstudante
 from services.orientacoes import ServicoOrientacoes, servico_orientacoes
-from ui_theme import THEME, SPACING, RADIUS, font
+from ui_theme import THEME, SPACING, RADIUS, font, themed_font
+from components.ui_components import PrimaryButton
 
 
 class OrientacoesFrame(ctk.CTkFrame):
@@ -63,77 +64,44 @@ class OrientacoesFrame(ctk.CTkFrame):
         """Constrói a interface completa"""
         # 1. Cabeçalho Superior
         self._create_header()
-        
-        # 2. Banner de Orientações
-        self._create_banner()
-        
-        # 3. Container Principal (2 colunas) - usando grid para ocupar todo espaço
+
+        # 2. Container Principal (2 colunas)
         self.main_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.main_container.grid(row=2, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, 12))
-        self.main_container.grid_rowconfigure(0, weight=1)  # Linha única expande
-        self.main_container.grid_columnconfigure(0, weight=1, minsize=280)  # Coluna Alunos
-        self.main_container.grid_columnconfigure(1, weight=4, minsize=600)  # Coluna Form
-        
-        # 4. Painel Esquerdo: Lista de Estudantes
+        self.main_container.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, 12))
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=1, minsize=280)
+        self.main_container.grid_columnconfigure(1, weight=4, minsize=600)
+
+        # 3. Painel Esquerdo: Lista de Estudantes
         self._create_students_panel()
-        
-        # 5. Painel Direito: Construtor de Orientações
+
+        # 4. Painel Direito: Construtor de Orientações
         self._create_builder_panel()
     
     def _create_header(self):
         """Cria o cabeçalho com título e botão salvar"""
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 8))
-        
-        # Título
+        header.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 12))
+
         ctk.CTkLabel(
-            header, 
-            text="Orientações", 
-            font=font(20, "bold"),
-            text_color=self.colors["text"]
+            header,
+            text="Orientações",
+            font=themed_font("h2", "bold"),
+            text_color=self.colors["text"],
         ).pack(side="left")
-        
-        # Botões da direita
+
         actions_frame = ctk.CTkFrame(header, fg_color="transparent")
         actions_frame.pack(side="right")
-        
-        # Botão Salvar
-        self.btn_salvar = ctk.CTkButton(
+
+        self.btn_salvar = PrimaryButton(
             actions_frame,
             text="Salvar Orientação",
-            fg_color=self.colors["primary"],
-            hover_color=self.colors["primary_hover"],
-            font=font(12, "bold"),
-            height=36,
-            width=140,
-            corner_radius=RADIUS["button"],
-            command=self._save_orientation
+            command=self._save_orientation,
+            width=160,
         )
         self.btn_salvar.pack(side="left", padx=5)
-        
-        # Ícone de notificação (usando emoji como ícone)
-        ctk.CTkLabel(actions_frame, text="🔔", font=font(18), text_color=self.colors["text_muted"]).pack(side="left", padx=5)
-    
-    def _create_banner(self):
-        """Cria o banner de orientações"""
-        banner = ctk.CTkFrame(self, fg_color=self.colors["card"], corner_radius=RADIUS["card"], border_width=1, border_color=self.colors["border"])
-        banner.grid(row=1, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 16))
-        
-        inner = ctk.CTkFrame(banner, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=20, pady=14)
-        
-        # Ícone
-        icon_box = ctk.CTkFrame(inner, width=48, height=48, fg_color=self.colors["purple_light"], corner_radius=12)
-        icon_box.pack(side="left", padx=(0, 16))
-        icon_box.pack_propagate(False)
-        ctk.CTkLabel(icon_box, text="💜", font=("Segoe UI", 20)).place(relx=0.5, rely=0.5, anchor="center")
-        
-        # Textos
-        texts = ctk.CTkFrame(inner, fg_color="transparent")
-        texts.pack(side="left")
-        ctk.CTkLabel(texts, text="Orientações e Acompanhamento", font=font(16, "bold"), text_color=self.colors["text"]).pack(anchor="w")
-        self.subtitle_label = ctk.CTkLabel(texts, text="Selecione um estudante ao lado para iniciar", font=font(13), text_color=self.colors["text_muted"])
-        self.subtitle_label.pack(anchor="w")
+
+        ctk.CTkLabel(actions_frame, text="🔔", font=themed_font("h3"), text_color=self.colors["text_muted"]).pack(side="left", padx=5)
     
     def _create_students_panel(self):
         """Cria o painel de lista de estudantes"""
