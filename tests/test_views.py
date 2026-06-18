@@ -19,7 +19,7 @@ from services.mural import servico_mural
 
 class TestViews:
     
-    @patch('views.login.AuthService')
+    @patch('views.login.ServicoAutenticacao')
     def test_login_view(self, MockAuth, app, controller):
         # Setup
         view = LoginFrame(app, controller)

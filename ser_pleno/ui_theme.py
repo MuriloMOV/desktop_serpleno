@@ -70,6 +70,10 @@ THEME = {
     # Login / extras
     "card_music": "#6366F1",
     "border_music": "#523C8F",
+    # Purple extras usados em algumas views
+    "purple": "#7E22CE",
+    "purple_light": "#F3E8FF",
+    "purple_soft": "#EDE9FE",
 }
 
 SPACING = {
@@ -122,5 +126,8 @@ def font(
     return ctk.CTkFont(family=family, size=size, weight=weight)
 
 
-def themed_font(role: Literal["display", "h1", "h2", "h3", "body", "caption", "overline"], weight: Literal["normal", "bold"] = "normal") -> ctk.CTkFont:
+def themed_font(
+    role: Literal["display", "h1", "h2", "h3", "body", "caption", "overline"],
+    weight: Literal["normal", "bold"] = "normal",
+) -> ctk.CTkFont:
     return ctk.CTkFont(family=FONT_FAMILY, size=TYPO[role], weight=weight)

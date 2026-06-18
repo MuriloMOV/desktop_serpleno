@@ -1,15 +1,18 @@
+from repositories.estudantes import EstudanteRepository
 from config.db_config import get_db_connection
 
+
 class ServicoBemEstar:
+    def __init__(self):
+        self.repo_estudante = EstudanteRepository()
+
     def obter_dashboard(self):
         connection = get_db_connection()
         cursor = connection.cursor(dictionary=True)
-        # Últimos registros de humor e checkins
         cursor.execute("SELECT * FROM desktop_moodentry ORDER BY entry_date DESC LIMIT 10")
         moods = cursor.fetchall()
         cursor.execute("SELECT * FROM desktop_wellnesscheckin ORDER BY check_in_date DESC LIMIT 10")
         checkins = cursor.fetchall()
-        # Média geral do humor
         cursor.execute("SELECT AVG(mood_level) as average_mood FROM desktop_moodentry")
         avg = cursor.fetchone()
         connection.close()
@@ -53,11 +56,7 @@ class ServicoBemEstar:
         return {"success": True, "data": {"checkins": result}}
 
     def listar_estudantes_risco(self):
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        # Buscar alunos com marcação de atenção e agrupar por prioridade
-        cursor.execute("SELECT id_aluno, nome, priority_level, attention_reason, requires_attention FROM aluno WHERE requires_attention = 1")
-        rows = cursor.fetchall()
+        rows = self.repo_estudante.listar(requer_atencao=True)
         groups = {'critical': [], 'high': [], 'medium': [], 'low': []}
         for r in rows:
             priority = r.get('priority_level') or 0
@@ -70,5 +69,4 @@ class ServicoBemEstar:
                 groups['medium'].append(student)
             else:
                 groups['low'].append(student)
-        connection.close()
         return {"success": True, "data": {"groups": groups}}

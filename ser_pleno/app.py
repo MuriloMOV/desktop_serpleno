@@ -17,17 +17,22 @@ from components.ui_components import (
     blend_color,
 )
 
+from controllers.dashboard import DashboardController
+from controllers.estudantes import EstudantesController
+from controllers.bem_estar import BemEstarController
+from controllers.configuracoes import ConfiguracoesController
+from controllers.analise_triagem import AnaliseTriagemController
+from views.login import LoginFrame
 from views.dashboard import DashboardFrame
 from views.estudantes import EstudantesFrame
 from views.agenda import AgendaFrame
-from views.login import LoginFrame
+from views.bem_estar import BemEstarFrame
 from views.analise_triagem import AnaliseTriagemFrame
+from views.relatorio import RelatorioFrame
 from views.comunicacao_interna import ComunicacaoInternaFrame
 from views.orientacoes import OrientacoesFrame
 from views.quadro_avisos import QuadroAvisosFrame
 from views.configuracoes import ConfiguracoesFrame
-from views.relatorio import RelatorioFrame
-from views.bem_estar import BemEstarFrame
 
 
 class App(ctk.CTk):
@@ -38,7 +43,7 @@ class App(ctk.CTk):
 
         self.title("SerPleno")
         self.geometry("1280x720")
-        self.minsize(1024, 640)
+        self.minsize(800, 480)
         self.configure(fg_color=THEME["bg"])
 
         self.usuario_logado = None  # Armazena os dados do usuário logados
@@ -64,8 +69,14 @@ class App(ctk.CTk):
     # ================= SISTEMA =================
     def iniciar_sistema(self, user_data):
         self.usuario_logado = user_data
-        self.usuario_logado_id = user_data['id']
+        self.usuario_logado_id = user_data["id"]
         self.limpar_tela()
+
+        self.dashboard_controller = DashboardController()
+        self.estudantes_controller = EstudantesController()
+        self.bem_estar_controller = BemEstarController()
+        self.configuracoes_controller = ConfiguracoesController()
+        self.analise_triagem_controller = AnaliseTriagemController()
 
         self.criar_sidebar()
         self.criar_area_conteudo()
@@ -131,7 +142,9 @@ class App(ctk.CTk):
         add_menu("bem_estar", "🧡  Bem-Estar", self.mostrar_bem_estar)
         add_menu("analise", "📈  Análise de Triagem", self.mostrar_analise_triagem)
         add_menu("relatorios", "📋  Relatórios", self.mostrar_relatorio)
-        add_menu("comunicacao", "💬  Comunicação Interna", self.mostrar_comunicacao_interna)
+        add_menu(
+            "comunicacao", "💬  Comunicação Interna", self.mostrar_comunicacao_interna
+        )
         add_menu("orientacoes", "🧭  Orientações", self.mostrar_orientacoes)
         add_menu("avisos", "📢  Quadro de Avisos", self.mostrar_quadro_avisos)
         add_menu("configuracoes", "⚙  Configurações", self.mostrar_configuracoes)
@@ -161,11 +174,11 @@ class App(ctk.CTk):
 
     def mostrar_dashboard(self):
         self.atualizar_menu("dashboard")
-        self.trocar_frame(DashboardFrame)
+        self.trocar_frame(DashboardFrame, self.dashboard_controller)
 
     def mostrar_estudantes(self):
         self.atualizar_menu("estudantes")
-        self.trocar_frame(EstudantesFrame)
+        self.trocar_frame(EstudantesFrame, self.estudantes_controller)
 
     def mostrar_agenda(self):
         self.atualizar_menu("agenda")
@@ -173,7 +186,7 @@ class App(ctk.CTk):
 
     def mostrar_bem_estar(self):
         self.atualizar_menu("bem_estar")
-        self.trocar_frame(BemEstarFrame)
+        self.trocar_frame(BemEstarFrame, self.bem_estar_controller)
 
     def mostrar_analise_triagem(self):
         self.atualizar_menu("analise")
@@ -197,13 +210,13 @@ class App(ctk.CTk):
 
     def mostrar_configuracoes(self):
         self.atualizar_menu("configuracoes")
-        self.trocar_frame(ConfiguracoesFrame)
+        self.trocar_frame(ConfiguracoesFrame, self.configuracoes_controller)
 
-    def trocar_frame(self, FrameClasse):
+    def trocar_frame(self, frame_cls, controller=None):
         for widget in self.content.winfo_children():
             widget.destroy()
 
-        frame = FrameClasse(self.content, self)
+        frame = frame_cls(self.content, self, controller=controller)
         frame.pack(fill="both", expand=True)
 
     def limpar_tela(self):

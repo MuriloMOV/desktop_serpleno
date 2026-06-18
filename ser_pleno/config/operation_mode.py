@@ -30,7 +30,7 @@ class OperationConfig:
     """Gerenciador de configuração de modo de operação"""
     
     # Arquivo de configuração local
-    CONFIG_FILE = "operation_config.json"
+    CONFIG_FILE = os.path.join("config", "operation_config.json")
     
     # Configurações padrão
     DEFAULT_CONFIG = {

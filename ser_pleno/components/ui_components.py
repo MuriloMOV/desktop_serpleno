@@ -7,11 +7,24 @@ from ui_theme import THEME, SPACING, RADIUS, ELEVATION, TYPO, font, themed_font
 # Componentes visuais reutilizáveis — SerPleno
 # ============================================================
 
+
 class PageHeader(ctk.CTkFrame):
     """Cabeçalho padrão de página com título, subtítulo e área de ações à direita."""
 
-    def __init__(self, parent, title: str, subtitle: str = "", actions: list[ctk.CTkButton] | None = None):
-        super().__init__(parent, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
+    def __init__(
+        self,
+        parent,
+        title: str,
+        subtitle: str = "",
+        actions: list[ctk.CTkButton] | None = None,
+    ):
+        super().__init__(
+            parent,
+            fg_color=THEME["card"],
+            corner_radius=RADIUS["card"],
+            border_width=1,
+            border_color=THEME["border"],
+        )
         self._build(title, subtitle, actions or [])
 
     def _build(self, title: str, subtitle: str, actions: list[ctk.CTkButton]) -> None:
@@ -20,9 +33,16 @@ class PageHeader(ctk.CTkFrame):
 
         txt = ctk.CTkFrame(inner, fg_color="transparent")
         txt.pack(side="left", fill="y")
-        ctk.CTkLabel(txt, text=title, font=themed_font("h2", "bold"), text_color=THEME["text"]).pack(anchor="w")
+        ctk.CTkLabel(
+            txt, text=title, font=themed_font("h2", "bold"), text_color=THEME["text"]
+        ).pack(anchor="w")
         if subtitle:
-            ctk.CTkLabel(txt, text=subtitle, font=themed_font("body"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(2, 0))
+            ctk.CTkLabel(
+                txt,
+                text=subtitle,
+                font=themed_font("body"),
+                text_color=THEME["text_muted"],
+            ).pack(anchor="w", pady=(2, 0))
 
         if actions:
             actions_frame = ctk.CTkFrame(inner, fg_color="transparent")
@@ -35,16 +55,32 @@ class PageHeader(ctk.CTkFrame):
 class SectionHeader(ctk.CTkFrame):
     """Cabeçalho de seção simples, usado antes de cards ou listas."""
 
-    def __init__(self, parent, title: str, subtitle: str = "", action_text: str = "", action_command=None):
+    def __init__(
+        self,
+        parent,
+        title: str,
+        subtitle: str = "",
+        action_text: str = "",
+        action_command=None,
+    ):
         super().__init__(parent, fg_color="transparent")
         self._build(title, subtitle, action_text, action_command)
 
-    def _build(self, title: str, subtitle: str, action_text: str, action_command) -> None:
+    def _build(
+        self, title: str, subtitle: str, action_text: str, action_command
+    ) -> None:
         left = ctk.CTkFrame(self, fg_color="transparent")
         left.pack(side="left", fill="y")
-        ctk.CTkLabel(left, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(anchor="w")
+        ctk.CTkLabel(
+            left, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]
+        ).pack(anchor="w")
         if subtitle:
-            ctk.CTkLabel(left, text=subtitle, font=themed_font("caption"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(2, 0))
+            ctk.CTkLabel(
+                left,
+                text=subtitle,
+                font=themed_font("caption"),
+                text_color=THEME["text_muted"],
+            ).pack(anchor="w", pady=(2, 0))
 
         if action_text and action_command:
             ctk.CTkButton(
@@ -81,14 +117,22 @@ class Card(ctk.CTkFrame):
     def _build_with_title(self, title: str) -> None:
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=self._padding[0], pady=(self._padding[1], 0))
-        ctk.CTkLabel(header, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
-        ctk.CTkFrame(self, height=1, fg_color=THEME["divider"]).pack(fill="x", padx=self._padding[0], pady=(8, 0))
+        ctk.CTkLabel(
+            header, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]
+        ).pack(side="left")
+        ctk.CTkFrame(self, height=1, fg_color=THEME["divider"]).pack(
+            fill="x", padx=self._padding[0], pady=(8, 0)
+        )
         self._body = ctk.CTkFrame(self, fg_color="transparent")
-        self._body.pack(fill="both", expand=True, padx=self._padding[0], pady=(8, self._padding[1]))
+        self._body.pack(
+            fill="both", expand=True, padx=self._padding[0], pady=(8, self._padding[1])
+        )
 
     def _build_empty(self) -> None:
         self._body = ctk.CTkFrame(self, fg_color="transparent")
-        self._body.pack(fill="both", expand=True, padx=self._padding[0], pady=self._padding[1])
+        self._body.pack(
+            fill="both", expand=True, padx=self._padding[0], pady=self._padding[1]
+        )
 
     @property
     def body(self) -> ctk.CTkFrame:
@@ -98,7 +142,9 @@ class Card(ctk.CTkFrame):
 class KPICard(ctk.CTkFrame):
     """Card de indicador KPI com ícone, título e valor em destaque."""
 
-    def __init__(self, parent, title: str, value: str, icon: str, accent: str, trend: str = ""):
+    def __init__(
+        self, parent, title: str, value: str, icon: str, accent: str, trend: str = ""
+    ):
         super().__init__(
             parent,
             fg_color=THEME["card"],
@@ -115,10 +161,19 @@ class KPICard(ctk.CTkFrame):
 
         txt = ctk.CTkFrame(content, fg_color="transparent")
         txt.pack(side="left", fill="both", expand=True)
-        ctk.CTkLabel(txt, text=title, font=themed_font("caption"), text_color=THEME["text_muted"]).pack(anchor="w")
-        ctk.CTkLabel(txt, text=value, font=themed_font("h1", "bold"), text_color=THEME["text"]).pack(anchor="w", pady=(4, 0))
+        ctk.CTkLabel(
+            txt, text=title, font=themed_font("caption"), text_color=THEME["text_muted"]
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            txt, text=value, font=themed_font("h1", "bold"), text_color=THEME["text"]
+        ).pack(anchor="w", pady=(4, 0))
         if trend:
-            ctk.CTkLabel(txt, text=trend, font=themed_font("overline"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(2, 0))
+            ctk.CTkLabel(
+                txt,
+                text=trend,
+                font=themed_font("overline"),
+                text_color=THEME["text_muted"],
+            ).pack(anchor="w", pady=(2, 0))
 
         icon_bg = _soft_bg(hex_c=self.accent, alpha=0.12)
         ctk.CTkLabel(
@@ -136,18 +191,32 @@ class KPICard(ctk.CTkFrame):
 class PrimaryButton(ctk.CTkButton):
     """Botão primário padronizado."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 140, height: int = 42, icon: str = "", **kwargs):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        command=None,
+        width: int = 140,
+        height: int = 42,
+        icon: str = "",
+        **kwargs,
+    ):
+        corner = kwargs.pop("corner_radius", RADIUS["button"])
+        fg = kwargs.pop("fg_color", THEME["primary"])
+        hover = kwargs.pop("hover_color", THEME["primary_hover"])
+        txtc = kwargs.pop("text_color", THEME["text_on_primary"])
+        f = kwargs.pop("font", themed_font("body", "bold"))
         super().__init__(
             parent,
             text=text,
             command=command,
             width=width,
             height=height,
-            fg_color=THEME["primary"],
-            hover_color=THEME["primary_hover"],
-            text_color=THEME["text_on_primary"],
-            font=themed_font("body", "bold"),
-            corner_radius=RADIUS["button"],
+            fg_color=fg,
+            hover_color=hover,
+            text_color=txtc,
+            font=f,
+            corner_radius=corner,
             **kwargs,
         )
         if icon:
@@ -159,20 +228,35 @@ class PrimaryButton(ctk.CTkButton):
 class SecondaryButton(ctk.CTkButton):
     """Botão secundário / outline."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 120, height: int = 38, **kwargs):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        command=None,
+        width: int = 120,
+        height: int = 38,
+        **kwargs,
+    ):
+        corner = kwargs.pop("corner_radius", RADIUS["button"])
+        fg = kwargs.pop("fg_color", "transparent")
+        hover = kwargs.pop("hover_color", THEME["primary_light"])
+        txtc = kwargs.pop("text_color", THEME["primary"])
+        f = kwargs.pop("font", themed_font("body", "bold"))
+        border_w = kwargs.pop("border_width", 1)
+        border_c = kwargs.pop("border_color", THEME["primary_soft"])
         super().__init__(
             parent,
             text=text,
             command=command,
             width=width,
             height=height,
-            fg_color="transparent",
-            hover_color=THEME["primary_light"],
-            text_color=THEME["primary"],
-            font=themed_font("body", "bold"),
-            corner_radius=RADIUS["button"],
-            border_width=1,
-            border_color=THEME["primary_soft"],
+            fg_color=fg,
+            hover_color=hover,
+            text_color=txtc,
+            font=f,
+            corner_radius=corner,
+            border_width=border_w,
+            border_color=border_c,
             **kwargs,
         )
 
@@ -180,18 +264,31 @@ class SecondaryButton(ctk.CTkButton):
 class GhostButton(ctk.CTkButton):
     """Botão fantasma para ações menos relevantes."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 100, height: int = 36, **kwargs):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        command=None,
+        width: int = 100,
+        height: int = 36,
+        **kwargs,
+    ):
+        corner = kwargs.pop("corner_radius", RADIUS["button"])
+        fg = kwargs.pop("fg_color", "transparent")
+        hover = kwargs.pop("hover_color", THEME["bg_alt"])
+        txtc = kwargs.pop("text_color", THEME["text_secondary"])
+        f = kwargs.pop("font", themed_font("caption", "bold"))
         super().__init__(
             parent,
             text=text,
             command=command,
             width=width,
             height=height,
-            fg_color="transparent",
-            hover_color=THEME["bg_alt"],
-            text_color=THEME["text_secondary"],
-            font=themed_font("caption", "bold"),
-            corner_radius=RADIUS["button"],
+            fg_color=fg,
+            hover_color=hover,
+            text_color=txtc,
+            font=f,
+            corner_radius=corner,
             **kwargs,
         )
 
@@ -199,18 +296,31 @@ class GhostButton(ctk.CTkButton):
 class DangerButton(ctk.CTkButton):
     """Botão de ação destrutiva."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 120, height: int = 38, **kwargs):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        command=None,
+        width: int = 120,
+        height: int = 38,
+        **kwargs,
+    ):
+        corner = kwargs.pop("corner_radius", RADIUS["button"])
+        fg = kwargs.pop("fg_color", THEME["danger"])
+        hover = kwargs.pop("hover_color", THEME["danger_strong"])
+        txtc = kwargs.pop("text_color", THEME["text_on_primary"])
+        f = kwargs.pop("font", themed_font("body", "bold"))
         super().__init__(
             parent,
             text=text,
             command=command,
             width=width,
             height=height,
-            fg_color=THEME["danger"],
-            hover_color=THEME["danger_strong"],
-            text_color=THEME["text_on_primary"],
-            font=themed_font("body", "bold"),
-            corner_radius=RADIUS["button"],
+            fg_color=fg,
+            hover_color=hover,
+            text_color=txtc,
+            font=f,
+            corner_radius=corner,
             **kwargs,
         )
 
@@ -218,12 +328,24 @@ class DangerButton(ctk.CTkButton):
 class InputField(ctk.CTkFrame):
     """Campo de entrada com rótulo, ícone e estado de foco consistente."""
 
-    def __init__(self, parent, label: str, placeholder: str = "", icon: str = "", password: bool = False):
+    def __init__(
+        self,
+        parent,
+        label: str,
+        placeholder: str = "",
+        icon: str = "",
+        password: bool = False,
+    ):
         super().__init__(parent, fg_color="transparent")
         self._build(label, placeholder, icon, password)
 
     def _build(self, label: str, placeholder: str, icon: str, password: bool) -> None:
-        ctk.CTkLabel(self, text=label, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(0, SPACING["label_gap"]))
+        ctk.CTkLabel(
+            self,
+            text=label,
+            font=themed_font("caption", "bold"),
+            text_color=THEME["text_muted"],
+        ).pack(anchor="w", pady=(0, SPACING["label_gap"]))
 
         inner = ctk.CTkFrame(
             self,
@@ -237,7 +359,9 @@ class InputField(ctk.CTkFrame):
         inner.pack_propagate(False)
 
         if icon:
-            ctk.CTkLabel(inner, text=icon, font=themed_font("body")).pack(side="left", padx=(12, 6))
+            ctk.CTkLabel(inner, text=icon, font=themed_font("body")).pack(
+                side="left", padx=(12, 6)
+            )
 
         self.entry = ctk.CTkEntry(
             inner,
@@ -250,8 +374,13 @@ class InputField(ctk.CTkFrame):
         self.entry.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
         # Estado visual de foco
-        self.entry.bind("<FocusIn>", lambda e: inner.configure(border_color=THEME["input_border_focus"]))
-        self.entry.bind("<FocusOut>", lambda e: inner.configure(border_color=THEME["input_border"]))
+        self.entry.bind(
+            "<FocusIn>",
+            lambda e: inner.configure(border_color=THEME["input_border_focus"]),
+        )
+        self.entry.bind(
+            "<FocusOut>", lambda e: inner.configure(border_color=THEME["input_border"])
+        )
 
     def get(self) -> str:
         return self.entry.get()
@@ -267,13 +396,22 @@ class SearchField(ctk.CTkFrame):
     """Campo de busca com ícone e placeholder."""
 
     def __init__(self, parent, placeholder: str = "Buscar...", command=None):
-        super().__init__(parent, fg_color=THEME["bg_alt"], corner_radius=RADIUS["input"], border_width=1, border_color=THEME["border"], height=40)
+        super().__init__(
+            parent,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["input"],
+            border_width=1,
+            border_color=THEME["border"],
+            height=40,
+        )
         self._command = command
         self._build(placeholder)
         self.pack_propagate(False)
 
     def _build(self, placeholder: str) -> None:
-        ctk.CTkLabel(self, text="🔍", font=themed_font("body"), text_color=THEME["text_muted"]).pack(side="left", padx=(12, 8))
+        ctk.CTkLabel(
+            self, text="🔍", font=themed_font("body"), text_color=THEME["text_muted"]
+        ).pack(side="left", padx=(12, 8))
         self.entry = ctk.CTkEntry(
             self,
             placeholder_text=placeholder,
@@ -295,7 +433,13 @@ class SearchField(ctk.CTkFrame):
 class Badge(ctk.CTkLabel):
     """Badge numérico ou textual para notificações e status."""
 
-    def __init__(self, parent, text: str, color: str = THEME["danger"], text_color: str = THEME["text_on_primary"]):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        color: str = THEME["danger"],
+        text_color: str = THEME["text_on_primary"],
+    ):
         super().__init__(
             parent,
             text=str(text),
@@ -312,25 +456,52 @@ class Badge(ctk.CTkLabel):
 class Pill(ctk.CTkFrame):
     """Pill / tag textual curta."""
 
-    def __init__(self, parent, text: str, color: str = THEME["primary_soft"], text_color: str = THEME["primary"]):
+    def __init__(
+        self,
+        parent,
+        text: str,
+        color: str = THEME["primary_soft"],
+        text_color: str = THEME["primary"],
+    ):
         super().__init__(parent, fg_color=color, corner_radius=RADIUS["pill"])
-        ctk.CTkLabel(self, text=text, font=themed_font("overline", "bold"), text_color=text_color).pack(padx=10, pady=3)
+        ctk.CTkLabel(
+            self, text=text, font=themed_font("overline", "bold"), text_color=text_color
+        ).pack(padx=10, pady=3)
 
 
 class EmptyState(ctk.CTkFrame):
     """Estado vazio padronizado para listas e áreas sem conteúdo."""
 
-    def __init__(self, parent, icon: str, title: str, subtitle: str = "", action_text: str = "", action_command=None):
+    def __init__(
+        self,
+        parent,
+        icon: str,
+        title: str,
+        subtitle: str = "",
+        action_text: str = "",
+        action_command=None,
+    ):
         super().__init__(parent, fg_color="transparent")
         self._build(icon, title, subtitle, action_text, action_command)
 
-    def _build(self, icon: str, title: str, subtitle: str, action_text: str, action_command) -> None:
+    def _build(
+        self, icon: str, title: str, subtitle: str, action_text: str, action_command
+    ) -> None:
         ctk.CTkLabel(self, text=icon, font=themed_font("display")).pack(pady=(20, 10))
-        ctk.CTkLabel(self, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(pady=(0, 6))
+        ctk.CTkLabel(
+            self, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]
+        ).pack(pady=(0, 6))
         if subtitle:
-            ctk.CTkLabel(self, text=subtitle, font=themed_font("body"), text_color=THEME["text_muted"]).pack(pady=(0, 12))
+            ctk.CTkLabel(
+                self,
+                text=subtitle,
+                font=themed_font("body"),
+                text_color=THEME["text_muted"],
+            ).pack(pady=(0, 12))
         if action_text and action_command:
-            PrimaryButton(self, text=action_text, command=action_command, width=180).pack(pady=8)
+            PrimaryButton(
+                self, text=action_text, command=action_command, width=180
+            ).pack(pady=8)
 
 
 class Divider(ctk.CTkFrame):
@@ -344,6 +515,7 @@ class Divider(ctk.CTkFrame):
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def _soft_bg(hex_c: str, alpha: float) -> str:
     r, g, b = int(hex_c[1:3], 16), int(hex_c[3:5], 16), int(hex_c[5:7], 16)
