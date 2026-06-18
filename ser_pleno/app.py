@@ -174,11 +174,11 @@ class App(ctk.CTk):
 
     def mostrar_dashboard(self):
         self.atualizar_menu("dashboard")
-        self.trocar_frame(DashboardFrame, self.dashboard_controller)
+        self.trocar_frame(DashboardFrame)
 
     def mostrar_estudantes(self):
         self.atualizar_menu("estudantes")
-        self.trocar_frame(EstudantesFrame, self.estudantes_controller)
+        self.trocar_frame(EstudantesFrame)
 
     def mostrar_agenda(self):
         self.atualizar_menu("agenda")
@@ -186,7 +186,7 @@ class App(ctk.CTk):
 
     def mostrar_bem_estar(self):
         self.atualizar_menu("bem_estar")
-        self.trocar_frame(BemEstarFrame, self.bem_estar_controller)
+        self.trocar_frame(BemEstarFrame)
 
     def mostrar_analise_triagem(self):
         self.atualizar_menu("analise")
@@ -210,13 +210,18 @@ class App(ctk.CTk):
 
     def mostrar_configuracoes(self):
         self.atualizar_menu("configuracoes")
-        self.trocar_frame(ConfiguracoesFrame, self.configuracoes_controller)
+        self.trocar_frame(ConfiguracoesFrame)
 
     def trocar_frame(self, frame_cls, controller=None):
         for widget in self.content.winfo_children():
             widget.destroy()
 
-        frame = frame_cls(self.content, self, controller=controller)
+        if frame_cls is QuadroAvisosFrame:
+            frame = frame_cls(self.content, app=self)
+        elif controller is not None:
+            frame = frame_cls(self.content, self, controller=controller)
+        else:
+            frame = frame_cls(self.content, self)
         frame.pack(fill="both", expand=True)
 
     def limpar_tela(self):

@@ -484,6 +484,8 @@ class OrientacoesFrame(ctk.CTkFrame):
     
     def _render_students(self, res):
         """Renderiza a lista de estudantes"""
+        if not self.winfo_exists():
+            return
         for w in self.scroll_alunos.winfo_children():
             w.destroy()
         
