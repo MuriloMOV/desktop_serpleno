@@ -313,6 +313,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             except Exception as e:
                 print(f"Erro ao enviar mensagem: {e}")
 
+    def enviar_msg(self):
+        self.enviar_mensagem()
+
     def criar_contato_item(self, contato, is_first=False):
         item = ctk.CTkFrame(self.scroll_contacts, fg_color="transparent", height=68)
         item.pack(fill="x", padx=8, pady=(0, 6))

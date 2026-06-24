@@ -1,322 +1,607 @@
+from __future__ import annotations
+
 import customtkinter as ctk
-from PIL import Image
+from tkinter import messagebox
 import os
 import json
+import logging
+from typing import Any
+
 from ui_theme import THEME, SPACING, RADIUS, font, themed_font
 from components.ui_components import (
     PageHeader,
     Card,
     PrimaryButton,
     GhostButton,
-    Divider,
-    EmptyState,
+    Badge,
 )
 
+logger = logging.getLogger("apps.desktop")
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Paleta dedicada + helpers de cor
+# ═══════════════════════════════════════════════════════════════════════════════
+CONFIG_COLORS: dict[str, str] = {
+    "bg":            THEME["bg"],
+    "card":          THEME["card"],
+    "border":        THEME["border"],
+    "border_strong": THEME["border_strong"],
+    "primary":       THEME["primary"],
+    "primary_light": THEME["primary_light"],
+    "primary_soft":  THEME["primary_soft"],
+    "text":          THEME["text"],
+    "text_muted":    THEME["text_muted"],
+    "text_secondary":THEME["text_secondary"],
+    "danger":        THEME["danger"],
+    "danger_soft":   THEME["danger_soft"],
+    "success":       THEME["success"],
+    "success_soft":  THEME["success_soft"],
+    "warning":       THEME["warning"],
+    "warning_soft":  THEME["warning_soft"],
+    "bg_alt":        THEME["bg_alt"],
+}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Componentes reutilizáveis
+# ═══════════════════════════════════════════════════════════════════════════════
+class ConfigInputField(ctk.CTkFrame):
+    """
+    Campo de entrada com label, ícone e estados
+    normal / foco / erro.
+    """
+    _BORDER_NORMAL = THEME["border"]
+    _BORDER_FOCUS  = THEME["primary"]
+    _BORDER_ERROR  = THEME["danger"]
+    _BG_NORMAL     = THEME["bg_alt"]
+    _BG_FOCUS      = THEME["card"]
+
+    def __init__(self, parent, label: str, value: str = "",
+                 icon: str = "", placeholder: str = "",
+                 password: bool = False):
+        super().__init__(parent, fg_color="transparent")
+
+        self._label = ctk.CTkLabel(
+            self, text=label,
+            font=themed_font("caption", "bold"),
+            text_color=CONFIG_COLORS["text_muted"],
+            anchor="w",
+        )
+        self._label.pack(fill="x", pady=(0, 4))
+
+        box = ctk.CTkFrame(
+            self,
+            corner_radius=RADIUS["md"],
+            fg_color=self._BG_NORMAL,
+            border_width=1,
+            border_color=self._BORDER_NORMAL,
+        )
+        box.pack(fill="x")
+        box.grid_columnconfigure(1, weight=1)
+        self._box = box
+
+        if icon:
+            ctk.CTkLabel(
+                box, text=icon,
+                font=themed_font("body"),
+                text_color=CONFIG_COLORS["text_muted"],
+                width=36,
+            ).grid(row=0, column=0, padx=(10, 4), pady=8)
+
+        self.entry = ctk.CTkEntry(
+            box,
+            placeholder_text=placeholder,
+            fg_color="transparent",
+            border_width=0,
+            font=themed_font("body"),
+            height=36,
+            show="●" if password else "",
+        )
+        self.entry.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=4)
+        if value:
+            self.entry.insert(0, value)
+
+        self.entry.bind("<FocusIn>",  self._on_focus_in)
+        self.entry.bind("<FocusOut>", self._on_focus_out)
+
+    # API ---------------------------------------------------------------------
+    def get(self) -> str:
+        return self.entry.get()
+
+    def set_error(self, msg: str = ""):
+        self._box.configure(
+            border_color=self._BORDER_ERROR,
+            fg_color=CONFIG_COLORS["danger_soft"],
+        )
+        self._label.configure(text_color=CONFIG_COLORS["danger"])
+
+    def clear_state(self):
+        self._box.configure(
+            border_color=self._BORDER_NORMAL,
+            fg_color=self._BG_NORMAL,
+        )
+        self._label.configure(text_color=CONFIG_COLORS["text_muted"])
+
+    # Internos ----------------------------------------------------------------
+    def _on_focus_in(self, _=None):
+        self._box.configure(
+            border_color=self._BORDER_FOCUS,
+            fg_color=self._BG_FOCUS,
+        )
+        self._label.configure(text_color=CONFIG_COLORS["primary"])
+
+    def _on_focus_out(self, _=None):
+        self._box.configure(
+            border_color=self._BORDER_NORMAL,
+            fg_color=self._BG_NORMAL,
+        )
+        self._label.configure(text_color=CONFIG_COLORS["text_muted"])
+
+
+class ToggleRow(ctk.CTkFrame):
+    """Linha com ícone + título + subtítulo + switch."""
+
+    def __init__(self, parent, icon: str, title: str, sub: str,
+                 on_toggle=None, initial: bool = False):
+        super().__init__(parent, fg_color="transparent")
+
+        self._on_toggle = on_toggle
+
+        txt = ctk.CTkFrame(self, fg_color="transparent")
+        txt.pack(side="left", fill="x", expand=True)
+
+        ctk.CTkLabel(
+            txt, text=title,
+            font=themed_font("body", "bold"),
+            text_color=CONFIG_COLORS["text"],
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            txt, text=sub,
+            font=themed_font("overline"),
+            text_color=CONFIG_COLORS["text_muted"],
+        ).pack(anchor="w")
+
+        self.switch = ctk.CTkSwitch(
+            self, text="",
+            progress_color=CONFIG_COLORS["primary"],
+        )
+        self.switch.pack(side="right", padx=8)
+        if initial:
+            self.switch.select()
+        else:
+            self.switch.deselect()
+        self.switch.configure(command=self._handle_toggle)
+
+    def _handle_toggle(self):
+        if self._on_toggle:
+            self._on_toggle(self.switch.get())
+
+
+class ActionItemRow(ctk.CTkFrame):
+    """Linha de item de ação com ícone, título, subtítulo e botão."""
+
+    def __init__(self, parent, icon: str, title: str, sub: str,
+                 btn_text: str, danger: bool = False, on_action=None):
+        super().__init__(parent, fg_color="transparent")
+
+        self._on_action = on_action
+
+        ctk.CTkLabel(
+            self, text=icon, font=themed_font("h3"),
+            fg_color=CONFIG_COLORS["bg_alt"],
+            width=40, height=40,
+            corner_radius=RADIUS["pill"],
+        ).pack(side="left", padx=(0, 12))
+
+        txt = ctk.CTkFrame(self, fg_color="transparent")
+        txt.pack(side="left", fill="x", expand=True)
+
+        ctk.CTkLabel(
+            txt, text=title,
+            font=themed_font("body", "bold"),
+            text_color=CONFIG_COLORS["text"],
+        ).pack(anchor="w")
+        ctk.CTkLabel(
+            txt, text=sub,
+            font=themed_font("overline"),
+            text_color=CONFIG_COLORS["text_muted"],
+        ).pack(anchor="w")
+
+        color = CONFIG_COLORS["danger"] if danger else CONFIG_COLORS["primary"]
+        hover = CONFIG_COLORS["danger_soft"] if danger else CONFIG_COLORS["primary_soft"]
+
+        btn = GhostButton(
+            self, text=btn_text, width=150,
+            command=lambda: self._handle_action(btn_text),
+        )
+        btn.pack(side="right", padx=8)
+        if danger:
+            btn.configure(
+                text_color=color,
+                hover_color=hover,
+            )
+
+    def _handle_action(self, btn_text: str):
+        if self._on_action:
+            self._on_action(btn_text)
+
+
+class SectionCard(ctk.CTkFrame):
+    """Card de seção com ícone e título."""
+
+    def __init__(self, parent, icon: str, title: str, badge: str = ""):
+        super().__init__(
+            parent,
+            fg_color=CONFIG_COLORS["card"],
+            corner_radius=RADIUS["lg"],
+            border_width=1,
+            border_color=CONFIG_COLORS["border"],
+        )
+        self._icon = icon
+        self._title = title
+        self._badge = badge
+
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=18, pady=(14, 8))
+
+        ctk.CTkLabel(
+            header, text=f"{icon}  {title}",
+            font=themed_font("h3", "bold"),
+            text_color=CONFIG_COLORS["text"],
+        ).pack(side="left")
+
+        if badge:
+            Badge(
+                header, text=badge,
+                color=CONFIG_COLORS["warning"],
+            ).pack(side="right")
+
+        self._body = ctk.CTkFrame(self, fg_color="transparent")
+        self._body.pack(fill="both", expand=True, padx=18, pady=(0, 14))
+
+    @property
+    def body(self) -> ctk.CTkFrame:
+        return self._body
+
+
+class FormModal(ctk.CTkToplevel):
+    """Modal reutilizável para formulários."""
+
+    def __init__(self, parent, title: str, width: int = 420, height: int = 340):
+        super().__init__(parent)
+        self.title(title)
+        self.geometry(f"{width}x{height}")
+        self.resizable(False, False)
+        self.configure(fg_color=CONFIG_COLORS["card"])
+        self.withdraw()
+
+        self._center(parent, width, height)
+        self._build()
+
+    def _center(self, parent, w, h):
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  // 2) - (w // 2)
+        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (h // 2)
+        self.geometry(f"+{x}+{y}")
+
+    def _build(self):
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=28, pady=28)
+
+        ctk.CTkLabel(
+            inner, text=self.title(),
+            font=themed_font("h3", "bold"),
+            text_color=CONFIG_COLORS["text"],
+        ).pack(pady=(0, 18))
+
+        self._fields_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        self._fields_frame.pack(fill="both", expand=True)
+
+        footer = ctk.CTkFrame(inner, fg_color="transparent", height=52)
+        footer.pack(fill="x", side="bottom", pady=(12, 0))
+        footer.pack_propagate(False)
+
+        GhostButton(
+            footer, text="Cancelar", width=120,
+            command=self.destroy,
+        ).pack(side="left", padx=(0, 8))
+        self._primary = PrimaryButton(
+            footer, text="Confirmar", width=140,
+            command=self._on_confirm,
+        )
+        self._primary.pack(side="right")
+
+    def _on_confirm(self):
+        raise NotImplementedError
+
+
+class AlterarSenhaModal(FormModal):
+    def __init__(self, parent, on_save):
+        super().__init__(parent, "Alterar Senha", width=420, height=380)
+        self._on_save = on_save
+
+        self.f_senha_atual    = ConfigInputField(self._fields_frame, "Senha Atual",    placeholder="••••••", password=True, icon="🔒")
+        self.f_nova_senha     = ConfigInputField(self._fields_frame, "Nova Senha",     placeholder="mín. 6 caracteres", password=True, icon="🔑")
+        self.f_confirmar_senha= ConfigInputField(self._fields_frame, "Confirmar Senha",placeholder="confirme a nova senha", password=True, icon="🔑")
+
+        for f in (self.f_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
+            f.pack(fill="x", pady=(0, 10))
+
+    def _on_confirm(self):
+        atual   = self.f_senha_atual.get().strip()
+        nova    = self.f_nova_senha.get().strip()
+        confirm = self.f_confirmar_senha.get().strip()
+
+        if not atual or not nova or not confirm:
+            messagebox.showwarning("Atenção", "Preencha todos os campos.")
+            return
+        if nova != confirm:
+            messagebox.showerror("Erro", "As senhas não coincidem.")
+            return
+        if len(nova) < 6:
+            messagebox.showwarning("Atenção", "A nova senha deve ter pelo menos 6 caracteres.")
+            return
+
+        self._on_save(atual, nova)
+        self.destroy()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Frame principal de configurações
+# ═══════════════════════════════════════════════════════════════════════════════
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=THEME["bg"])
+        super().__init__(parent, fg_color=CONFIG_COLORS["bg"])
         self.controller = controller
-        self.colors = THEME
-        self._images = {}
-        self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.base_path  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self._images: dict[str, Any] = {}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=2)
-        self.render_layout()
 
-    def load_image(self, name, size):
+        self._build_header()
+        self._build_body()
+
+    # ── helpers ---------------------------------------------------------------
+    def _load_image(self, name: str, size: tuple[int, int]):
+        key = f"{name}:{size}"
+        if key in self._images:
+            return self._images[key]
+        path = os.path.join(self.base_path, "assets", "avatars", name)
         try:
-            cache_key = f"{name}:{size}"
-            if cache_key in self._images:
-                return self._images[cache_key]
-            path = os.path.join(self.base_path, "assets", "avatars", name)
+            from PIL import Image
             if os.path.exists(path):
                 img = ctk.CTkImage(light_image=Image.open(path), size=size)
-                self._images[cache_key] = img
+                self._images[key] = img
                 return img
-        except Exception as e:
-            print(f"Erro ao carregar imagem {name}: {e}")
-            return None
+        except Exception as exc:
+            logger.exception("Erro ao carregar imagem %s: %s", name, exc)
+        return None
 
-    def render_layout(self):
-        header = self.criar_secao_header("Preferências do Sistema", "Personalize sua experiência no SerPleno", show_actions=True)
-        header.grid(row=0, column=0, columnspan=2, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 16))
-
-        col_left = ctk.CTkFrame(self, fg_color="transparent")
-        col_left.grid(row=1, column=0, sticky="nsew", padx=(SPACING["page_x"], 10))
-
-        self.render_cartao_pessoal(col_left)
-
-        col_right = ctk.CTkFrame(self, fg_color="transparent")
-        col_right.grid(row=1, column=1, sticky="nsew", padx=(10, SPACING["page_x"]))
-
-        self.render_central_avisos(col_right)
-        self.render_aparencia(col_right)
-        self.render_seguranca(col_right)
-
-    def criar_secao_header(self, title, subtitle, show_actions=False):
-        frame = Card(self, title=f"{title} — {subtitle}" if subtitle else title)
-        inner = frame.body
-
-        icon_box = ctk.CTkFrame(inner, width=40, height=40, corner_radius=RADIUS["md"], fg_color=THEME["primary_light"])
-        icon_box.place(x=20, y=18)
-        icon_box.pack_propagate(False)
-        ctk.CTkLabel(icon_box, text="⚙️", font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
-
-        txt_box = ctk.CTkFrame(inner, fg_color="transparent")
-        txt_box.place(x=70, y=12)
-
-        ctk.CTkLabel(txt_box, text=title, font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(txt_box, text=subtitle, font=themed_font("body"), text_color=THEME["text_muted"]).pack(anchor="w")
-
-        if show_actions:
-            actions = ctk.CTkFrame(inner, fg_color="transparent")
-            actions.place(relx=1.0, rely=0.0, anchor="ne", x=-20, y=16)
-            GhostButton(actions, text="Descartar", width=90).pack(side="left", padx=5)
-            PrimaryButton(actions, text="Salvar", width=80, command=lambda: None).pack(side="left")
-        return frame
-
-    def render_cartao_pessoal(self, container):
-        card = Card(container)
-        card.pack(fill="both", expand=True)
-
-        h = ctk.CTkFrame(card.body, fg_color="transparent")
-        h.pack(fill="x", padx=18, pady=(16, 10))
-        ctk.CTkLabel(h, text="👤 Informações Pessoais", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
-
+    def _profile_data(self) -> dict[str, str]:
         try:
             with open(os.path.join(self.base_path, "user_profile.json"), "r") as f:
-                profile = json.load(f)
-            avatar_name = profile.get("avatar", "avatar-1.jpg")
-        except Exception as e:
-            print(f"Erro ao carregar perfil: {e}")
-            avatar_name = "avatar-1.jpg"
+                return json.load(f)
+        except Exception:
+            return {}
 
-        self.avatar_display = ctk.CTkLabel(card.body, text="", image=self.load_image(avatar_name, (160, 160)))
+    # ── layout ---------------------------------------------------------------
+    def _build_header(self):
+        header = PageHeader(
+            self,
+            title="Preferências do Sistema",
+            subtitle="Personalize sua experiência no SerPleno",
+        )
+        header.grid(row=0, column=0, columnspan=2,
+                     sticky="ew",
+                     padx=SPACING["page_x"],
+                     pady=(SPACING["page_y"], 16))
+
+    def _build_body(self):
+        col_left  = ctk.CTkFrame(self, fg_color="transparent")
+        col_left.grid(row=1, column=0, sticky="nsew",
+                      padx=(SPACING["page_x"], 10))
+        self._build_cartao_pessoal(col_left)
+
+        col_right = ctk.CTkFrame(self, fg_color="transparent")
+        col_right.grid(row=1, column=1, sticky="nsew",
+                       padx=(10, SPACING["page_x"]))
+
+        self._build_central_avisos(col_right)
+        self._build_aparencia(col_right)
+        self._build_seguranca(col_right)
+
+    # ── cartão pessoal -------------------------------------------------------
+    def _build_cartao_pessoal(self, container):
+        card = SectionCard(container, "👤", "Informações Pessoais")
+        card.pack(fill="both", expand=True)
+
+        profile = self._profile_data()
+        avatar_name = profile.get("avatar", "avatar-1.jpg")
+
+        self.avatar_display = ctk.CTkLabel(
+            card.body, text="", image=self._load_image(avatar_name, (160, 160))
+        )
         self.avatar_display.pack(pady=10)
 
-        change_btn = GhostButton(card.body, text="Alterar imagem de perfil", command=self.toggle_gallery, width=220)
-        change_btn.pack(pady=(0, 8))
+        GhostButton(
+            card.body, text="Alterar imagem de perfil",
+            command=self._toggle_gallery, width=240,
+        ).pack(pady=(0, 8))
 
-        self.gallery_frame = ctk.CTkFrame(card.body, fg_color=THEME["bg_alt"], corner_radius=RADIUS["md"], border_width=1, border_color=THEME["border"])
+        self.gallery_frame = ctk.CTkFrame(
+            card.body,
+            fg_color=CONFIG_COLORS["bg_alt"],
+            corner_radius=RADIUS["md"],
+            border_width=1,
+            border_color=CONFIG_COLORS["border"],
+        )
         self.grid_galeria = ctk.CTkFrame(self.gallery_frame, fg_color="transparent")
         self.grid_galeria.pack(padx=10, pady=10)
+        self._fill_gallery()
 
+        nome = (
+            f"{self.controller.usuario_logado.get('first_name', '')} "
+            f"{self.controller.usuario_logado.get('last_name', '')}"
+        ).strip() or self.controller.usuario_logado.get("username", "Usuário")
+        email = self.controller.usuario_logado.get("email", "email@exemplo.com")
+
+        ConfigInputField(card.body, "Nome de exibição", value=nome, icon="👤")\
+            .pack(fill="x", pady=(0, 8))
+        ConfigInputField(card.body, "Endereço de E-mail", value=email, icon="📧")\
+            .pack(fill="x", pady=(0, 8))
+
+    def _fill_gallery(self):
         avatars_dir = os.path.join(self.base_path, "assets", "avatars")
         try:
-            avatar_files = [f for f in os.listdir(avatars_dir) if f.startswith("avatar-") and f.endswith(".jpg")]
-            avatar_files.sort()
-        except Exception as e:
-            print(f"Erro ao listar avatares: {e}")
-            avatar_files = []
+            files = sorted(f for f in os.listdir(avatars_dir)
+                           if f.startswith("avatar-") and f.endswith(".jpg"))
+        except Exception:
+            files = []
 
-        for i, filename in enumerate(avatar_files):
-            btn = ctk.CTkButton(
+        for i, filename in enumerate(files):
+            ctk.CTkButton(
                 self.grid_galeria,
                 text="",
-                image=self.load_image(filename, (52, 52)),
-                width=52,
-                height=52,
+                image=self._load_image(filename, (52, 52)),
+                width=52, height=52,
                 fg_color="white",
-                hover_color=THEME["primary_light"],
-                command=lambda x=filename: self.update_avatar(x),
-            )
-            btn.grid(row=i // 3, column=i % 3, padx=3, pady=3)
+                hover_color=CONFIG_COLORS["primary_light"],
+                corner_radius=RADIUS["md"],
+                command=lambda fn=filename: self._select_avatar(fn),
+            ).grid(row=i // 3, column=i % 3, padx=3, pady=3)
 
-        if self.controller.usuario_logado:
-            nome_usuario = f"{self.controller.usuario_logado.get('first_name', '')} {self.controller.usuario_logado.get('last_name', '')}".strip()
-            nome_usuario = nome_usuario if nome_usuario else self.controller.usuario_logado.get('username', 'Usuário')
-            email_usuario = self.controller.usuario_logado.get('email', 'email@exemplo.com')
-        else:
-            nome_usuario = 'Usuário'
-            email_usuario = 'email@exemplo.com'
-
-        self.criar_input_field(card.body, "Nome de exibição", nome_usuario, "👤")
-        self.criar_input_field(card.body, "Endereço de E-mail", email_usuario, "📧")
-
-    def toggle_gallery(self):
+    def _toggle_gallery(self):
         if self.gallery_frame.winfo_ismapped():
             self.gallery_frame.pack_forget()
         else:
-            self.gallery_frame.pack(fill="x", padx=20, pady=10, before=self.avatar_display)
+            self.gallery_frame.pack(fill="x", padx=20, pady=10,
+                                    before=self.avatar_display)
 
-    def update_avatar(self, filename):
-        img = self.load_image(filename, (160, 160))
+    def _select_avatar(self, filename):
+        img = self._load_image(filename, (160, 160))
         if img:
             self.avatar_display.configure(image=img)
             try:
                 with open(os.path.join(self.base_path, "user_profile.json"), "w") as f:
                     json.dump({"avatar": filename}, f)
-            except Exception as e:
-                print(f"Erro ao salvar avatar: {e}")
+            except Exception as exc:
+                logger.exception("Erro ao salvar avatar: %s", exc)
         self.gallery_frame.pack_forget()
 
-    def render_central_avisos(self, container):
-        card = Card(container)
+    # ── central de avisos ----------------------------------------------------
+    def _build_central_avisos(self, container):
+        card = SectionCard(container, "🔔", "Central de Avisos", badge="Tempo Real")
         card.pack(fill="x", pady=(0, 16))
 
-        h = ctk.CTkFrame(card.body, fg_color="transparent")
-        h.pack(fill="x", padx=18, pady=(14, 8))
-        ctk.CTkLabel(h, text="🔔 Central de Avisos", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
-        ctk.CTkLabel(h, text="Tempo Real", font=themed_font("overline", "bold"), fg_color=THEME["warning_soft"], text_color=THEME["warning_strong"], corner_radius=RADIUS["pill"], padx=10).pack(side="right")
-
-        items = [
-            ("Mensagens Diretas", "Alertar novos chats privados e mural"),
-            ("Pedidos de Ajuda", "Notificações críticas de suporte ao aluno"),
+        itens = [
+            ("Mensagens Diretas",  "Alertar novos chats privados e mural"),
+            ("Pedidos de Ajuda",   "Notificações críticas de suporte ao aluno"),
             ("Feedback de Alunos", "Novas avaliações e comentários"),
-            ("Efeitos Sonoros", "Feedback auditivo para alertas"),
+            ("Efeitos Sonoros",    "Feedback auditivo para alertas"),
         ]
-        self.notification_switches = {}
-        for t, s in items:
-            switch = self.criar_toggle_row(card.body, t, s)
-            self.notification_switches[t] = switch
-            switch.configure(command=lambda switch=switch, t=t: self.toggle_notification(t, switch))
+        for titulo, subtitulo in itens:
+            ToggleRow(
+                card.body, "", titulo, subtitulo,
+                on_toggle=lambda estado, t=titulo: self._on_toggle_notificacao(t, estado),
+            ).pack(fill="x", pady=4)
 
-    def toggle_notification(self, notification_type, switch):
-        estado = switch.get()
-        print(f"Notificação '{notification_type}' {'ativada' if estado else 'desativada'}")
+    def _on_toggle_notificacao(self, tipo: str, estado: bool):
+        logger.info("Notificação '%s' %s", tipo, "ativada" if estado else "desativada")
 
-    def render_aparencia(self, container):
-        card = Card(container)
+    # ── aparência ------------------------------------------------------------
+    def _build_aparencia(self, container):
+        card = SectionCard(container, "🌎", "Aparência & Acessibilidade")
         card.pack(fill="x", pady=(0, 16))
-
-        h = ctk.CTkFrame(card.body, fg_color="transparent")
-        h.pack(fill="x", padx=18, pady=(14, 8))
-        ctk.CTkLabel(h, text="🌎 Aparência & Acessibilidade", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
 
         row = ctk.CTkFrame(card.body, fg_color="transparent")
-        row.pack(fill="x", padx=18, pady=8)
-        self.theme_select = self.criar_select(row, "Esquema de Cores", ["Modo Sereno (Claro)", "Modo Foco (Escuro)"])
-        self.theme_select.pack(side="left", expand=True, fill="x", padx=(0, 10))
-        self.font_select = self.criar_select(row, "Escala de Texto", ["Padrão (16px)", "Grande (18px)"])
-        self.font_select.pack(side="left", expand=True, fill="x")
+        row.pack(fill="x", pady=(0, 10))
 
-        tip = Card(card.body)
-        tip.pack(fill="x", padx=18, pady=(0, 16))
-        ctk.CTkLabel(tip.body, text="📝 Dica de Produtividade", font=themed_font("body", "bold"), text_color=THEME["text"]).pack(anchor="w", padx=14, pady=(10, 0))
-        ctk.CTkLabel(tip.body, text="O Modo Foco reduz a emissão de luz azul, ideal para sessões noturnas.", font=themed_font("body"), text_color=THEME["text_muted"], wraplength=420, justify="left").pack(anchor="w", padx=14, pady=(4, 14))
+        self._theme_select = ctk.CTkOptionMenu(
+            row,
+            values=["Modo Sereno (Claro)", "Modo Foco (Escuro)"],
+            fg_color=CONFIG_COLORS["bg_alt"],
+            text_color=CONFIG_COLORS["text"],
+            button_color=CONFIG_COLORS["border"],
+            button_hover_color=CONFIG_COLORS["border_strong"],
+            height=34,
+            command=self._alterar_tema,
+        )
+        self._theme_select.pack(side="left", expand=True, fill="x", padx=(0, 8))
 
-    def render_seguranca(self, container):
-        card = Card(container)
-        card.pack(fill="x")
+        self._font_select = ctk.CTkOptionMenu(
+            row,
+            values=["Padrão (16px)", "Grande (18px)"],
+            fg_color=CONFIG_COLORS["bg_alt"],
+            text_color=CONFIG_COLORS["text"],
+            button_color=CONFIG_COLORS["border"],
+            button_hover_color=CONFIG_COLORS["border_strong"],
+            height=34,
+            command=self._alterar_fonte,
+        )
+        self._font_select.pack(side="left", expand=True, fill="x")
 
-        h = ctk.CTkFrame(card.body, fg_color="transparent")
-        h.pack(fill="x", padx=18, pady=(14, 8))
-        ctk.CTkLabel(h, text="🛡️ Sessão & Segurança", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
+        tip = SectionCard(card.body, "", "Dica de Produtividade")
+        tip.pack(fill="x")
+        ctk.CTkLabel(
+            tip.body,
+            text="📝  O Modo Foco reduz a emissão de luz azul, ideal para sessões noturnas.",
+            font=themed_font("body"),
+            text_color=CONFIG_COLORS["text_secondary"],
+            wraplength=420, justify="left",
+        ).pack(anchor="w", padx=14, pady=12)
 
-        self.criar_item_lista(card.body, "👥", "Perfil Público", "Permitir que outros visualizem suas conquistas", toggle=True)
-        self.criar_item_lista(card.body, "🔑", "Credenciais", "Última alteração há 3 meses", btn_text="Alterar Senha")
-        self.criar_item_lista(card.body, "💻", "Este Dispositivo", "Sessão ativa agora • Windows Desktop", btn_text="Encerrar Acesso", danger=True)
-
-    def alterar_configuracao(self, valor):
+    def _alterar_tema(self, valor: str):
         if valor == "Modo Sereno (Claro)":
             ctk.set_appearance_mode("light")
         elif valor == "Modo Foco (Escuro)":
             ctk.set_appearance_mode("dark")
 
-    def toggle_seguranca_opcao(self, opcao, switch):
-        estado = switch.get()
-        print(f"Opção '{opcao}' {'ativada' if estado else 'desativada'}")
+    def _alterar_fonte(self, valor: str):
+        logger.info("Escala de texto alterada: %s", valor)
+        # TODO: implementar escala global via ui_theme
 
-    def clicar_botao_seguranca(self, btn_text):
+    # ── segurança ------------------------------------------------------------
+    def _build_seguranca(self, container):
+        card = SectionCard(container, "🛡️", "Sessão & Segurança")
+        card.pack(fill="x")
+
+        ActionItemRow(
+            card.body, "👥", "Perfil Público",
+            "Permitir que outros visualizem suas conquistas",
+            btn_text="", on_action=lambda t: self._on_seguranca_action(t),
+        ).pack(fill="x", pady=2)
+
+        ActionItemRow(
+            card.body, "🔑", "Credenciais",
+            "Última alteração há 3 meses",
+            btn_text="Alterar Senha",
+            on_action=lambda t: self._on_seguranca_action(t),
+        ).pack(fill="x", pady=2)
+
+        ActionItemRow(
+            card.body, "💻", "Este Dispositivo",
+            "Sessão ativa agora • Windows Desktop",
+            btn_text="Encerrar Acesso",
+            danger=True,
+            on_action=lambda t: self._on_seguranca_action(t),
+        ).pack(fill="x", pady=2)
+
+    def _on_seguranca_action(self, btn_text: str):
         if btn_text == "Alterar Senha":
-            self.abrir_tela_alterar_senha()
+            self._abrir_modal_senha()
         elif btn_text == "Encerrar Acesso":
-            self.encerrar_sessao()
+            self._encerrar_sessao()
 
-    def abrir_tela_alterar_senha(self):
-        top = ctk.CTkToplevel(self)
-        top.title("Alterar Senha")
-        top.geometry("420x320")
-        top.resizable(False, False)
-        top.configure(fg_color=THEME["card"])
+    def _abrir_modal_senha(self):
+        AlterarSenhaModal(self, on_save=self._salvar_senha)
 
-        top.update_idletasks()
-        x = (top.winfo_screenwidth() // 2) - (420 // 2)
-        y = (top.winfo_screenheight() // 2) - (320 // 2)
-        top.geometry(f"+{x}+{y}")
+    def _salvar_senha(self, senha_atual: str, nova_senha: str):
+        # integração com backend pendente
+        logger.info("Alteração de senha solicitada")
+        messagebox.showinfo("Sucesso", "Senha alterada com sucesso.")
 
-        frame = ctk.CTkFrame(top, fg_color="transparent")
-        frame.pack(fill="both", expand=True, padx=24, pady=24)
-
-        ctk.CTkLabel(frame, text="Alterar Senha", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(pady=(0, 16))
-
-        self.senha_atual_entry = self.criar_input_field(frame, "Senha Atual", "", "🔒")
-        self.nova_senha_entry = self.criar_input_field(frame, "Nova Senha", "", "🔑")
-        self.confirmar_senha_entry = self.criar_input_field(frame, "Confirmar Senha", "", "🔑")
-
-        PrimaryButton(frame, text="Salvar Alterações", command=self.salvar_alteracao_senha, width=220).pack(fill="x", pady=(16, 0))
-
-    def salvar_alteracao_senha(self):
-        senha_atual = self.senha_atual_entry.get()
-        nova_senha = self.nova_senha_entry.get()
-        confirmar_senha = self.confirmar_senha_entry.get()
-
-        if nova_senha != confirmar_senha:
-            print("As senhas não coincidem")
-            return
-
-        if len(nova_senha) < 6:
-            print("Senha deve ter pelo menos 6 caracteres")
-            return
-
-        print("Senha alterada com sucesso")
-
-    def encerrar_sessao(self):
-        self.controller.mostrar_login()
-
-    def criar_toggle_row(self, parent, title, sub):
-        f = ctk.CTkFrame(parent, fg_color="transparent")
-        f.pack(fill="x", padx=18, pady=8)
-        txt = ctk.CTkFrame(f, fg_color="transparent")
-        txt.pack(side="left")
-        ctk.CTkLabel(txt, text=title, font=themed_font("body", "bold"), text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(txt, text=sub, font=themed_font("overline"), text_color=THEME["text_muted"]).pack(anchor="w")
-        switch = ctk.CTkSwitch(f, text="", progress_color=THEME["primary"])
-        switch.pack(side="right")
-        return switch
-
-    def criar_input_field(self, parent, label, val, icon):
-        f = ctk.CTkFrame(parent, fg_color="transparent")
-        f.pack(fill="x", padx=18, pady=6)
-        ctk.CTkLabel(f, text=label, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w")
-        entry_f = ctk.CTkFrame(f, fg_color=THEME["bg_alt"], height=36, corner_radius=RADIUS["sm"], border_width=1, border_color=THEME["border"])
-        entry_f.pack(fill="x", pady=4)
-        entry_f.pack_propagate(False)
-        ctk.CTkLabel(entry_f, text=icon, font=themed_font("body")).pack(side="left", padx=10)
-        e = ctk.CTkEntry(entry_f, fg_color="transparent", border_width=0, font=themed_font("body"))
-        e.pack(side="left", fill="both", expand=True)
-        e.insert(0, val)
-        return e
-
-    def criar_select(self, parent, label, opts):
-        f = ctk.CTkFrame(parent, fg_color="transparent")
-        ctk.CTkLabel(f, text=label, font=themed_font("caption", "bold"), text_color=THEME["text_muted"]).pack(anchor="w")
-        option_menu = ctk.CTkOptionMenu(f, values=opts, fg_color=THEME["bg_alt"], text_color=THEME["text"], button_color=THEME["border"], button_hover_color=THEME["border_strong"], height=34, command=self.alterar_configuracao)
-        option_menu.pack(fill="x", pady=4)
-        return f
-
-    def criar_item_lista(self, parent, icon, title, sub, toggle=False, btn_text=None, danger=False):
-        f = ctk.CTkFrame(parent, fg_color="transparent", border_width=1, border_color=THEME["border"], corner_radius=RADIUS["md"])
-        f.pack(fill="x", padx=18, pady=4)
-        inner = ctk.CTkFrame(f, fg_color="transparent")
-        inner.pack(fill="x", padx=14, pady=10)
-
-        ctk.CTkLabel(inner, text=icon, font=themed_font("h3"), fg_color=THEME["bg_alt"], width=36, height=36, corner_radius=RADIUS["pill"]).pack(side="left", padx=(0, 12))
-
-        txt = ctk.CTkFrame(inner, fg_color="transparent")
-        txt.pack(side="left")
-        ctk.CTkLabel(txt, text=title, font=themed_font("body", "bold"), text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(txt, text=sub, font=themed_font("overline"), text_color=THEME["text_muted"]).pack(anchor="w")
-
-        if toggle:
-            switch = ctk.CTkSwitch(inner, text="", progress_color=THEME["primary"])
-            switch.pack(side="right")
-            switch.configure(command=lambda switch=switch, title=title: self.toggle_seguranca_opcao(title, switch))
-        elif btn_text:
-            color = THEME["danger"] if danger else THEME["primary"]
-            btn = GhostButton(inner, text=btn_text, command=lambda btn_text=btn_text: self.clicar_botao_seguranca(btn_text), width=140)
-            if danger:
-                btn.configure(text_color=color, hover_color=THEME["danger_soft"])
-            btn.pack(side="right")
+    def _encerrar_sessao(self):
+        if messagebox.askyesno("Confirmação", "Deseja encerrar a sessão atual?"):
+            self.controller.mostrar_login()

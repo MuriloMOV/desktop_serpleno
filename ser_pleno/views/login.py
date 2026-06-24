@@ -2,306 +2,680 @@ import os
 import customtkinter as ctk
 import random
 import math
-import colorsys
-from services.autenticacao import ServicoAutenticacao
-from services.agendamentos import set_auth_service as set_auth_service_agendamentos
-from services.api import set_auth_service as set_auth_service_api
 import threading
 from pygame import mixer
 
-from ui_theme import THEME, SPACING, RADIUS, ELEVATION, font, themed_font, blend_color, _hex_to_rgb
+from services.autenticacao import ServicoAutenticacao
+from services.agendamentos import set_auth_service as set_auth_service_agendamentos
+from services.api import set_auth_service as set_auth_service_api
+from ui_theme import THEME, SPACING, RADIUS, font, themed_font
 from components.ui_components import (
-    PrimaryButton, SecondaryButton, InputField, EmptyState, Divider, Card, Pill
+    PrimaryButton, SecondaryButton, InputField
 )
 
 
+# ─────────────────────────────────────────────
+#  Paleta dedicada à tela de login
+# ─────────────────────────────────────────────
+LOGIN_COLORS = {
+    # Fundo – gradiente diagonal de azul-anil profundo para lavanda quente
+    "grad_top_left":   "#1E1B4B",   # índigo escuro
+    "grad_top_right":  "#312E81",   # índigo médio
+    "grad_bottom_left":"#4338CA",   # violeta-índigo
+    "grad_bottom":     "#6D5CE8",   # lavanda média
+
+    # Card
+    "card_bg":         "#FFFFFF",
+    "card_border":     "#E5E7EB",
+    "card_shadow":     "#1E1B4B22",
+
+    # Acento do ícone / botão principal
+    "accent":          "#4F46E5",   # índigo vibrante
+    "accent_hover":    "#4338CA",
+    "accent_soft":     "#EEF2FF",   # índigo pastel (bg do ícone)
+
+    # Texto
+    "text_primary":    "#111827",
+    "text_muted":      "#6B7280",
+    "text_light":      "#9CA3AF",
+
+    # Estados
+    "success":         "#059669",
+    "danger":          "#DC2626",
+    "warning":         "#D97706",
+
+    # Bolhas – branco translúcido
+    "bubble_light":    "#FFFFFF",
+}
+
+
+def _hex_to_rgb(hex_c: str):
+    h = hex_c.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _lerp_color(c1_hex, c2_hex, t):
+    r1, g1, b1 = _hex_to_rgb(c1_hex)
+    r2, g2, b2 = _hex_to_rgb(c2_hex)
+    r = int(r1 + (r2 - r1) * t)
+    g = int(g1 + (g2 - g1) * t)
+    b = int(b1 + (b2 - b1) * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+# ─────────────────────────────────────────────
+#  Campos de entrada refinados (sem dependência
+#  de InputField externo para garantir estilo)
+# ─────────────────────────────────────────────
+class LoginInputField(ctk.CTkFrame):
+    """
+    Campo de entrada com label flutuante, ícone e
+    estados visuais (normal / foco / erro / sucesso).
+    """
+    _BORDER_NORMAL  = "#D1D5DB"
+    _BORDER_FOCUS   = "#4F46E5"
+    _BORDER_ERROR   = "#DC2626"
+    _BORDER_SUCCESS = "#059669"
+    _BG             = "#F9FAFB"
+    _BG_FOCUS       = "#FFFFFF"
+
+    def __init__(self, parent, label: str, placeholder: str = "",
+                 icon: str = "", password: bool = False):
+        super().__init__(parent, fg_color="transparent")
+        self._password = password
+        self._show_pass = False
+
+        # ── Label topo ──────────────────────────────────────────────
+        self._label = ctk.CTkLabel(
+            self, text=label,
+            font=ctk.CTkFont("Segoe UI", 12, "normal"),
+            text_color=LOGIN_COLORS["text_muted"],
+            anchor="w",
+        )
+        self._label.pack(fill="x", padx=2, pady=(0, 4))
+
+        # ── Container do campo ──────────────────────────────────────
+        self._box = ctk.CTkFrame(
+            self, corner_radius=12,
+            fg_color=self._BG,
+            border_width=1,
+            border_color=self._BORDER_NORMAL,
+        )
+        self._box.pack(fill="x")
+        self._box.grid_columnconfigure(1, weight=1)
+
+        # Ícone esquerdo
+        if icon:
+            ctk.CTkLabel(
+                self._box, text=icon,
+                font=ctk.CTkFont("Segoe UI", 15),
+                text_color=LOGIN_COLORS["text_muted"],
+                width=36,
+            ).grid(row=0, column=0, padx=(10, 0), pady=10)
+
+        # Entry
+        self.entry = ctk.CTkEntry(
+            self._box,
+            placeholder_text=placeholder,
+            placeholder_text_color=LOGIN_COLORS["text_light"],
+            fg_color="transparent",
+            border_width=0,
+            text_color=LOGIN_COLORS["text_primary"],
+            font=ctk.CTkFont("Segoe UI", 14),
+            height=42,
+            show="" if not password else "●",
+        )
+        self.entry.grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=4)
+
+        # Botão mostrar/ocultar senha
+        if password:
+            self._eye_btn = ctk.CTkButton(
+                self._box, text="👁", width=36, height=36,
+                fg_color="transparent", hover_color="#F3F4F6",
+                text_color=LOGIN_COLORS["text_muted"],
+                font=ctk.CTkFont("Segoe UI", 14),
+                command=self._toggle_show,
+                corner_radius=8,
+            )
+            self._eye_btn.grid(row=0, column=2, padx=(0, 6), pady=4)
+
+        # ── Mensagem de erro/ajuda ───────────────────────────────────
+        self._msg = ctk.CTkLabel(
+            self, text="", anchor="w",
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=LOGIN_COLORS["danger"],
+        )
+        self._msg.pack(fill="x", padx=2, pady=(3, 0))
+
+        # Foco
+        self.entry.bind("<FocusIn>",  self._on_focus_in)
+        self.entry.bind("<FocusOut>", self._on_focus_out)
+
+    # ── API ────────────────────────────────────────────────────────
+    def get(self) -> str:
+        return self.entry.get()
+
+    def set_error(self, msg: str = ""):
+        self._box.configure(border_color=self._BORDER_ERROR, fg_color="#FEF2F2")
+        self._label.configure(text_color=LOGIN_COLORS["danger"])
+        self._msg.configure(text=f"⚠  {msg}" if msg else "", text_color=LOGIN_COLORS["danger"])
+
+    def set_success(self):
+        self._box.configure(border_color=self._BORDER_SUCCESS, fg_color="#F0FDF4")
+        self._label.configure(text_color=LOGIN_COLORS["success"])
+        self._msg.configure(text="")
+
+    def clear_state(self):
+        self._box.configure(border_color=self._BORDER_NORMAL, fg_color=self._BG)
+        self._label.configure(text_color=LOGIN_COLORS["text_muted"])
+        self._msg.configure(text="")
+
+    # ── Internos ───────────────────────────────────────────────────
+    def _on_focus_in(self, _=None):
+        self._box.configure(border_color=self._BORDER_FOCUS, fg_color=self._BG_FOCUS)
+        self._label.configure(text_color=LOGIN_COLORS["accent"])
+
+    def _on_focus_out(self, _=None):
+        # Volta ao normal a menos que esteja em estado de erro/sucesso
+        self._box.configure(border_color=self._BORDER_NORMAL, fg_color=self._BG)
+        self._label.configure(text_color=LOGIN_COLORS["text_muted"])
+
+    def _toggle_show(self):
+        self._show_pass = not self._show_pass
+        self.entry.configure(show="" if self._show_pass else "●")
+        self._eye_btn.configure(text="🙈" if self._show_pass else "👁")
+
+
+# ─────────────────────────────────────────────
+#  Frame principal de login
+# ─────────────────────────────────────────────
 class LoginFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=THEME["brand_accent"])
+        super().__init__(parent, fg_color="#1E1B4B")
 
-        self.controller = controller
+        self.controller  = controller
         self.servico_autenticacao = ServicoAutenticacao()
+        self.bolhas: list[dict] = []
+        self._is_loading = False
 
-        self.bolhas = []
-        self.background_drawn = False
-        self._load_attempted = False
-
-        os.environ['SDL_AUDIODRIVER'] = 'directsound'
+        os.environ["SDL_AUDIODRIVER"] = "directsound"
         mixer.init()
 
-        self.canvas = ctk.CTkCanvas(self, highlightthickness=0)
+        # Canvas de fundo (gradiente + bolhas)
+        self.canvas = ctk.CTkCanvas(self, highlightthickness=0, bd=0)
         self.canvas.place(relwidth=1, relheight=1)
 
-        self.criar_bolhas()
-        self.criar_card_login()
-        self.criar_music_toggle()
+        self._criar_bolhas()
+        self._criar_card_login()
+        self._criar_music_toggle()
 
-        self.bind("<Configure>", self.desenhar_gradiente)
-        self.animar_bolhas()
+        self.bind("<Configure>", self._desenhar_fundo)
+        self._animar_bolhas()
 
-    # ================= GRADIENTE SUAVE =================
-    def cor_para_canvas(self, hex_c):
-        return hex_c
-
-    def desenhar_gradiente(self, event=None):
-        width = self.winfo_width()
-        height = self.winfo_height()
-
-        if width <= 1:
+    # ══════════════════════════════════════════
+    #  FUNDO – gradiente diagonal suave
+    # ══════════════════════════════════════════
+    def _desenhar_fundo(self, event=None):
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 1 or h <= 1:
             return
 
-        hex_clrs = [THEME["brand_gradient_start"], THEME["brand_gradient_mid"], THEME["brand_gradient_end"]]
-        steps = max(1, height)
+        self.canvas.delete("bg")
+
+        # Gradiente vertical com dois trilhos de cor para simular diagonal
+        top_l  = LOGIN_COLORS["grad_top_left"]
+        top_r  = LOGIN_COLORS["grad_top_right"]
+        bot    = LOGIN_COLORS["grad_bottom"]
+
+        steps = max(1, h)
         for i in range(steps):
-            t = i / steps
-            row_h = 1
-            color = self._gradient_color(hex_clrs, t)
-            self.canvas.create_rectangle(0, i, width, i + row_h, fill=color, outline="", tags="bg_rect")
+            t     = i / steps
+            # interpola entre topo-esquerda e topo-direita ao longo da largura,
+            # depois mistura com a cor de fundo conforme desce
+            c_top = _lerp_color(top_l, top_r, 0.5)
+            color = _lerp_color(c_top, bot, t ** 0.8)
+            self.canvas.create_rectangle(0, i, w, i + 1,
+                                         fill=color, outline="", tags="bg")
 
-        self.background_drawn = True
+        # Elipse decorativa (brilho suave no canto superior direito)
+        glow_r = int(w * 0.55)
+        self.canvas.create_oval(
+            w - glow_r, -glow_r // 2,
+            w + glow_r // 2, glow_r,
+            fill="#6D5CE8", outline="", tags="bg"
+        )
+        # Segundo brilho inferior esquerdo
+        self.canvas.create_oval(
+            -glow_r // 3, h - glow_r // 2,
+            glow_r // 1.5, h + glow_r // 3,
+            fill="#4338CA", outline="", tags="bg"
+        )
 
+        # Garante que os elementos de UI fiquem por cima
+        self.canvas.tag_lower("bg")
+        self._elevar_elementos()
+
+    def _elevar_elementos(self):
+        for b in self.bolhas:
+            if b.get("id"):
+                self.canvas.tag_raise(b["id"])
         if hasattr(self, "card"):
             self.card.lift()
         if hasattr(self, "music_frame"):
             self.music_frame.lift()
-        for b in self.bolhas:
-            self.canvas.tag_raise(b["id"])
-            if b.get("text_id"):
-                self.canvas.tag_raise(b["text_id"])
 
-    def _gradient_color(self, hex_colors, t):
-        segments = len(hex_colors) - 1
-        idx = min(int(t * segments), segments - 1)
-        local_t = (t * segments) - idx
-        c1 = self._hex_to_rgb(hex_colors[idx])
-        c2 = self._hex_to_rgb(hex_colors[idx + 1])
-        r = int(c1[0] + (c2[0] - c1[0]) * local_t)
-        g = int(c1[1] + (c2[1] - c1[1]) * local_t)
-        b = int(c1[2] + (c2[2] - c1[2]) * local_t)
-        return f"#{r:02x}{g:02x}{b:02x}"
+    # ══════════════════════════════════════════
+    #  BOLHAS flutuantes – mais delicadas
+    # ══════════════════════════════════════════
+    def _criar_bolhas(self):
+        for _ in range(28):
+            x    = random.randint(0, 1400)
+            y    = random.randint(50, 900)
+            size = random.randint(14, 80)
+            a    = random.uniform(0.05, 0.18)
 
-    def _hex_to_rgb(self, hex_c):
-        hex_c = hex_c.lstrip("#")
-        return (int(hex_c[0:2], 16), int(hex_c[2:4], 16), int(hex_c[4:6], 16))
+            # Borda branca levemente transparente
+            w_val = min(255, int(200 + 55 * a))
+            fill  = f"#{w_val:02x}{w_val:02x}{w_val:02x}"
 
-    # ================= BOLHAS FLUTUANTES =================
-    def criar_bolhas(self):
-        chars = [''] * 22
-        for i in range(35):
-            x = random.randint(0, 1400)
-            y = random.randint(50, 900)
-            size = random.randint(20, 110)
-            alpha = random.uniform(0.12, 0.28)
-            fill_rgba = self._compute_bubble_fill(alpha)
-            bolha_id = self.canvas.create_oval(x, y, x + size, y + size, outline="", fill=fill_rgba, tags="bubble")
-
-            char = chars[i] if i < len(chars) else ""
-            text_id = None
-            if char:
-                text_id = self.canvas.create_text(x + size / 2, y + size / 2, text=char,
-                                                  fill=self._compute_text_fill(alpha), font=("Segoe UI", int(size / 3), "bold"))
+            bid = self.canvas.create_oval(
+                x, y, x + size, y + size,
+                outline=fill, width=1.2, fill="",
+                tags="bubble",
+            )
+            # Reflexo interno (bolinha menor)
+            rx, ry, rs = x + size * 0.2, y + size * 0.15, size * 0.18
+            rid = self.canvas.create_oval(
+                rx, ry, rx + rs, ry + rs,
+                fill=fill, outline="", tags="bubble",
+            )
 
             self.bolhas.append({
-                "id": bolha_id,
-                "text_id": text_id,
-                "x": x, "y": y, "size": size,
-                "speed": random.uniform(0.15, 0.6),
+                "id": bid, "reflex_id": rid,
+                "x": float(x), "y": float(y), "size": size,
+                "speed": random.uniform(0.10, 0.45),
                 "wobble": random.uniform(0, 2 * math.pi),
+                "wobble_amp": random.uniform(0.2, 0.7),
             })
 
-    def _compute_bubble_fill(self, a):
-        w = min(255, int(255 * a + 200 * (1 - a)))
-        return f"#{w:02x}{w:02x}{w:02x}"
-
-    def _compute_text_fill(self, a):
-        w = max(30, int(255 * a))
-        return f"#{w:02x}{w:02x}{w:02x}"
-
-    def animar_bolhas(self):
+    def _animar_bolhas(self):
         if not self.winfo_exists():
-            self.after(30, self.animar_bolhas)
+            self.after(30, self._animar_bolhas)
             return
-        width = self.winfo_width()
-        height = self.winfo_height()
 
-        if width > 1 and height > 1:
+        w = self.winfo_width()
+        h = self.winfo_height()
+
+        if w > 1 and h > 1:
             for b in self.bolhas:
                 b["y"] -= b["speed"]
-                b["wobble"] += 0.03
-                dx = math.sin(b["wobble"]) * 0.4
-                b["x"] += dx
+                b["wobble"] += 0.025
+                b["x"] += math.sin(b["wobble"]) * b["wobble_amp"]
 
-                if b["y"] + b["size"] < -10:
-                    b["y"] = height + b["size"] + random.randint(10, 60)
-                    b["x"] = random.randint(-20, width + 20)
+                if b["y"] + b["size"] < -20:
+                    b["y"] = float(h + b["size"] + random.randint(10, 80))
+                    b["x"] = float(random.randint(-30, w + 30))
 
-                if b["x"] < -60:
-                    b["x"] = width + 20
+                if b["x"] < -80:
+                    b["x"] = float(w + 20)
+                elif b["x"] > w + 80:
+                    b["x"] = -20.0
 
-                self.canvas.coords(b["id"], b["x"], b["y"], b["x"] + b["size"], b["y"] + b["size"])
-                if b.get("text_id"):
-                    self.canvas.coords(b["text_id"], b["x"] + b["size"] / 2, b["y"] + b["size"] / 2)
+                x, y, s = b["x"], b["y"], b["size"]
+                self.canvas.coords(b["id"], x, y, x + s, y + s)
 
-        self.after(25, self.animar_bolhas)
+                rx = x + s * 0.2
+                ry = y + s * 0.15
+                rs = s * 0.18
+                self.canvas.coords(b["reflex_id"], rx, ry, rx + rs, ry + rs)
 
-    # ================= CARD DE LOGIN =================
-    def criar_card_login(self):
+        self.after(22, self._animar_bolhas)
+
+    # ══════════════════════════════════════════
+    #  CARD DE LOGIN
+    # ══════════════════════════════════════════
+    def _criar_card_login(self):
+        # Sombra simulada (frame ligeiramente maior, mais escuro)
+        shadow = ctk.CTkFrame(
+            self, width=448, height=588,
+            corner_radius=24,
+            fg_color="#1E1B4B",
+            border_width=0,
+            bg_color="#1E1B4B",
+        )
+        shadow.place(relx=0.5, rely=0.5, anchor="center", x=4, y=6)
+
+        # Card principal
         self.card = ctk.CTkFrame(
-            self, width=440, height=600, corner_radius=RADIUS["2xl"],
-            fg_color=THEME["surface"], border_width=1, border_color=THEME["border"],
-            bg_color=THEME["brand_accent"],
+            self, width=444, height=582,
+            corner_radius=24,
+            fg_color=LOGIN_COLORS["card_bg"],
+            border_width=1,
+            border_color=LOGIN_COLORS["card_border"],
+            bg_color="#1E1B4B",
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
-        self.card.lift()
         self.card.pack_propagate(False)
+        self.card.lift()
 
         inner = ctk.CTkFrame(self.card, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=36, pady=32)
+        inner.pack(fill="both", expand=True, padx=40, pady=36)
 
-        icon_bg = ctk.CTkFrame(inner, width=76, height=76, corner_radius=38,
-                               fg_color=THEME["primary"])
-        icon_bg.pack(pady=(8, 16))
+        # ── Cabeçalho ─────────────────────────────────────────────
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 18))
+
+        badge = ctk.CTkFrame(
+            header, height=32, corner_radius=999,
+            fg_color=LOGIN_COLORS["accent_soft"],
+        )
+        badge.pack(pady=(0, 10))
+        badge.pack_propagate(False)
+        ctk.CTkLabel(
+            badge, text="Acesso seguro · Plataforma SerPleno",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=LOGIN_COLORS["accent"],
+        ).place(relx=0.5, rely=0.5, anchor="center")
+
+        # Ícone num círculo degradê (simula com cor sólida)
+        icon_bg = ctk.CTkFrame(
+            header, width=68, height=68,
+            corner_radius=34,
+            fg_color=LOGIN_COLORS["accent_soft"],
+        )
+        icon_bg.pack(pady=(0, 10))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="🧠", font=themed_font("h1"), text_color="white").place(relx=0.5, rely=0.5, anchor="center")
 
-        ctk.CTkLabel(inner, text="SerPleno", font=themed_font("h1", "bold"),
-                     text_color=THEME["text"]).pack(pady=(0, 2))
-        ctk.CTkLabel(inner, text="Bem-estar e acompanhamento escolar",
-                     font=themed_font("body_sm"), text_color=THEME["text_muted"]).pack(pady=(0, 22))
+        ctk.CTkLabel(
+            icon_bg, text="🧠",
+            font=ctk.CTkFont("Segoe UI", 28),
+        ).place(relx=0.5, rely=0.5, anchor="center")
 
-        self.input_user = InputField(inner, "Usuário", placeholder="Seu nome de usuário",
-                                     icon="👤", helper="Use seu usuário institucional")
-        self.input_user.pack(fill="x", pady=SPACING["input_y"])
+        ctk.CTkLabel(
+            header,
+            text="SerPleno",
+            font=ctk.CTkFont("Segoe UI", 26, "bold"),
+            text_color=LOGIN_COLORS["text_primary"],
+        ).pack(pady=(0, 4))
 
-        self.input_pass = InputField(inner, "Senha", placeholder="Sua senha", icon="🔒",
-                                     password=True)
-        self.input_pass.pack(fill="x", pady=SPACING["input_y"])
+        ctk.CTkLabel(
+            header,
+            text="Bem-estar, acompanhamento escolar e comunicação integrada",
+            font=ctk.CTkFont("Segoe UI", 13),
+            text_color=LOGIN_COLORS["text_muted"],
+        ).pack()
 
+        info_row = ctk.CTkFrame(inner, fg_color="transparent")
+        info_row.pack(fill="x", pady=(0, 16))
+        for text in ["🔒 LGPD", "⚡ Acesso rápido", "🤝 Apoio contínuo"]:
+            chip = ctk.CTkFrame(info_row, height=30, corner_radius=999, fg_color="#F9FAFB")
+            chip.pack(side="left", padx=(0, 8))
+            chip.pack_propagate(False)
+            ctk.CTkLabel(chip, text=text, font=ctk.CTkFont("Segoe UI", 10), text_color=LOGIN_COLORS["text_muted"]).place(relx=0.5, rely=0.5, anchor="center")
+
+        # ── Divider sutil ──────────────────────────────────────────
+        divider = ctk.CTkFrame(inner, height=1, fg_color="#E5E7EB")
+        divider.pack(fill="x", pady=(0, 20))
+
+        # ── Campos ────────────────────────────────────────────────
+        self.input_user = LoginInputField(
+            inner, "Usuário",
+            placeholder="Seu nome de usuário",
+            icon="👤",
+        )
+        self.input_user.pack(fill="x", pady=(0, 12))
+
+        self.input_pass = LoginInputField(
+            inner, "Senha",
+            placeholder="Sua senha",
+            icon="🔒",
+            password=True,
+        )
+        self.input_pass.pack(fill="x", pady=(0, 4))
+
+        # ── Mensagem de erro global ────────────────────────────────
+        self.lbl_erro = ctk.CTkLabel(
+            inner, text="",
+            text_color=LOGIN_COLORS["danger"],
+            font=ctk.CTkFont("Segoe UI", 12),
+            anchor="center",
+        )
+        self.lbl_erro.pack(pady=(8, 0))
+
+        # ── Botão principal ────────────────────────────────────────
+        self.btn_entrar = ctk.CTkButton(
+            inner,
+            text="Entrar",
+            command=self._fazer_login,
+            height=48,
+            corner_radius=12,
+            font=ctk.CTkFont("Segoe UI", 15, "bold"),
+            fg_color=LOGIN_COLORS["accent"],
+            hover_color=LOGIN_COLORS["accent_hover"],
+            text_color="white",
+        )
+        self.btn_entrar.pack(fill="x", pady=(14, 8))
+
+        # ── Link privacidade ───────────────────────────────────────
+        self.btn_privacidade = ctk.CTkButton(
+            inner,
+            text="🔒  Política de Privacidade",
+            command=self._abrir_politica,
+            height=34,
+            corner_radius=8,
+            font=ctk.CTkFont("Segoe UI", 12),
+            fg_color="transparent",
+            hover_color=LOGIN_COLORS["accent_soft"],
+            text_color=LOGIN_COLORS["text_muted"],
+            border_width=0,
+        )
+        self.btn_privacidade.pack(fill="x")
+
+        # Referências rápidas
         self.entry_user = self.input_user.entry
         self.entry_pass = self.input_pass.entry
 
-        self.lbl_erro = ctk.CTkLabel(inner, text="", text_color=THEME["danger"],
-                                     font=themed_font("overline"))
-        self.lbl_erro.pack(pady=(6, 0))
+        # Enter aciona login
+        self.entry_user.bind("<Return>", lambda _: self._fazer_login())
+        self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
 
-        self.btn_entrar = PrimaryButton(
-            inner, text="Entrar", command=self.fazer_login,
-            width=220, height=48, icon="→", size="lg", loading=False
-        )
-        self.btn_entrar.pack(fill="x", pady=(16, 10))
-
-        self.btn_privacidade = SecondaryButton(
-            inner, text="Política de Privacidade", command=self.abrir_politica,
-            width=220, icon="🔒"
-        )
-        self.btn_privacidade.pack(pady=4)
-
-    # ================= TOGGLE DE MÚSICA =================
-    def criar_music_toggle(self):
+    # ══════════════════════════════════════════
+    #  TOGGLE DE MÚSICA (canto inferior direito)
+    # ══════════════════════════════════════════
+    def _criar_music_toggle(self):
         self.music_frame = ctk.CTkFrame(
-            self, width=48, height=48, corner_radius=RADIUS["pill"],
-            fg_color=THEME["surface"], border_width=1, border_color=THEME["border"],
-            bg_color=THEME["brand_accent"],
+            self, width=52, height=52,
+            corner_radius=26,
+            fg_color="white",
+            border_width=1,
+            border_color=LOGIN_COLORS["card_border"],
+            bg_color="#1E1B4B",
         )
-        self.music_frame.place(relx=0.98, rely=0.98, anchor="se")
+        self.music_frame.place(relx=0.97, rely=0.97, anchor="se")
 
         self.music_var = ctk.StringVar(value="off")
-        self.music_switch = ctk.CTkSwitch(
-            self.music_frame, text="♫", width=40, height=24,
-            command=self.toggle_music, variable=self.music_var,
-            onvalue="on", offvalue="off",
-            progress_color=THEME["primary"], button_color=THEME["surface"],
-            button_hover_color=THEME["bg_alt"], fg_color=THEME["border"],
+        self._music_btn = ctk.CTkButton(
+            self.music_frame,
+            text="♪",
+            width=44, height=44,
+            corner_radius=22,
+            font=ctk.CTkFont("Segoe UI", 18),
+            fg_color="transparent",
+            hover_color=LOGIN_COLORS["accent_soft"],
+            text_color=LOGIN_COLORS["text_muted"],
+            command=self._toggle_music,
         )
-        self.music_switch.place(relx=0.5, rely=0.5, anchor="center")
+        self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
 
-    # ================= AÇÕES =================
+    # ══════════════════════════════════════════
+    #  LÓGICA DE LOGIN
+    # ══════════════════════════════════════════
     def fazer_login(self):
+        self._fazer_login()
+
+    def _fazer_login(self):
         username = self.input_user.get().strip()
         password = self.input_pass.get().strip()
 
-        if not username or not password:
-            self.lbl_erro.configure(text="⚠ Preencha usuário e senha para continuar")
-            for field, lbl in ((self.input_user, None), (self.input_pass, self.lbl_erro)):
-                if not field.get().strip():
-                    field.set_error("Campo obrigatório")
-                else:
-                    field.set_success()
+        # Limpa estados anteriores
+        self.input_user.clear_state()
+        self.input_pass.clear_state()
+        self.lbl_erro.configure(text="")
+
+        has_error = False
+        if not username:
+            self.input_user.set_error("Campo obrigatório")
+            has_error = True
+        if not password:
+            self.input_pass.set_error("Campo obrigatório")
+            has_error = True
+        if has_error:
+            self.lbl_erro.configure(text="Preencha todos os campos para continuar.")
+            self._shake_card()
             return
 
-        self.lbl_erro.configure(text="Autenticando...", text_color=THEME["text_secondary"])
+        # Feedback visual de carregamento
+        self._is_loading = True
+        self.lbl_erro.configure(
+            text="Autenticando...",
+            text_color=LOGIN_COLORS["text_muted"],
+        )
+        self.btn_entrar.configure(text="Aguarde...", state="disabled")
+        self.btn_privacidade.configure(state="disabled")
         self.update_idletasks()
-
-        self.input_user.set_success()
-        self.input_pass.set_success()
-
-        self.btn_entrar.set_loading(True)
 
         def run_login():
             try:
-                result = self.servico_autenticacao.login(username, password)
-                success = result.get('success', False)
-                user = result.get('user', {})
+                result  = self.servico_autenticacao.login(username, password)
+                success = result.get("success", False)
+                user    = result.get("user", {})
                 if success:
                     self.after(0, lambda: self._on_login_success(user))
                 else:
-                    msg = result.get('message', 'Erro ao fazer login')
+                    msg = result.get("message", "Erro ao fazer login")
                     self.after(0, lambda: self._on_login_failure(msg))
             except Exception as e:
                 self.after(0, lambda: self._on_login_failure(f"Erro de conexão: {e}"))
 
         threading.Thread(target=run_login, daemon=True).start()
 
+    def _shake_card(self):
+        def shake(step=0):
+            if step >= 8:
+                self.card.place(relx=0.5, rely=0.5, anchor="center", x=0, y=0)
+                return
+            offset = -5 if step % 2 == 0 else 5
+            self.card.place(relx=0.5, rely=0.5, anchor="center", x=offset, y=0)
+            self.after(38, lambda: shake(step + 1))
+        shake()
+
     def _on_login_success(self, user):
-        self.btn_entrar.set_loading(False)
+        self._is_loading = False
+        self._set_idle_state()
         self.lbl_erro.configure(text="")
         set_auth_service_agendamentos(self.servico_autenticacao)
         set_auth_service_api(self.servico_autenticacao)
         self.controller.iniciar_sistema(user)
 
     def _on_login_failure(self, msg):
-        self.btn_entrar.set_loading(False)
-        self.lbl_erro.configure(text=f"✕ {msg}", text_color=THEME["danger"])
+        self._is_loading = False
+        self._set_idle_state()
+        self.lbl_erro.configure(
+            text=f"✕  {msg}",
+            text_color=LOGIN_COLORS["danger"],
+        )
         self.input_pass.set_error("Credenciais inválidas")
         self.input_pass.entry.delete(0, "end")
+        self._shake_card()
 
-    def abrir_politica(self):
+    def _set_idle_state(self):
+        self.btn_entrar.configure(text="Entrar", state="normal")
+        self.btn_privacidade.configure(state="normal")
+
+    # ══════════════════════════════════════════
+    #  POLÍTICA DE PRIVACIDADE
+    # ══════════════════════════════════════════
+    def _abrir_politica(self):
         top = ctk.CTkToplevel(self)
         top.title("Política de Privacidade")
-        top.geometry("420x340")
-        top.configure(fg_color=THEME["surface"])
+        top.geometry("440x360")
+        top.configure(fg_color="white")
         top.resizable(False, False)
-
         top.transient(self.winfo_toplevel())
         top.grab_set()
-        top.after(50, lambda: top.geometry(f"420x340+{self.winfo_screenwidth()//2-210}+{self.winfo_screenheight()//2-170}"))
+        top.after(50, lambda: top.geometry(
+            f"440x360+{self.winfo_screenwidth()//2-220}+{self.winfo_screenheight()//2-180}"
+        ))
 
         inner = ctk.CTkFrame(top, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=28, pady=28)
-        ctk.CTkLabel(inner, text="🔒  Política de Privacidade",
-                     font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(pady=(0, 14))
-        ctk.CTkLabel(inner, text=(
-            "O SerPleno trata seus dados com responsabilidade e em conformidade com a LGPD."
-            " Esta política garante a proteção de informações pessoais e acadêmicas durante o uso da plataforma."
-        ), font=themed_font("body"), text_color=THEME["text_muted"], wraplength=340, justify="left").pack()
-        SecondaryButton(inner, text="Entendi", command=top.destroy, width=140, icon="✔").pack(pady=(20, 0))
+        inner.pack(fill="both", expand=True, padx=32, pady=32)
 
-    def toggle_music(self):
-        status = self.music_var.get()
-        if status == "on":
+        # Ícone
+        icon_bg = ctk.CTkFrame(inner, width=52, height=52, corner_radius=26,
+                               fg_color=LOGIN_COLORS["accent_soft"])
+        icon_bg.pack(pady=(0, 14))
+        icon_bg.pack_propagate(False)
+        ctk.CTkLabel(icon_bg, text="🔒",
+                     font=ctk.CTkFont("Segoe UI", 20)).place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(
+            inner, text="Política de Privacidade",
+            font=ctk.CTkFont("Segoe UI", 17, "bold"),
+            text_color=LOGIN_COLORS["text_primary"],
+        ).pack(pady=(0, 12))
+
+        ctk.CTkLabel(
+            inner,
+            text=(
+                "O SerPleno trata seus dados com responsabilidade e em\n"
+                "conformidade com a LGPD. Esta política garante a proteção\n"
+                "de informações pessoais e acadêmicas durante o uso da\n"
+                "plataforma."
+            ),
+            font=ctk.CTkFont("Segoe UI", 13),
+            text_color=LOGIN_COLORS["text_muted"],
+            justify="center",
+        ).pack(pady=(0, 20))
+
+        ctk.CTkButton(
+            inner,
+            text="Entendi",
+            command=top.destroy,
+            height=40,
+            corner_radius=10,
+            width=160,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            fg_color=LOGIN_COLORS["accent"],
+            hover_color=LOGIN_COLORS["accent_hover"],
+            text_color="white",
+        ).pack()
+
+    # ══════════════════════════════════════════
+    #  TOGGLE DE MÚSICA
+    # ══════════════════════════════════════════
+    def _toggle_music(self):
+        is_playing = getattr(self, "_music_playing", False)
+        if not is_playing:
             try:
-                caminho_musica = "assets/Music/background_music.mp3"
-                if os.path.exists(caminho_musica):
-                    mixer.music.load(caminho_musica)
-                    mixer.music.play(loops=-1, fade_ms=800)
-                else:
-                    print(f"Erro: Arquivo não encontrado em {caminho_musica}")
-                    self.music_var.set("off")
+                path = "assets/Music/background_music.mp3"
+                if os.path.exists(path):
+                    mixer.music.load(path)
+                    mixer.music.play(loops=-1, fade_ms=1000)
+                    self._music_playing = True
+                    self._music_btn.configure(
+                        text="♬",
+                        text_color=LOGIN_COLORS["accent"],
+                    )
             except Exception as e:
                 print(f"Erro ao tocar música: {e}")
-                self.music_var.set("off")
         else:
             try:
-                mixer.music.fadeout(600)
+                mixer.music.fadeout(700)
+                self._music_playing = False
+                self._music_btn.configure(
+                    text="♪",
+                    text_color=LOGIN_COLORS["text_muted"],
+                )
             except Exception:
                 pass

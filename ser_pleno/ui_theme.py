@@ -1,10 +1,20 @@
 import customtkinter as ctk
 from typing import Literal
 
-FONT_FAMILY = "Inter"
+import platform
+
+# Prefer platform-native UI fonts with fallbacks for consistency
+_PLATFORM = platform.system()
+if _PLATFORM == "Windows":
+    FONT_FAMILY = "Segoe UI"
+elif _PLATFORM == "Darwin":
+    FONT_FAMILY = "San Francisco" if False else "Helvetica Neue"
+else:
+    FONT_FAMILY = "Inter"
+
 FONT_FAMILY_MONO = "JetBrains Mono"
 
-THEME = {
+LIGHT_THEME = {
     "bg": "#F8FAFC",
     "bg_alt": "#F1F5F9",
     "surface": "#FFFFFF",
@@ -82,6 +92,129 @@ THEME = {
     "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
     "shadow_xl": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
 }
+
+DARK_THEME = {
+    "bg": "#0F172A",
+    "bg_alt": "#1E293B",
+    "surface": "#1E293B",
+    "surface_elevated": "#334155",
+    "border": "#334155",
+    "border_strong": "#475569",
+    "divider": "#1E293B",
+    "text": "#F8FAFC",
+    "text_secondary": "#CBD5E1",
+    "text_muted": "#94A3B8",
+    "text_disabled": "#64748B",
+    "text_on_primary": "#FFFFFF",
+    "primary": "#818CF8",
+    "primary_hover": "#6366F1",
+    "primary_soft": "#1E1B4B",
+    "primary_medium": "#312E81",
+    "primary_strong": "#A5B4FC",
+    "accent": "#A78BFA",
+    "accent_soft": "#2E1065",
+    "accent_medium": "#4C1D95",
+    "success": "#34D399",
+    "success_soft": "#064E3B",
+    "success_medium": "#065F46",
+    "success_strong": "#6EE7B7",
+    "warning": "#FBBF24",
+    "warning_soft": "#78350F",
+    "warning_medium": "#92400E",
+    "warning_strong": "#FCD34D",
+    "danger": "#F87171",
+    "danger_soft": "#7F1D1D",
+    "danger_medium": "#991B1B",
+    "danger_strong": "#FCA5A5",
+    "info": "#60A5FA",
+    "info_soft": "#1E3A8A",
+    "info_medium": "#1E40AF",
+    "info_strong": "#93C5FD",
+    "nav_bg": "#1E293B",
+    "nav_text": "#94A3B8",
+    "nav_muted": "#64748B",
+    "nav_active_bg": "#312E81",
+    "nav_hover": "#334155",
+    "nav_active_text": "#A5B4FC",
+    "brand_accent": "#818CF8",
+    "brand_gradient_start": "#6366F1",
+    "brand_gradient_mid": "#8B5CF6",
+    "brand_gradient_end": "#A855F7",
+    "bg_chat": "#0F172A",
+    "card": "#1E293B",
+    "primary_light": "#1E1B4B",
+    "bubble_sent": "#6366F1",
+    "bubble_recv": "#334155",
+    "tag_bg": "#334155",
+    "tag_text": "#CBD5E1",
+    "status_online": "#34D399",
+    "status_offline": "#64748B",
+    "status_busy": "#FBBF24",
+    "input_bg": "#1E293B",
+    "input_border": "#334155",
+    "input_border_focus": "#818CF8",
+    "input_placeholder": "#64748B",
+    "card_music": "#6366F1",
+    "border_music": "#4F46E5",
+    "purple": "#A78BFA",
+    "purple_light": "#2E1065",
+    "purple_soft": "#4C1D95",
+    "chart_grid": "#1E293B",
+    "chart_line": "#818CF8",
+    "chart_area_start": "#818CF8",
+    "chart_area_end": "#1E293B",
+    "overlay": "#000000",
+    "overlay_light": "#F8FAFC",
+    "shadow_xs": "0 1px 2px 0 rgb(0 0 0 / 0.3)",
+    "shadow_sm": "0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4)",
+    "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4)",
+    "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4)",
+    "shadow_xl": "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
+}
+
+THEME = LIGHT_THEME.copy()
+
+_current_mode: Literal["light", "dark"] = "light"
+
+
+def get_theme() -> dict:
+    return THEME
+
+
+def get_mode() -> str:
+    return _current_mode
+
+
+def set_mode(mode: Literal["light", "dark"]) -> None:
+    global _current_mode, THEME
+    _current_mode = mode
+    THEME = LIGHT_THEME.copy() if mode == "light" else DARK_THEME.copy()
+    ctk.set_appearance_mode(mode)
+
+
+def toggle_mode() -> str:
+    new_mode = "dark" if _current_mode == "light" else "light"
+    set_mode(new_mode)
+    return new_mode
+
+
+def apply_global_style(mode: Literal["light", "dark"] = "light", color_theme: str = "blue") -> None:
+    """Apply global appearance and sensible defaults for the app.
+
+    - Sets appearance mode (light/dark)
+    - Applies a default color theme
+    - Ensures customtkinter uses the selected mode
+    """
+    try:
+        ctk.set_appearance_mode(mode)
+    except Exception:
+        pass
+    try:
+        # safe best-effort: built-in color themes include 'blue', 'green', etc.
+        ctk.set_default_color_theme(color_theme)
+    except Exception:
+        pass
+
 
 SPACING = {
     "page_x": 32,
