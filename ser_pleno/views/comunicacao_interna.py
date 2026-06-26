@@ -4,112 +4,938 @@ import os
 import datetime
 import threading
 import time
-from ui_theme import THEME, SPACING, RADIUS, themed_font, blend_color, lighten, darken
-from components.ui_components import (
-    PageHeader, Card, PrimaryButton, SecondaryButton, GhostButton, DangerButton,
-    SectionHeader, InputField, SearchField, EmptyState, Divider, Pill, Badge,
-    Avatar, Tabs, SegmentedButton, Dropdown, Tooltip, Toast, SkeletonLoader
-)
 from services.comunicacao import ServicoComunicacao
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Design tokens – família índigo (consistente com login/app/dashboard)
+# ══════════════════════════════════════════════════════════════════════════════
+C = {
+    # Layout
+    "page_bg":          "#F8F7FF",
+    "sidebar_bg":       "#FFFFFF",
+    "sidebar_border":   "#E5E7EB",
+    "sidebar_w":        300,
+
+    # Chat area
+    "chat_bg":          "#F3F4F8",
+    "header_bg":        "#FFFFFF",
+    "header_border":    "#E5E7EB",
+    "input_bg":         "#FFFFFF",
+    "input_border":     "#E5E7EB",
+    "input_focus":      "#4F46E5",
+
+    # Bolhas
+    "bubble_sent_bg":   "#4F46E5",   # índigo – mensagem enviada
+    "bubble_sent_text": "#FFFFFF",
+    "bubble_recv_bg":   "#FFFFFF",   # branco – mensagem recebida
+    "bubble_recv_text": "#111827",
+    "bubble_recv_border":"#E5E7EB",
+
+    # Timestamp / tick
+    "time_color":       "#9CA3AF",
+    "tick_read":        "#4F46E5",
+    "tick_sent":        "#9CA3AF",
+
+    # Contato ativo
+    "contact_active_bg":"#EEF2FF",
+    "contact_hover_bg": "#F5F3FF",
+
+    # Texto
+    "text":             "#111827",
+    "text_muted":       "#6B7280",
+    "text_light":       "#9CA3AF",
+
+    # Acento
+    "accent":           "#4F46E5",
+    "accent_soft":      "#EEF2FF",
+    "accent_hover":     "#4338CA",
+
+    # Status online
+    "online":           "#10B981",
+    "offline":          "#9CA3AF",
+
+    # Badge não-lidas
+    "badge_bg":         "#DC2626",
+    "badge_text":       "#FFFFFF",
+
+    # Data-label no chat
+    "date_label_bg":    "#E5E7EB",
+    "date_label_text":  "#6B7280",
+
+    # Avatar cores por papel
+    "avatar_admin":     "#7C3AED",
+    "avatar_analista":  "#4F46E5",
+    "avatar_coord":     "#059669",
+    "avatar_suporte":   "#D97706",
+    "avatar_group":     "#EC4899",
+
+    # Arquivo card
+    "file_card_bg":     "#F9FAFB",
+    "file_card_border": "#E5E7EB",
+
+    # Modal arquivos
+    "modal_bg":         "#FFFFFF",
+    "modal_border":     "#E5E7EB",
+    "modal_item_bg":    "#F5F3FF",
+    "modal_item_hover": "#EEF2FF",
+}
+
+# Cor de avatar por papel
+_AVATAR_COLOR = {
+    "admin":       C["avatar_admin"],
+    "analista":    C["avatar_analista"],
+    "coordenador": C["avatar_coord"],
+    "suporte":     C["avatar_suporte"],
+    "group":       C["avatar_group"],
+}
+
+# Iniciais padrão por papel
+_AVATAR_INITIALS = {
+    "admin": "AD", "analista": "AN",
+    "coordenador": "CO", "suporte": "SP", "group": "👥",
+}
+
+# Ícones de tipo de arquivo
+_FILE_ICONS = {
+    "Imagens": "🖼️", "Videos": "🎥", "Audio": "🎵",
+    "Planilhas": "📊", "Presentações": "📽️",
+    "Arquivos Zip": "🗜️", "Code": "💻",
+}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Helper: avatar colorido com inicial
+# ──────────────────────────────────────────────────────────────────────────────
+def _make_avatar(parent, initials: str, color: str,
+                 size: int = 40) -> ctk.CTkFrame:
+    av = ctk.CTkFrame(parent, width=size, height=size,
+                      corner_radius=size // 2, fg_color=color)
+    av.pack_propagate(False)
+    ctk.CTkLabel(
+        av, text=initials[:2],
+        font=ctk.CTkFont("Segoe UI", size // 3, "bold"),
+        text_color="#FFFFFF",
+    ).place(relx=0.5, rely=0.5, anchor="center")
+    return av
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Frame principal
+# ══════════════════════════════════════════════════════════════════════════════
 class ComunicacaoInternaFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=THEME["bg"])
-        self.controller = controller
+        super().__init__(parent, fg_color=C["page_bg"])
+        self.controller          = controller
         self.servico_comunicacao = ServicoComunicacao()
-        self.contatos = []
-        self.conversa_ativa = None
-        self.conversa_atual = None
-        self.mensagens = []
-        self.atualizando = False
-        self.contador_nao_lidas = {}
-        self.atualizacao_periodica = True
-        self.usuario_logado_id = controller.usuario_logado_id
+        self.contatos:     list  = []
+        self.conversa_ativa      = None
+        self.conversa_atual      = None
+        self.mensagens:    list  = []
+        self.atualizando         = False
+        self.contador_nao_lidas: dict = {}
+        self.atualizacao_periodica    = True
+        self.usuario_logado_id        = controller.usuario_logado_id
         self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        self.img_path = os.path.join(self.base_path, "..", "imagens")
+        self.img_path  = os.path.join(self.base_path, "..", "imagens")
+        self._images: dict = {}
+        self._contact_widgets: dict = {}   # id → frame widget
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
-        self.criar_sidebar()
-        self.criar_chat_area()
-        self.carregar_contatos()
-        self.iniciar_atualizacao_periodica()
-        self.bind("<Destroy>", self.on_destroy)
 
-    def on_destroy(self, event):
+        self._criar_sidebar()
+        self._criar_chat_area()
+        self.carregar_contatos()
+        self._iniciar_atualizacao_periodica()
+        self.bind("<Destroy>", self._on_destroy)
+
+    # ══════════════════════════════════════════
+    #  Ciclo de vida
+    # ══════════════════════════════════════════
+    def _on_destroy(self, _=None):
         self.atualizacao_periodica = False
 
-    def load_image(self, name, size):
-        try:
-            if not hasattr(self, "_images"):
-                self._images = {}
-            cache_key = f"{name}:{size}"
-            if cache_key in self._images:
-                return self._images[cache_key]
-            candidates = [
-                os.path.join(self.img_path, name),
-                os.path.join(self.base_path, "assets", "avatars", name),
-                os.path.join(self.base_path, "..", "imagens", name),
-            ]
-            for path in candidates:
-                if path and os.path.exists(path):
+    def on_destroy(self, event):          # alias legado
+        self._on_destroy(event)
+
+    # ══════════════════════════════════════════
+    #  Imagens
+    # ══════════════════════════════════════════
+    def load_image(self, name: str, size: tuple):
+        key = f"{name}:{size}"
+        if key in self._images:
+            return self._images[key]
+        candidates = [
+            os.path.join(self.img_path, name),
+            os.path.join(self.base_path, "assets", "avatars", name),
+            os.path.join(self.base_path, "..", "imagens", name),
+        ]
+        for path in candidates:
+            if path and os.path.exists(path):
+                try:
                     img = ctk.CTkImage(light_image=Image.open(path), size=size)
-                    self._images[cache_key] = img
+                    self._images[key] = img
                     return img
-        except Exception as e:
-            print(f"Erro ao carregar imagem {name}: {e}")
+                except Exception as e:
+                    print(f"Erro ao carregar imagem {name}: {e}")
         return None
 
-    def criar_sidebar(self):
-        card = Card(self)
-        card.grid(row=0, column=0, sticky="nsew", padx=(SPACING["page_x"], 12))
-        card.grid_propagate(False)
-        hdr = ctk.CTkFrame(card.body, fg_color="transparent")
-        hdr.pack(fill="x", padx=16, pady=(16, 10))
-        ctk.CTkLabel(hdr, text="Mensagens", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
-        ctk.CTkLabel(hdr, text="Conversas internas e suporte", font=themed_font("overline"), text_color=THEME["text_muted"]).pack(side="left", padx=(8, 0))
-        GhostButton(hdr, text="＋", width=36, height=36, command=lambda: None).pack(side="right")
-        search = SearchField(card.body, placeholder="Buscar conversas...", command=self.filtrar_contatos)
-        search.pack(fill="x", padx=16, pady=(0, 12))
-        self.scroll_contacts = ctk.CTkScrollableFrame(card.body, fg_color="transparent")
-        self.scroll_contacts.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+    def get_avatar_por_papel(self, papel: str) -> str:
+        return {
+            "admin": "avatar-1.jpg", "analista": "avatar-2.jpg",
+            "coordenador": "avatar-3.jpg", "suporte": "avatar-4.jpg",
+        }.get(papel, "avatar-6.jpg")
 
+    # ══════════════════════════════════════════
+    #  SIDEBAR – lista de contatos
+    # ══════════════════════════════════════════
+    def _criar_sidebar(self):
+        sidebar = ctk.CTkFrame(
+            self,
+            width=C["sidebar_w"],
+            fg_color=C["sidebar_bg"],
+            corner_radius=0,
+            border_width=0,
+        )
+        sidebar.grid(row=0, column=0, sticky="nsew")
+        sidebar.grid_propagate(False)
+        sidebar.grid_rowconfigure(2, weight=1)
+        sidebar.grid_columnconfigure(0, weight=1)
+
+        # ── Cabeçalho da sidebar ────────────────────────────────────
+        hdr = ctk.CTkFrame(sidebar, fg_color="transparent")
+        hdr.grid(row=0, column=0, sticky="ew", padx=18, pady=(18, 10))
+
+        ctk.CTkLabel(
+            hdr, text="Mensagens",
+            font=ctk.CTkFont("Segoe UI", 17, "bold"),
+            text_color=C["text"],
+        ).pack(side="left")
+
+        # Botão nova conversa
+        ctk.CTkButton(
+            hdr, text="✏",
+            width=34, height=34, corner_radius=10,
+            fg_color=C["accent_soft"],
+            hover_color=C["accent_hover"],
+            text_color=C["accent"],
+            font=ctk.CTkFont("Segoe UI", 15),
+            command=lambda: None,
+        ).pack(side="right")
+
+        # ── Campo de busca ──────────────────────────────────────────
+        search_wrap = ctk.CTkFrame(
+            sidebar, fg_color="#F3F4F6",
+            corner_radius=10,
+        )
+        search_wrap.grid(row=1, column=0, sticky="ew", padx=14, pady=(0, 8))
+
+        ctk.CTkLabel(
+            search_wrap, text="🔍",
+            font=ctk.CTkFont("Segoe UI", 13),
+            text_color=C["text_light"],
+        ).pack(side="left", padx=(10, 0))
+
+        self.entry_busca = ctk.CTkEntry(
+            search_wrap,
+            placeholder_text="Buscar conversas...",
+            fg_color="transparent",
+            border_width=0,
+            text_color=C["text"],
+            placeholder_text_color=C["text_light"],
+            font=ctk.CTkFont("Segoe UI", 13),
+            height=36,
+        )
+        self.entry_busca.pack(side="left", fill="x", expand=True, padx=(4, 8))
+        self.entry_busca.bind("<KeyRelease>", self.filtrar_contatos)
+
+        # ── Lista de contatos ───────────────────────────────────────
+        ctk.CTkFrame(sidebar, height=1,
+                     fg_color=C["sidebar_border"]).grid(
+            row=2, column=0, sticky="ew", padx=0, pady=0
+        )
+        self.scroll_contacts = ctk.CTkScrollableFrame(
+            sidebar,
+            fg_color="transparent",
+            scrollbar_button_color="#D1D5DB",
+            scrollbar_button_hover_color="#9CA3AF",
+        )
+        self.scroll_contacts.grid(row=2, column=0, sticky="nsew")
+
+    # ══════════════════════════════════════════
+    #  Carregar / filtrar contatos
+    # ══════════════════════════════════════════
     def carregar_contatos(self):
         try:
-            resultado = self.servico_comunicacao.listar_contatos(self.usuario_logado_id)
-            if resultado["success"]:
-                self.contatos = [c for c in resultado["data"] if c["role"] in ["admin", "analista", "coordenador", "suporte"]]
-                self.contatos.insert(0, {"id": None, "name": "Todos", "email": "", "student_name": "", "role": "group", "is_staff": True})
-                if hasattr(self, "scroll_contacts") and self.scroll_contacts.winfo_exists():
-                    for widget in self.scroll_contacts.winfo_children():
-                        widget.destroy()
-                    for i, c in enumerate(self.contatos):
-                        avatar = self.get_avatar_por_papel(c["role"])
-                        self.criar_contato_item({
-                            "id": c["id"], "name": c["name"],
-                            "msg": "Grupo de todos" if c["role"] == "group" else f"Online ({c['role']})",
-                            "active": c["is_staff"], "unread": 0, "img": avatar, "role": c["role"],
-                        }, is_first=(i == 0))
+            res = self.servico_comunicacao.listar_contatos(self.usuario_logado_id)
+            if res["success"]:
+                self.contatos = [
+                    c for c in res["data"]
+                    if c["role"] in ["admin", "analista", "coordenador", "suporte"]
+                ]
+                self.contatos.insert(0, {
+                    "id": None, "name": "Todos", "email": "",
+                    "student_name": "", "role": "group", "is_staff": True,
+                })
+                self._renderizar_lista_contatos(self.contatos, select_first=True)
         except Exception as e:
             print(f"Erro ao carregar contatos: {e}")
 
-    def carregar_contador_nao_lidas(self):
-        try:
-            data = self.servico_comunicacao.contar_mensagens_nao_lidas(self.usuario_logado_id)
-            if data and "success" in data and data["success"]:
-                self.contador_nao_lidas = data["data"]
-        except Exception as e:
-            print(f"Erro ao carregar contador de não lidas: {e}")
+    def _renderizar_lista_contatos(self, lista: list, select_first: bool = False):
+        if not hasattr(self, "scroll_contacts") or not self.scroll_contacts.winfo_exists():
+            return
+        for w in self.scroll_contacts.winfo_children():
+            w.destroy()
+        self._contact_widgets = {}
+        for i, c in enumerate(lista):
+            self._criar_contato_item(c)
+            if select_first and i == 0:
+                w = self._contact_widgets.get(c["id"])
+                if w:
+                    self.selecionar_conversa(c, w)
 
-    def iniciar_atualizacao_periodica(self):
+    def _criar_contato_item(self, contato: dict):
+        cid   = contato["id"]
+        papel = contato["role"]
+        nome  = contato["name"]
+
+        row = ctk.CTkFrame(
+            self.scroll_contacts,
+            fg_color="transparent",
+            corner_radius=10,
+            cursor="hand2",
+        )
+        row.pack(fill="x", padx=8, pady=2)
+        row.contato_data = contato
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=10, pady=8)
+        inner.grid_columnconfigure(1, weight=1)
+
+        # Avatar colorido com inicial
+        av_color = _AVATAR_COLOR.get(papel, C["accent"])
+        av_init  = nome[:2].upper() if papel != "group" else "👥"
+        av = _make_avatar(inner, av_init, av_color, size=44)
+        av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="nsew")
+
+        # Nome
+        ctk.CTkLabel(
+            inner, text=nome,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color=C["text"], anchor="w",
+        ).grid(row=0, column=1, sticky="w")
+
+        # Sub-label (papel)
+        sub = "Grupo de comunicação" if papel == "group" else papel.capitalize()
+        ctk.CTkLabel(
+            inner, text=sub,
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=C["text_muted"], anchor="w",
+        ).grid(row=1, column=1, sticky="w")
+
+        # Badge de não-lidas (oculto por padrão)
+        unread = self.contador_nao_lidas.get(cid, 0)
+        badge_frame = ctk.CTkFrame(
+            inner, width=22, height=22,
+            corner_radius=11, fg_color=C["badge_bg"],
+        )
+        if unread > 0:
+            badge_frame.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+            badge_frame.grid_propagate(False)
+            ctk.CTkLabel(
+                badge_frame, text=str(unread),
+                font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                text_color=C["badge_text"],
+            ).place(relx=0.5, rely=0.5, anchor="center")
+        row._badge_frame = badge_frame
+
+        # Hover
+        row.bind("<Enter>",   lambda e, r=row: r.configure(fg_color=C["contact_hover_bg"]))
+        row.bind("<Leave>",   lambda e, r=row, cid2=cid: r.configure(
+            fg_color=C["contact_active_bg"]
+            if self.conversa_ativa and self.conversa_ativa.get("id") == cid2
+            else "transparent"
+        ))
+        row.bind("<Button-1>", lambda e, c=contato, r=row: self.selecionar_conversa(c, r))
+        for child in row.winfo_children():
+            child.bind("<Button-1>", lambda e, c=contato, r=row: self.selecionar_conversa(c, r))
+
+        self._contact_widgets[cid] = row
+
+    def criar_contato_item(self, contato: dict, is_first: bool = False):
+        """Alias legado."""
+        self._criar_contato_item(contato)
+        if is_first:
+            w = self._contact_widgets.get(contato["id"])
+            if w:
+                self.selecionar_conversa(contato, w)
+
+    def filtrar_contatos(self, _=None):
+        termo = self.entry_busca.get().lower() if hasattr(self, "entry_busca") else ""
+        filtrados = [
+            c for c in self.contatos
+            if termo in c["name"].lower() or termo in c["role"].lower()
+        ]
+        self._renderizar_lista_contatos(filtrados)
+
+    # ══════════════════════════════════════════
+    #  Selecionar conversa
+    # ══════════════════════════════════════════
+    def selecionar_conversa(self, contato: dict, item_widget=None):
+        # Limpa seleção anterior
+        for w in self.scroll_contacts.winfo_children():
+            if hasattr(w, "contato_data"):
+                w.configure(fg_color="transparent")
+        if item_widget:
+            item_widget.configure(fg_color=C["contact_active_bg"])
+
+        self.conversa_ativa = contato
+        self.conversa_atual = contato
+
+        # Atualiza header do chat
+        nome  = contato["name"]
+        papel = contato["role"]
+        sub   = "Grupo de comunicação" if papel == "group" else papel.capitalize()
+
+        self.lbl_chat_nome.configure(text=nome)
+        self.lbl_chat_status.configure(text=sub)
+
+        # Atualiza avatar no header
+        av_color = _AVATAR_COLOR.get(papel, C["accent"])
+        av_init  = nome[:2].upper() if papel != "group" else "👥"
+        for w in self._header_av_slot.winfo_children():
+            w.destroy()
+        av = _make_avatar(self._header_av_slot, av_init, av_color, size=42)
+        av.pack(expand=True)
+
+        self.carregar_mensagens()
+
+    # ══════════════════════════════════════════
+    #  CHAT AREA
+    # ══════════════════════════════════════════
+    def _criar_chat_area(self):
+        chat = ctk.CTkFrame(self, fg_color=C["chat_bg"], corner_radius=0)
+        chat.grid(row=0, column=1, sticky="nsew")
+        chat.grid_rowconfigure(1, weight=1)
+        chat.grid_columnconfigure(0, weight=1)
+
+        self._criar_chat_header(chat)
+        self._criar_mensagens_area(chat)
+        self._criar_input_area(chat)
+
+    # ── Header ─────────────────────────────────────────────────────────────
+    def _criar_chat_header(self, parent):
+        header = ctk.CTkFrame(
+            parent,
+            fg_color=C["header_bg"],
+            corner_radius=0,
+            height=66,
+        )
+        header.grid(row=0, column=0, sticky="ew")
+        header.grid_propagate(False)
+        # Linha de separação base
+        ctk.CTkFrame(header, height=1,
+                     fg_color=C["header_border"]).pack(side="bottom", fill="x")
+
+        inner = ctk.CTkFrame(header, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=20, pady=0)
+
+        # Slot de avatar (substituível ao trocar conversa)
+        self._header_av_slot = ctk.CTkFrame(
+            inner, width=44, height=44,
+            fg_color="transparent",
+        )
+        self._header_av_slot.pack(side="left", padx=(0, 14))
+        self._header_av_slot.pack_propagate(False)
+        # Avatar inicial
+        _make_avatar(self._header_av_slot, "AN", C["avatar_analista"], 42).pack()
+
+        # Nome + status
+        title_stack = ctk.CTkFrame(inner, fg_color="transparent")
+        title_stack.pack(side="left")
+
+        self.lbl_chat_nome = ctk.CTkLabel(
+            title_stack, text="Selecione uma conversa",
+            font=ctk.CTkFont("Segoe UI", 14, "bold"),
+            text_color=C["text"],
+        )
+        self.lbl_chat_nome.pack(anchor="w")
+
+        status_row = ctk.CTkFrame(title_stack, fg_color="transparent")
+        status_row.pack(anchor="w")
+
+        # Ponto verde de status
+        ctk.CTkFrame(
+            status_row, width=8, height=8,
+            corner_radius=4, fg_color=C["online"],
+        ).pack(side="left", padx=(0, 5))
+
+        self.lbl_chat_status = ctk.CTkLabel(
+            status_row, text="Online",
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=C["online"],
+        )
+        self.lbl_chat_status.pack(side="left")
+
+        # Botões de ação (direita)
+        actions = ctk.CTkFrame(inner, fg_color="transparent")
+        actions.pack(side="right")
+
+        for icon in ("📷", "📞", "⋮"):
+            ctk.CTkButton(
+                actions, text=icon,
+                width=36, height=36, corner_radius=10,
+                fg_color="transparent",
+                hover_color=C["accent_soft"],
+                text_color=C["text_muted"],
+                font=ctk.CTkFont("Segoe UI", 16),
+            ).pack(side="left", padx=3)
+
+    # ── Área de mensagens ───────────────────────────────────────────────────
+    def _criar_mensagens_area(self, parent):
+        self.msg_area = ctk.CTkScrollableFrame(
+            parent,
+            fg_color="transparent",
+            scrollbar_button_color="#D1D5DB",
+            scrollbar_button_hover_color="#9CA3AF",
+        )
+        self.msg_area.grid(row=1, column=0, sticky="nsew", padx=16, pady=8)
+
+    # ── Input ───────────────────────────────────────────────────────────────
+    def _criar_input_area(self, parent):
+        input_bar = ctk.CTkFrame(
+            parent,
+            fg_color=C["input_bg"],
+            corner_radius=0,
+            height=74,
+        )
+        input_bar.grid(row=2, column=0, sticky="ew")
+        input_bar.grid_propagate(False)
+        ctk.CTkFrame(input_bar, height=1,
+                     fg_color=C["header_border"]).pack(side="top", fill="x")
+
+        inner = ctk.CTkFrame(input_bar, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=16, pady=10)
+
+        # Caixa de input
+        box = ctk.CTkFrame(
+            inner,
+            fg_color="#F9FAFB",
+            corner_radius=14,
+            border_width=1,
+            border_color=C["input_border"],
+        )
+        box.pack(fill="x", expand=True)
+
+        # Botão clipe
+        self.btn_clip = ctk.CTkButton(
+            box, text="📎",
+            width=36, height=36, corner_radius=10,
+            fg_color="transparent",
+            hover_color=C["accent_soft"],
+            text_color=C["text_muted"],
+            font=ctk.CTkFont("Segoe UI", 16),
+            command=self.toggle_modal_arquivos,
+        )
+        self.btn_clip.pack(side="left", padx=(8, 0))
+
+        # Entry
+        self.entry_mensagem = ctk.CTkEntry(
+            box,
+            placeholder_text="Digite sua mensagem...",
+            fg_color="transparent",
+            border_width=0,
+            text_color=C["text"],
+            placeholder_text_color=C["text_light"],
+            font=ctk.CTkFont("Segoe UI", 13),
+            height=42,
+        )
+        self.entry_mensagem.pack(side="left", fill="x", expand=True, padx=4)
+        self.entry_mensagem.bind("<Return>", lambda e: self.enviar_mensagem())
+        self.entry_mensagem.bind("<FocusIn>",  lambda e: box.configure(border_color=C["input_focus"]))
+        self.entry_mensagem.bind("<FocusOut>", lambda e: box.configure(border_color=C["input_border"]))
+
+        # Emoji
+        ctk.CTkButton(
+            box, text="😊",
+            width=36, height=36, corner_radius=10,
+            fg_color="transparent",
+            hover_color=C["accent_soft"],
+            text_color=C["text_muted"],
+            font=ctk.CTkFont("Segoe UI", 16),
+        ).pack(side="left", padx=4)
+
+        # Enviar
+        self.btn_enviar = ctk.CTkButton(
+            box, text="➤",
+            width=40, height=40, corner_radius=12,
+            fg_color=C["accent"],
+            hover_color=C["accent_hover"],
+            text_color="#FFFFFF",
+            font=ctk.CTkFont("Segoe UI", 16, "bold"),
+            command=self.enviar_mensagem,
+        )
+        self.btn_enviar.pack(side="right", padx=(4, 8))
+
+        # Modal de arquivos (oculto)
+        self._criar_modal_arquivos(parent)
+
+    # ══════════════════════════════════════════
+    #  Modal de arquivos (popover)
+    # ══════════════════════════════════════════
+    def _criar_modal_arquivos(self, parent):
+        self.modal_arquivos = ctk.CTkFrame(
+            parent,
+            fg_color=C["modal_bg"],
+            corner_radius=14,
+            border_width=1,
+            border_color=C["modal_border"],
+            width=280,
+        )
+        self.modal_arquivos.grid(row=2, column=0, sticky="sw",
+                                  padx=16, pady=78)
+        self.modal_arquivos.grid_remove()
+
+        categorias = [
+            ("📄", "Documentos",   [".pdf", ".doc", ".docx", ".txt"]),
+            ("🖼️", "Imagens",      [".jpg", ".jpeg", ".png", ".gif"]),
+            ("🎥", "Vídeos",       [".mp4", ".avi", ".mov"]),
+            ("🎵", "Áudio",        [".mp3", ".wav", ".ogg"]),
+            ("📊", "Planilhas",    [".xls", ".xlsx", ".csv"]),
+            ("📽️", "Apresentações",[".ppt", ".pptx"]),
+            ("🗜️", "Compactados",  [".zip", ".rar", ".7z"]),
+            ("💻", "Código",       [".py", ".js", ".html", ".css"]),
+            ("📁", "Todos",        []),
+        ]
+
+        # Título do popover
+        ctk.CTkLabel(
+            self.modal_arquivos,
+            text="Enviar arquivo",
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color=C["text"],
+        ).grid(row=0, column=0, columnspan=3, padx=14, pady=(12, 8), sticky="w")
+
+        for i, (icon, nome, exts) in enumerate(categorias):
+            btn = ctk.CTkButton(
+                self.modal_arquivos,
+                text=f"{icon}\n{nome}",
+                font=ctk.CTkFont("Segoe UI", 11),
+                height=58, width=78,
+                corner_radius=10,
+                fg_color=C["modal_item_bg"],
+                hover_color=C["modal_item_hover"],
+                text_color=C["text"],
+                command=lambda c={"nome": nome, "extensao": exts}: self.selecionar_categoria(c),
+            )
+            row_i, col_i = divmod(i, 3)
+            btn.grid(row=row_i + 1, column=col_i, padx=5, pady=5)
+
+    def toggle_modal_arquivos(self):
+        if self.modal_arquivos.winfo_manager():
+            self.modal_arquivos.grid_remove()
+        else:
+            self.modal_arquivos.grid()
+
+    # Alias legado
+    def criar_modal_arquivos(self, parent):
+        self._criar_modal_arquivos(parent)
+
+    def criar_chat_area(self):
+        self._criar_chat_area()
+
+    def criar_sidebar(self):
+        self._criar_sidebar()
+
+    # ══════════════════════════════════════════
+    #  Mensagens
+    # ══════════════════════════════════════════
+    def carregar_mensagens(self):
+        if not self.conversa_ativa:
+            return
+        if not hasattr(self, "winfo_exists") or not self.winfo_exists():
+            return
+        try:
+            if self.conversa_ativa["role"] == "group":
+                res = self.servico_comunicacao.obter_mensagens_grupo()
+            else:
+                res = self.servico_comunicacao.obter_mensagens(
+                    self.usuario_logado_id, self.conversa_ativa["id"]
+                )
+            if res["success"]:
+                novas = res["data"]
+                if self.mensagens != novas:
+                    self.mensagens = novas
+                    self.atualizar_area_mensagens()
+        except Exception as e:
+            if "invalid command name" not in str(e):
+                print(f"Erro ao carregar mensagens: {e}")
+
+    def marcar_mensagens_lidas(self):
+        for msg in self.mensagens:
+            if not msg.get("read"):
+                try:
+                    self.servico_comunicacao.marcar_mensagem_lida(msg.get("id"))
+                except Exception as e:
+                    print(f"Erro ao marcar como lida: {e}")
+
+    def atualizar_area_mensagens(self):
+        if not hasattr(self, "msg_area") or not self.msg_area.winfo_exists():
+            return
+        for w in self.msg_area.winfo_children():
+            if w.winfo_exists():
+                w.destroy()
+
+        # Label de data
+        date_lbl = ctk.CTkFrame(
+            self.msg_area,
+            fg_color=C["date_label_bg"],
+            corner_radius=10,
+        )
+        date_lbl.pack(pady=(12, 8))
+        ctk.CTkLabel(
+            date_lbl, text="HOJE",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=C["date_label_text"],
+        ).pack(padx=14, pady=4)
+
+        for msg in self.mensagens:
+            self.criar_mensagem(msg)
+
+        # Scroll para o final
+        self.after(50, lambda: self.msg_area._parent_canvas.yview_moveto(1.0))
+
+    def criar_mensagem(self, msg: dict):
+        is_mine = msg["sender_id"] == self.usuario_logado_id
+        remetente = "Eu" if is_mine else self.obter_nome_remetente(msg["sender_id"])
+
+        outer = ctk.CTkFrame(self.msg_area, fg_color="transparent")
+        outer.pack(fill="x", pady=4, padx=8)
+        outer.msg_data = msg
+
+        side = "right" if is_mine else "left"
+
+        wrapper = ctk.CTkFrame(outer, fg_color="transparent")
+        wrapper.pack(side=side, padx=4)
+
+        # Avatar do remetente (mensagens recebidas em grupo)
+        if (not is_mine
+                and self.conversa_ativa
+                and self.conversa_ativa["role"] == "group"):
+            av_row = ctk.CTkFrame(wrapper, fg_color="transparent")
+            av_row.pack(anchor="w", pady=(0, 2))
+            av_color = C["accent"]
+            for c in self.contatos:
+                if c["id"] == msg["sender_id"]:
+                    av_color = _AVATAR_COLOR.get(c.get("role", ""), C["accent"])
+                    break
+            _make_avatar(av_row, remetente[:2].upper(), av_color, 22).pack(
+                side="left", padx=(0, 6)
+            )
+            ctk.CTkLabel(
+                av_row, text=remetente,
+                font=ctk.CTkFont("Segoe UI", 11, "bold"),
+                text_color=C["text_muted"],
+            ).pack(side="left")
+
+        # Bolha
+        bubble = ctk.CTkFrame(
+            wrapper,
+            fg_color=C["bubble_sent_bg"] if is_mine else C["bubble_recv_bg"],
+            corner_radius=14,
+            border_width=0 if is_mine else 1,
+            border_color=C["bubble_recv_border"],
+        )
+        bubble.pack(anchor="e" if is_mine else "w")
+
+        txt_color = C["bubble_sent_text"] if is_mine else C["bubble_recv_text"]
+
+        if "caminho_arquivo" in msg:
+            self._criar_mensagem_arquivo(bubble, msg, txt_color)
+        else:
+            ctk.CTkLabel(
+                bubble,
+                text=msg["text"],
+                font=ctk.CTkFont("Segoe UI", 13),
+                text_color=txt_color,
+                wraplength=380,
+                justify="left",
+            ).pack(padx=14, pady=(10, 8))
+
+        # Timestamp + ticks
+        meta = ctk.CTkFrame(wrapper, fg_color="transparent")
+        meta.pack(anchor="e" if is_mine else "w", pady=(2, 0))
+
+        try:
+            ts  = datetime.datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
+            time_str = ts.strftime("%H:%M")
+        except Exception:
+            time_str = ""
+
+        ctk.CTkLabel(
+            meta, text=time_str,
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=C["time_color"],
+        ).pack(side="left")
+
+        if is_mine:
+            ctk.CTkLabel(
+                meta, text=" ✓✓",
+                font=ctk.CTkFont("Segoe UI", 10),
+                text_color=C["tick_read"] if msg.get("read") else C["tick_sent"],
+            ).pack(side="left")
+
+    def _criar_mensagem_arquivo(self, bubble, msg: dict, txt_color: str):
+        nome   = os.path.basename(msg["caminho_arquivo"])
+        tam    = self._formatar_tamanho(
+            os.path.getsize(msg["caminho_arquivo"]) if os.path.exists(msg["caminho_arquivo"]) else 0
+        )
+        icon   = _FILE_ICONS.get(msg.get("tipo_arquivo", ""), "📄")
+
+        card = ctk.CTkFrame(
+            bubble,
+            fg_color=C["file_card_bg"],
+            corner_radius=10,
+            border_width=1,
+            border_color=C["file_card_border"],
+        )
+        card.pack(padx=12, pady=10, fill="x")
+        card.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            card, text=icon,
+            font=ctk.CTkFont("Segoe UI", 26),
+        ).grid(row=0, column=0, rowspan=2, padx=(12, 8), pady=10)
+
+        ctk.CTkLabel(
+            card, text=nome,
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            text_color=C["text"], anchor="w", wraplength=220,
+        ).grid(row=0, column=1, sticky="w", pady=(10, 2))
+
+        ctk.CTkLabel(
+            card, text=tam,
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=C["text_muted"], anchor="w",
+        ).grid(row=1, column=1, sticky="w", pady=(0, 10))
+
+        btns = ctk.CTkFrame(card, fg_color="transparent")
+        btns.grid(row=0, column=2, rowspan=2, padx=(4, 10))
+
+        for icon_btn, cmd in [
+            ("👁", lambda p=msg["caminho_arquivo"]: self.visualizar_arquivo(p)),
+            ("📥", lambda p=msg["caminho_arquivo"], n=nome: self.download_arquivo(p, n)),
+        ]:
+            ctk.CTkButton(
+                btns, text=icon_btn,
+                width=30, height=30, corner_radius=8,
+                fg_color=C["accent_soft"],
+                hover_color=C["accent_hover"],
+                text_color=C["accent"],
+                font=ctk.CTkFont("Segoe UI", 14),
+                command=cmd,
+            ).pack(pady=3)
+
+    def criar_mensagem_arquivo(self, bubble, msg, txt_color):
+        self._criar_mensagem_arquivo(bubble, msg, txt_color)
+
+    # ══════════════════════════════════════════
+    #  Enviar mensagem / arquivo
+    # ══════════════════════════════════════════
+    def enviar_mensagem(self):
+        txt = self.entry_mensagem.get().strip()
+        if not txt or not self.conversa_ativa:
+            return
+        try:
+            if self.conversa_ativa["role"] == "group":
+                res = self.servico_comunicacao.enviar_mensagem_grupo(
+                    self.usuario_logado_id, txt
+                )
+            else:
+                res = self.servico_comunicacao.enviar_mensagem(
+                    self.usuario_logado_id, self.conversa_ativa["id"], txt
+                )
+            if res["success"]:
+                self.carregar_mensagens()
+                self.entry_mensagem.delete(0, "end")
+                self.carregar_contador_nao_lidas()
+                self.atualizar_lista_contatos()
+        except Exception as e:
+            print(f"Erro ao enviar mensagem: {e}")
+
+    def enviar_msg(self):
+        self.enviar_mensagem()
+
+    def selecionar_categoria(self, categoria: dict):
+        import tkinter.filedialog as fd
+        exts = categoria.get("extensao", [])
+        if exts:
+            tipos = [(f"{categoria['nome']} (*{e})", f"*{e}") for e in exts]
+            tipos.append((f"Todos {categoria['nome']}", " ".join(f"*{e}" for e in exts)))
+        else:
+            tipos = [("Todos os arquivos", "*.*")]
+        arq = fd.askopenfilename(
+            title=f"Selecionar {categoria['nome'].lower()}", filetypes=tipos
+        )
+        if arq:
+            self.enviar_arquivo(arq, categoria["nome"])
+
+    def enviar_arquivo(self, caminho: str, categoria: str):
+        if not self.conversa_ativa:
+            return
+        try:
+            nome = os.path.basename(caminho)
+            if self.conversa_ativa["role"] == "group":
+                res = self.servico_comunicacao.enviar_mensagem_grupo(
+                    self.usuario_logado_id, nome, caminho, categoria
+                )
+            else:
+                res = self.servico_comunicacao.enviar_mensagem(
+                    self.usuario_logado_id, self.conversa_ativa["id"],
+                    nome, caminho, categoria
+                )
+            if res["success"]:
+                self.carregar_mensagens()
+            self.modal_arquivos.grid_remove()
+        except Exception as e:
+            print(f"Erro ao enviar arquivo: {e}")
+
+    def visualizar_arquivo(self, caminho: str):
+        import webbrowser
+        try:
+            webbrowser.open(caminho)
+        except Exception as e:
+            print(f"Erro ao visualizar: {e}")
+
+    def download_arquivo(self, caminho: str, nome: str):
+        import tkinter.filedialog as fd
+        try:
+            destino = fd.asksaveasfilename(
+                title="Salvar arquivo", initialfile=nome,
+                filetypes=[("Todos os arquivos", "*.*")],
+            )
+            if destino:
+                import shutil
+                shutil.copy2(caminho, destino)
+        except Exception as e:
+            print(f"Erro ao salvar: {e}")
+
+    # ══════════════════════════════════════════
+    #  Atualização periódica
+    # ══════════════════════════════════════════
+    def _iniciar_atualizacao_periodica(self):
         def task():
             while self.atualizacao_periodica:
                 time.sleep(5)
                 if not self.atualizando:
-                    self.atualizar_dados_conversa()
+                    self._atualizar_dados()
         threading.Thread(target=task, daemon=True).start()
 
-    def atualizar_dados_conversa(self):
+    def iniciar_atualizacao_periodica(self):
+        self._iniciar_atualizacao_periodica()
+
+    def _atualizar_dados(self):
         if not hasattr(self, "winfo_exists") or not self.winfo_exists():
             self.atualizacao_periodica = False
             return
@@ -120,336 +946,64 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             if self.conversa_atual:
                 self.carregar_mensagens()
         except Exception as e:
-            if "invalid command name" not in str(e) and "TCL error" not in str(e):
-                print(f"Erro na atualização periódica: {e}")
+            if "invalid command name" not in str(e):
+                print(f"Erro na atualização: {e}")
         finally:
             self.atualizando = False
 
+    def atualizar_dados_conversa(self):
+        self._atualizar_dados()
+
+    def carregar_contador_nao_lidas(self):
+        try:
+            data = self.servico_comunicacao.contar_mensagens_nao_lidas(
+                self.usuario_logado_id
+            )
+            if data and data.get("success"):
+                self.contador_nao_lidas = data["data"]
+        except Exception as e:
+            print(f"Erro ao carregar contador: {e}")
+
     def atualizar_lista_contatos(self):
+        """Atualiza badges de não-lidas sem redesenhar a lista inteira."""
         if not hasattr(self, "scroll_contacts") or not self.scroll_contacts.winfo_exists():
             return
-        for widget in self.scroll_contacts.winfo_children():
-            if hasattr(widget, "contato_data") and widget.winfo_exists():
-                contato = widget.contato_data
-                unread = self.contador_nao_lidas.get(contato["id"], 0)
-                badge = None
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkFrame) and child.winfo_exists():
-                        for grandchild in child.winfo_children():
-                            if isinstance(grandchild, ctk.CTkLabel) and grandchild.cget("text").isdigit():
-                                badge = child
-                                break
-                        if badge:
-                            break
-                if unread > 0:
-                    if not badge:
-                        info_frame = next((ch for ch in widget.winfo_children() if isinstance(ch, ctk.CTkFrame) and ch.cget("fg_color") == "transparent"), None)
-                        if info_frame and info_frame.winfo_exists():
-                            badge = ctk.CTkFrame(info_frame, fg_color=THEME["danger"], corner_radius=RADIUS["pill"])
-                            badge.pack(side="right", padx=10)
-                            Badge(badge, text=str(unread)).pack()
-                    else:
-                        for child in badge.winfo_children():
-                            if isinstance(child, ctk.CTkLabel) and child.winfo_exists():
-                                child.configure(text=str(unread))
-                else:
-                    if badge and badge.winfo_exists():
-                        badge.destroy()
-
-    def filtrar_contatos(self, event):
-        termo_busca = (self.entry_busca.get() if hasattr(self, "entry_busca") else "").lower()
-        for widget in self.scroll_contacts.winfo_children():
-            widget.destroy()
-        for i, c in enumerate(self.contatos):
-            if termo_busca in c["name"].lower() or termo_busca in c["role"].lower():
-                avatar = self.get_avatar_por_papel(c["role"])
-                self.criar_contato_item({
-                    "id": c["id"], "name": c["name"],
-                    "msg": "Grupo de todos" if c["role"] == "group" else f"Online ({c['role']})",
-                    "active": c["is_staff"], "unread": 0, "img": avatar, "role": c["role"],
-                }, is_first=(i == 0))
-
-    def selecionar_conversa(self, contato, item_widget=None):
-        for widget in self.scroll_contacts.winfo_children():
-            if hasattr(widget, "contato_data"):
-                widget.configure(fg_color="transparent")
-        if item_widget:
-            item_widget.configure(fg_color=THEME["primary_soft"])
-        self.conversa_ativa = contato
-        self.conversa_atual = contato
-        self.lbl_chat_nome.configure(text=contato["name"])
-        self.lbl_chat_status.configure(text="Grupo de comunicação" if contato["role"] == "group" else contato["role"].capitalize())
-        avatar = self.get_avatar_por_papel(contato["role"])
-        img_h = self.load_image(avatar, (42, 42))
-        try:
-            for widget in self.lbl_chat_nome.master.master.winfo_children():
-                if isinstance(widget, ctk.CTkLabel) and widget.cget("image"):
-                    widget.configure(image=img_h)
-                    break
-        except Exception as e:
-            print(f"Erro ao atualizar avatar: {e}")
-        self.carregar_mensagens()
-
-    def carregar_mensagens(self):
-        if not self.conversa_ativa or not hasattr(self, "winfo_exists") or not self.winfo_exists():
-            return
-        try:
-            if self.conversa_ativa["role"] == "group":
-                resultado = self.servico_comunicacao.obter_mensagens_grupo()
+        for cid, widget in self._contact_widgets.items():
+            if not widget.winfo_exists():
+                continue
+            unread = self.contador_nao_lidas.get(cid, 0)
+            badge  = getattr(widget, "_badge_frame", None)
+            if badge is None:
+                continue
+            if unread > 0:
+                lbl = next(
+                    (c for c in badge.winfo_children() if isinstance(c, ctk.CTkLabel)),
+                    None,
+                )
+                if lbl:
+                    lbl.configure(text=str(unread))
+                badge.grid()
             else:
-                resultado = self.servico_comunicacao.obter_mensagens(self.usuario_logado_id, self.conversa_ativa["id"])
-            if resultado["success"]:
-                novas = resultado["data"]
-                if self.mensagens != novas:
-                    self.mensagens = novas
-                    self.atualizar_area_mensagens()
-        except Exception as e:
-            if "invalid command name" not in str(e) and "TCL error" not in str(e):
-                print(f"Erro ao carregar mensagens: {e}")
+                badge.grid_remove()
 
-    def marcar_mensagens_lidas(self):
-        for msg in self.mensagens:
-            if not msg.get("read"):
-                try:
-                    self.servico_comunicacao.marcar_mensagem_lida(msg.get("id"))
-                except Exception as e:
-                    print(f"Erro ao marcar mensagem como lida: {e}")
-
-    def atualizar_area_mensagens(self):
-        if not hasattr(self, "msg_area") or not self.msg_area.winfo_exists():
-            return
-        for widget in self.msg_area.winfo_children():
-            if widget.winfo_exists():
-                widget.destroy()
-        ctk.CTkLabel(self.msg_area, text="HOJE", font=themed_font("overline", "bold"), text_color=THEME["text_muted"], fg_color=THEME["bg_alt"], corner_radius=RADIUS["pill"], width=72).pack(pady=16)
-        for msg in self.mensagens:
-            self.criar_mensagem(msg)
-
-    def criar_mensagem(self, msg):
-        is_mine = msg["sender_id"] == self.usuario_logado_id
-        remetente_nome = "Eu" if is_mine else self.obter_nome_remetente(msg["sender_id"])
-        frame = ctk.CTkFrame(self.msg_area, fg_color="transparent")
-        frame.pack(fill="x", pady=8)
-        frame.msg_data = msg
-        align = "right" if is_mine else "left"
-        bubble_color = THEME["bubble_sent"] if is_mine else THEME["bubble_recv"]
-        text_color = THEME["text_on_primary"] if is_mine else THEME["text"]
-        wrapper = ctk.CTkFrame(frame, fg_color="transparent")
-        wrapper.pack(side=align, padx=12)
-        bubble = ctk.CTkFrame(wrapper, fg_color=bubble_color, corner_radius=RADIUS["xl"], border_width=1 if not is_mine else 0, border_color=THEME["border"])
-        bubble.pack(side="top")
-        if self.conversa_ativa and self.conversa_ativa["role"] == "group" and not is_mine:
-            ctk.CTkLabel(bubble, text=remetente_nome, font=themed_font("body", "bold"), text_color=text_color, wraplength=400, justify="left").pack(padx=14, pady=(10, 0))
-        if "caminho_arquivo" in msg:
-            self.criar_mensagem_arquivo(bubble, msg, text_color)
-        else:
-            pad_config = (0 if (self.conversa_ativa and self.conversa_ativa["role"] == "group" and not is_mine) else 10, 10)
-            lbl = ctk.CTkLabel(bubble, text=msg["text"], font=themed_font("body"), text_color=text_color, wraplength=400, justify="left")
-            lbl.pack(padx=14, pady=pad_config)
-        info = ctk.CTkFrame(wrapper, fg_color="transparent")
-        info.pack(side="top", fill="x", pady=2)
-        timestamp = datetime.datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
-        time_str = timestamp.strftime("%H:%M")
-        ctk.CTkLabel(info, text=time_str, font=themed_font("overline"), text_color=THEME["text_disabled"]).pack(side=align)
-        if is_mine:
-            ctk.CTkLabel(info, text="✓✓", font=themed_font("overline"), text_color=THEME["primary"]).pack(side=align, padx=6)
-
-    def criar_mensagem_arquivo(self, bubble, msg, text_color):
-        nome_arquivo = os.path.basename(msg["caminho_arquivo"])
-        tamanho_arquivo = os.path.getsize(msg["caminho_arquivo"])
-        tamanho_str = self.formatar_tamanho_arquivo(tamanho_arquivo)
-        card_arquivo = ctk.CTkFrame(bubble, fg_color=THEME["bg_alt"], corner_radius=RADIUS["md"], border_width=1, border_color=THEME["border"])
-        card_arquivo.pack(padx=14, pady=10, fill="x")
-        icone_arquivo = "📄"
-        tipo = msg.get("tipo_arquivo", "")
-        mapping = {"Imagens": "🖼️", "Videos": "🎥", "Audio": "🎵", "Planilhas": "📊", "Presentações": "📽️", "Arquivos Zip": "🗜️", "Code": "💻"}
-        icone_arquivo = mapping.get(tipo, "📄")
-        ctk.CTkLabel(card_arquivo, text=icone_arquivo, font=themed_font("h2")).pack(side="left", padx=12, pady=10)
-        info_arquivo = ctk.CTkFrame(card_arquivo, fg_color="transparent")
-        info_arquivo.pack(side="left", fill="both", expand=True, padx=8, pady=10)
-        ctk.CTkLabel(info_arquivo, text=nome_arquivo, font=themed_font("body", "bold"), text_color=text_color, wraplength=260, justify="left").pack(anchor="w")
-        ctk.CTkLabel(info_arquivo, text=tamanho_str, font=themed_font("overline"), text_color=THEME["text_muted"]).pack(anchor="w")
-        botoes = ctk.CTkFrame(card_arquivo, fg_color="transparent")
-        botoes.pack(side="right", padx=10, pady=10)
-        GhostButton(botoes, text="👁️", width=32, height=32, corner_radius=RADIUS["pill"], command=lambda: self.visualizar_arquivo(msg["caminho_arquivo"])).pack(side="top", pady=2)
-        GhostButton(botoes, text="📥", width=32, height=32, corner_radius=RADIUS["pill"], command=lambda: self.download_arquivo(msg["caminho_arquivo"], nome_arquivo)).pack(side="top", pady=2)
-
-    def visualizar_arquivo(self, caminho_arquivo):
-        import webbrowser
-        try:
-            webbrowser.open(caminho_arquivo)
-        except Exception as e:
-            print(f"Erro ao visualizar arquivo: {e}")
-
-    def download_arquivo(self, caminho_arquivo, nome_arquivo):
-        import tkinter.filedialog as fd
-        try:
-            destino = fd.asksaveasfilename(title="Salvar arquivo", initialfile=nome_arquivo, filetypes=[("Todos os arquivos", "*.*")])
-            if destino:
-                import shutil
-                shutil.copy2(caminho_arquivo, destino)
-        except Exception as e:
-            print(f"Erro ao download arquivo: {e}")
-
-    def obter_nome_remetente(self, id_remetente):
-        for contato in self.contatos:
-            if contato["id"] == id_remetente:
-                return contato["name"]
+    # ══════════════════════════════════════════
+    #  Utilitários
+    # ══════════════════════════════════════════
+    def obter_nome_remetente(self, id_remetente) -> str:
+        for c in self.contatos:
+            if c["id"] == id_remetente:
+                return c["name"]
         return f"Usuário {id_remetente}"
 
-    def enviar_mensagem(self):
-        txt = self.entry_mensagem.get()
-        if txt and self.conversa_ativa:
-            try:
-                if self.conversa_ativa["role"] == "group":
-                    resultado = self.servico_comunicacao.enviar_mensagem_grupo(self.usuario_logado_id, txt)
-                else:
-                    resultado = self.servico_comunicacao.enviar_mensagem(self.usuario_logado_id, self.conversa_ativa["id"], txt)
-                if resultado["success"]:
-                    self.carregar_mensagens()
-                    self.entry_mensagem.delete(0, "end")
-                    self.carregar_contador_nao_lidas()
-                    self.atualizar_lista_contatos()
-            except Exception as e:
-                print(f"Erro ao enviar mensagem: {e}")
+    @staticmethod
+    def _formatar_tamanho(b: int) -> str:
+        if b < 1024:
+            return f"{b} B"
+        if b < 1024 ** 2:
+            return f"{b / 1024:.1f} KB"
+        if b < 1024 ** 3:
+            return f"{b / 1024**2:.1f} MB"
+        return f"{b / 1024**3:.1f} GB"
 
-    def enviar_msg(self):
-        self.enviar_mensagem()
-
-    def criar_contato_item(self, contato, is_first=False):
-        item = ctk.CTkFrame(self.scroll_contacts, fg_color="transparent", height=68)
-        item.pack(fill="x", padx=8, pady=(0, 6))
-        item.pack_propagate(False)
-        item.contato_data = contato
-        img = self.load_image(contato["img"], (44, 44))
-        lbl_avatar = ctk.CTkLabel(item, text="", image=img, width=44, height=44, corner_radius=RADIUS["pill"], fg_color=THEME["border"])
-        lbl_avatar.pack(side="left", padx=(4, 10))
-        info = ctk.CTkFrame(item, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True)
-        ctk.CTkLabel(info, text=contato["name"], font=themed_font("body", "bold"), text_color=THEME["text"]).pack(anchor="w", pady=(8, 0))
-        ctk.CTkLabel(info, text=contato["msg"], font=themed_font("overline"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(2, 8))
-        if contato.get("unread", 0) > 0:
-            Badge(info, text=str(contato["unread"])).pack(side="right", padx=10)
-        item.bind("<Button-1>", lambda e: self.selecionar_conversa(contato, item))
-        if is_first:
-            self.selecionar_conversa(contato, item)
-
-    def get_avatar_por_papel(self, papel):
-        avatares = {"admin": "avatar-1.jpg", "analista": "avatar-2.jpg", "coordenador": "avatar-3.jpg", "suporte": "avatar-4.jpg", "group": "avatar-6.jpg"}
-        return avatares.get(papel, "avatar-6.jpg")
-
-    def criar_chat_area(self):
-        container = ctk.CTkFrame(self, fg_color=THEME["bg_chat"], corner_radius=0)
-        container.grid(row=0, column=1, sticky="nsew")
-        container.grid_rowconfigure(1, weight=1)
-        container.grid_columnconfigure(0, weight=1)
-        header = ctk.CTkFrame(container, fg_color=THEME["card"], height=80, corner_radius=0, border_width=1, border_color=THEME["border"])
-        header.grid(row=0, column=0, sticky="ew")
-        header.grid_propagate(False)
-        inner_h = ctk.CTkFrame(header, fg_color="transparent")
-        inner_h.pack(fill="both", expand=True, padx=20, pady=8)
-        user_info = ctk.CTkFrame(inner_h, fg_color="transparent")
-        user_info.pack(side="left")
-        img_h = self.load_image("avatar-2.jpg", (42, 42))
-        self.label_avatar = ctk.CTkLabel(user_info, text="", image=img_h, width=42, height=42, corner_radius=21, fg_color=THEME["border"])
-        self.label_avatar.pack(side="left", padx=(0, 12))
-        title_v = ctk.CTkFrame(user_info, fg_color="transparent")
-        title_v.pack(side="left")
-        self.lbl_chat_nome = ctk.CTkLabel(title_v, text="Dra. Beatriz Clara", font=themed_font("h3", "bold"), text_color=THEME["text"])
-        self.lbl_chat_nome.pack(anchor="w")
-        self.lbl_chat_status = ctk.CTkLabel(title_v, text="Online agora", font=themed_font("body"), text_color=THEME["success"])
-        self.lbl_chat_status.pack(anchor="w")
-        actions = ctk.CTkFrame(inner_h, fg_color="transparent")
-        actions.pack(side="right")
-        btn_style = {"width": 40, "height": 40, "corner_radius": RADIUS["pill"], "fg_color": "transparent", "hover_color": THEME["bg_alt"], "text_color": THEME["text_muted"]}
-        GhostButton(actions, text="📷", **btn_style).pack(side="left", padx=4)
-        GhostButton(actions, text="📞", **btn_style).pack(side="left", padx=4)
-        GhostButton(actions, text="⋮", **btn_style).pack(side="left", padx=4)
-
-        self.msg_area = ctk.CTkScrollableFrame(container, fg_color="transparent")
-        self.msg_area.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
-
-        input_container = ctk.CTkFrame(container, fg_color=THEME["card"], height=100, corner_radius=0, border_width=1, border_color=THEME["border"])
-        input_container.grid(row=2, column=0, sticky="ew")
-        input_container.grid_propagate(False)
-        box = ctk.CTkFrame(input_container, fg_color=THEME["bg_alt"], height=56, corner_radius=RADIUS["pill"], border_width=1, border_color=THEME["border"])
-        box.pack(fill="x", padx=20, pady=16)
-        box.pack_propagate(False)
-        self.btn_clip = GhostButton(box, text="📎", width=40, height=40, corner_radius=RADIUS["pill"], command=self.toggle_modal_arquivos)
-        self.btn_clip.pack(side="left", padx=10)
-        self.entry_mensagem = ctk.CTkEntry(box, placeholder_text="Digite sua mensagem...", fg_color="transparent", border_width=0, font=themed_font("body"))
-        self.entry_mensagem.pack(side="left", fill="both", expand=True)
-        self.entry_mensagem.bind("<Return>", lambda e: self.enviar_mensagem())
-        actions_in = ctk.CTkFrame(box, fg_color="transparent")
-        actions_in.pack(side="right", padx=10)
-        GhostButton(actions_in, text="😊", width=40, height=40, corner_radius=RADIUS["pill"]).pack(side="left", padx=4)
-        self.btn_enviar = PrimaryButton(actions_in, text="➤", width=44, height=44, corner_radius=RADIUS["pill"], command=self.enviar_mensagem)
-        self.btn_enviar.pack(side="left", padx=(6, 0))
-        self.criar_modal_arquivos(container)
-
-    def toggle_modal_arquivos(self):
-        if self.modal_arquivos.winfo_manager():
-            self.modal_arquivos.grid_remove()
-        else:
-            btn_x = self.btn_clip.winfo_x()
-            btn_y = max(10, self.btn_clip.winfo_y() - 280)
-            self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=(btn_x + 25, 0), pady=(btn_y, 0))
-
-    def criar_modal_arquivos(self, parent):
-        self.modal_arquivos = ctk.CTkFrame(parent, fg_color=THEME["card"], corner_radius=RADIUS["card"], border_width=1, border_color=THEME["border"])
-        self.modal_arquivos.grid(row=2, column=0, sticky="w", padx=20, pady=0)
-        self.modal_arquivos.grid_remove()
-        categorias = [
-            {"nome": "Documentos", "icone": "📄", "extensao": [".pdf", ".doc", ".docx", ".txt", ".xls", ".xlsx"]},
-            {"nome": "Imagens", "icone": "🖼️", "extensao": [".jpg", ".jpeg", ".png", ".gif", ".bmp"]},
-            {"nome": "Videos", "icone": "🎥", "extensao": [".mp4", ".avi", ".mov", ".wmv"]},
-            {"nome": "Audio", "icone": "🎵", "extensao": [".mp3", ".wav", ".ogg"]},
-            {"nome": "Planilhas", "icone": "📊", "extensao": [".xls", ".xlsx", ".csv"]},
-            {"nome": "Presentações", "icone": "📽️", "extensao": [".ppt", ".pptx"]},
-            {"nome": "Arquivos Zip", "icone": "🗜️", "extensao": [".zip", ".rar", ".7z"]},
-            {"nome": "Code", "icone": "💻", "extensao": [".py", ".js", ".html", ".css"]},
-            {"nome": "Todos", "icone": "📁", "extensao": []},
-        ]
-        for row in range(3):
-            self.modal_arquivos.grid_rowconfigure(row, minsize=60)
-        for col in range(3):
-            self.modal_arquivos.grid_columnconfigure(col, minsize=80)
-        for i, cat in enumerate(categorias):
-            btn = ctk.CTkButton(self.modal_arquivos, text=f"{cat['icone']}\n{cat['nome']}", font=themed_font("overline"), height=60, corner_radius=RADIUS["md"], fg_color=THEME["bg_alt"], hover_color=THEME["border"], text_color=THEME["text"], command=lambda c=cat: self.selecionar_categoria(c))
-            btn.grid(row=i // 3, column=i % 3, padx=5, pady=5)
-
-    def selecionar_categoria(self, categoria):
-        import tkinter.filedialog as fd
-        if categoria["extensao"]:
-            tipos = [(f"{categoria['nome']} (*{ext})", f"*{ext}") for ext in categoria["extensao"]]
-            tipos.append((f"Todos {categoria['nome']}", " ".join([f"*{ext}" for ext in categoria["extensao"]])))
-        else:
-            tipos = [("Todos os arquivos", "*.*")]
-        arquivo = fd.askopenfilename(title=f"Selecione um arquivo {categoria['nome'].lower()}", filetypes=tipos)
-        if arquivo:
-            self.enviar_arquivo(arquivo, categoria["nome"])
-
-    def enviar_arquivo(self, caminho_arquivo, categoria):
-        if not self.conversa_ativa:
-            return
-        try:
-            nome_arquivo = os.path.basename(caminho_arquivo)
-            if self.conversa_ativa["role"] == "group":
-                resultado = self.servico_comunicacao.enviar_mensagem_grupo(self.usuario_logado_id, nome_arquivo, caminho_arquivo, categoria)
-            else:
-                resultado = self.servico_comunicacao.enviar_mensagem(self.usuario_logado_id, self.conversa_ativa["id"], nome_arquivo, caminho_arquivo, categoria)
-            if resultado["success"]:
-                self.carregar_mensagens()
-            self.modal_arquivos.grid_remove()
-        except Exception as e:
-            print(f"Erro ao enviar arquivo: {e}")
-
-    def formatar_tamanho_arquivo(self, bytes):
-        if bytes < 1024:
-            return f"{bytes} B"
-        elif bytes < 1024 * 1024:
-            return f"{round(bytes / 1024, 1)} KB"
-        elif bytes < 1024 * 1024 * 1024:
-            return f"{round(bytes / (1024 * 1024), 1)} MB"
-        else:
-            return f"{round(bytes / (1024 * 1024 * 1024), 1)} GB"
+    def formatar_tamanho_arquivo(self, b: int) -> str:
+        return self._formatar_tamanho(b)

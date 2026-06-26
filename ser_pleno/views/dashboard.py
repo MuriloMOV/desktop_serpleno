@@ -1,146 +1,328 @@
 import customtkinter as ctk
 import threading
 from services.dashboard import ServicoDashboard
-from ui_theme import THEME, SPACING, RADIUS, font, themed_font, blend_color, lighten
+from ui_theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
 from components.ui_components import (
-    PageHeader, SectionHeader, Card, KPICard, EmptyState,
+    PageHeader, Card, KPICard, EmptyState,
     PrimaryButton, GhostButton, Badge, Pill, Divider,
-    Avatar, MetricCard, ListCard, SkeletonLoader, Toast
+    Avatar, SkeletonLoader,
 )
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Paleta dedicada à tela de Dashboard
+#  Design tokens – família índigo (consistente com login e app)
 # ══════════════════════════════════════════════════════════════════════════════
-DASH_COLORS = {
-    "kpi_card_bg":     THEME["surface"],
-    "section_bg":      THEME["bg_alt"],
-    "agenda_row":      THEME["bg_alt"],
-    "alerta_row":      THEME["danger_soft"],
-    "alerta_text":     THEME["danger_strong"],
-    "chart_line":      THEME["primary"],
-    "chart_fill":      blend_color(THEME["primary"], 0.08),
-    "chart_bg":        THEME["surface"],
-    "dot_good":        THEME["success"],
-    "dot_warn":        THEME["warning"],
-    "dot_bad":         THEME["danger"],
+D = {
+    # Fundo geral
+    "page_bg":          "#F8F7FF",   # branco com toque lavanda
+    "card_bg":          "#FFFFFF",
+    "card_border":      "#E5E7EB",
+    "card_radius":      16,
+
+    # KPI cores de acento
+    "kpi_blue":         "#4F46E5",   # índigo
+    "kpi_green":        "#059669",   # esmeralda
+    "kpi_red":          "#DC2626",   # vermelho
+    "kpi_violet":       "#7C3AED",   # violeta
+    "kpi_amber":        "#D97706",   # âmbar
+
+    # KPI pastel (bg do ícone)
+    "kpi_blue_soft":    "#EEF2FF",
+    "kpi_green_soft":   "#D1FAE5",
+    "kpi_red_soft":     "#FEE2E2",
+    "kpi_violet_soft":  "#EDE9FE",
+    "kpi_amber_soft":   "#FEF3C7",
+
+    # Texto
+    "text":             "#111827",
+    "text_muted":       "#6B7280",
+    "text_light":       "#9CA3AF",
+
+    # Gráfico
+    "chart_line":       "#4F46E5",
+    "chart_fill":       "#EEF2FF",
+    "chart_grid":       "#E5E7EB",
+    "dot_good":         "#059669",
+    "dot_warn":         "#D97706",
+    "dot_bad":          "#DC2626",
+
+    # Seções
+    "agenda_row_bg":    "#F8F7FF",
+    "agenda_row_hover": "#EEF2FF",
+    "alerta_row_bg":    "#FEF2F2",
+    "alerta_text":      "#DC2626",
+
+    # Bem-estar
+    "be_academic":      "#4F46E5",
+    "be_emotional":     "#EC4899",
+    "be_social":        "#059669",
+
+    # Divider
+    "divider":          "#F3F4F6",
+
+    # Badge notificação
+    "badge_bg":         "#DC2626",
+    "badge_text":       "#FFFFFF",
 }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Componentes reutilizáveis extraídos para classes próprias
+#  Componentes auxiliares
 # ══════════════════════════════════════════════════════════════════════════════
 
-class AgendaItemRow(ctk.CTkFrame):
-    """Linha individual de item na seção de agenda."""
-    def __init__(self, parent, appt: dict):
-        super().__init__(parent, fg_color=DASH_COLORS["agenda_row"], corner_radius=RADIUS["md"])
-        self.appt = appt
-        self._build()
+class _SectionCard(ctk.CTkFrame):
+    """Card padrão de seção com título e corpo."""
+    def __init__(self, parent, title: str, action_text: str = "",
+                 action_cmd=None, badge_text: str = ""):
+        super().__init__(
+            parent,
+            fg_color=D["card_bg"],
+            corner_radius=D["card_radius"],
+            border_width=1,
+            border_color=D["card_border"],
+        )
 
-    def _build(self):
-        info = ctk.CTkFrame(self, fg_color="transparent")
-        info.pack(side="left", padx=18, pady=14)
+        # ── Cabeçalho do card ────────────────────────────────────────────
+        header = ctk.CTkFrame(self, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=(16, 0))
 
-        ctk.CTkLabel(
-            info, text=self.appt.get("student_name", "?"),
-            font=themed_font("body", "bold"), text_color=THEME["text"]
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            info,
-            text=f"🎓  {self.appt.get('curso', '')}",
-            font=themed_font("overline"), text_color=THEME["text_muted"]
-        ).pack(anchor="w", pady=(2, 0))
+        title_row = ctk.CTkFrame(header, fg_color="transparent")
+        title_row.pack(side="left", fill="x")
 
         ctk.CTkLabel(
-            self, text=f"🕒  {self.appt.get('time', '')}",
-            font=themed_font("body", "bold"), text_color=THEME["primary"]
-        ).pack(side="right", padx=18)
-
-
-class AlertaItemRow(ctk.CTkFrame):
-    """Linha individual de item na seção de alertas."""
-    def __init__(self, parent, student: dict):
-        super().__init__(parent, fg_color=DASH_COLORS["alerta_row"], corner_radius=RADIUS["md"])
-        self.student = student
-        self._build()
-
-    def _build(self):
-        info = ctk.CTkFrame(self, fg_color="transparent")
-        info.pack(side="left", padx=18, pady=14)
-
-        ctk.CTkLabel(
-            info, text=self.student.get("name", "?"),
-            font=themed_font("body", "bold"), text_color=THEME["text"]
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            info,
-            text=self.student.get("attention_reason", ""),
-            font=themed_font("body_sm"), text_color=DASH_COLORS["alerta_text"]
-        ).pack(anchor="w", pady=(2, 0))
-
-        priority = self.student.get("priority_level", 0)
-        icon_pri = {0: "🟡", 1: "🟠", 2: "🔴"}.get(priority, "🟡")
-
-        ctk.CTkLabel(self, text=icon_pri, font=themed_font("h3")).pack(side="right", padx=18)
-
-
-class BemEstarDimensionBar(ctk.CTkFrame):
-    """Barra de progresso para uma dimensão de bem-estar."""
-    def __init__(self, parent, nome: str, valor: float, color: str):
-        super().__init__(parent, fg_color="transparent")
-        self.valor = max(0.0, min(1.0, valor))  # clamp 0..1
-        self.color = color
-        self.nome = nome
-        self._build()
-
-    def _build(self):
-        container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="x", pady=10)
-
-        header = ctk.CTkFrame(container, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 6))
-
-        ctk.CTkLabel(
-            header, text=self.nome,
-            font=themed_font("body_sm"), text_color=THEME["text"]
+            title_row, text=title,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color=D["text"],
         ).pack(side="left")
 
-        ctk.CTkLabel(
-            header, text=f"{int(self.valor * 100)}%",
-            font=themed_font("body_sm", "bold"), text_color=self.color
-        ).pack(side="right")
+        if badge_text:
+            badge = ctk.CTkFrame(
+                title_row, width=22, height=22,
+                corner_radius=11, fg_color=D["badge_bg"],
+            )
+            badge.pack(side="left", padx=(6, 0))
+            badge.pack_propagate(False)
+            ctk.CTkLabel(
+                badge, text=badge_text,
+                font=ctk.CTkFont("Segoe UI", 10, "bold"),
+                text_color=D["badge_text"],
+            ).place(relx=0.5, rely=0.5, anchor="center")
 
-        prog = ctk.CTkProgressBar(
-            container, height=6, progress_color=self.color,
-            fg_color=THEME["bg_alt"], corner_radius=RADIUS["pill"]
+        if action_text and action_cmd:
+            ctk.CTkButton(
+                header, text=action_text,
+                command=action_cmd,
+                font=ctk.CTkFont("Segoe UI", 11),
+                fg_color="transparent",
+                hover_color=D["kpi_blue_soft"],
+                text_color=D["kpi_blue"],
+                height=28, corner_radius=8,
+            ).pack(side="right")
+
+        ctk.CTkFrame(self, height=1, fg_color=D["divider"]).pack(
+            fill="x", padx=20, pady=(12, 0)
         )
-        prog.pack(fill="x", pady=(4, 0))
-        prog.set(self.valor)
+
+        # ── Corpo ────────────────────────────────────────────────────────
+        self.body = ctk.CTkFrame(self, fg_color="transparent")
+        self.body.pack(fill="both", expand=True, padx=16, pady=(8, 16))
 
 
-class IndicatorFooter(ctk.CTkFrame):
-    """Indicador compacto com ícone, label e valor para o chart."""
-    def __init__(self, parent, icon: str, label: str, val: str):
+class _KPICard(ctk.CTkFrame):
+    """Card de KPI redesenhado: ícone num círculo colorido, valor grande, label."""
+    def __init__(self, parent, title: str, value: str, icon: str,
+                 accent: str, soft: str, sub: str = ""):
+        super().__init__(
+            parent,
+            fg_color=D["card_bg"],
+            corner_radius=D["card_radius"],
+            border_width=1,
+            border_color=D["card_border"],
+        )
+
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=18, pady=16)
+
+        # Linha superior: ícone + valor
+        top = ctk.CTkFrame(inner, fg_color="transparent")
+        top.pack(fill="x")
+
+        # Círculo ícone
+        icon_bg = ctk.CTkFrame(
+            top, width=42, height=42,
+            corner_radius=12, fg_color=soft,
+        )
+        icon_bg.pack(side="left")
+        icon_bg.pack_propagate(False)
+        ctk.CTkLabel(
+            icon_bg, text=icon,
+            font=ctk.CTkFont("Segoe UI", 18),
+        ).place(relx=0.5, rely=0.5, anchor="center")
+
+        # Valor numérico grande
+        ctk.CTkLabel(
+            top, text=value,
+            font=ctk.CTkFont("Segoe UI", 28, "bold"),
+            text_color=D["text"],
+        ).pack(side="right", anchor="e")
+
+        # Linha inferior: título + sub
+        ctk.CTkLabel(
+            inner, text=title,
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            text_color=D["text"],
+            anchor="w",
+        ).pack(fill="x", pady=(10, 2))
+
+        if sub:
+            ctk.CTkLabel(
+                inner, text=sub,
+                font=ctk.CTkFont("Segoe UI", 11),
+                text_color=D["text_muted"],
+                anchor="w",
+            ).pack(fill="x")
+
+        # Barra de acento na base
+        ctk.CTkFrame(
+            self, height=3,
+            corner_radius=0, fg_color=accent,
+        ).pack(side="bottom", fill="x")
+
+
+class _AgendaRow(ctk.CTkFrame):
+    """Linha de item de agenda com estilo refinado."""
+    def __init__(self, parent, appt: dict):
+        super().__init__(
+            parent,
+            fg_color=D["agenda_row_bg"],
+            corner_radius=10,
+        )
+        self._build(appt)
+
+    def _build(self, appt):
+        # Barra colorida lateral
+        ctk.CTkFrame(
+            self, width=3, corner_radius=2, fg_color=D["kpi_blue"],
+        ).pack(side="left", fill="y", padx=(10, 12), pady=10)
+
+        info = ctk.CTkFrame(self, fg_color="transparent")
+        info.pack(side="left", pady=12, fill="x", expand=True)
+
+        ctk.CTkLabel(
+            info, text=appt.get("student_name", "?"),
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color=D["text"], anchor="w",
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            info, text=appt.get("curso", ""),
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=D["text_muted"], anchor="w",
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Hora
+        time_frame = ctk.CTkFrame(
+            self, fg_color=D["kpi_blue_soft"],
+            corner_radius=8,
+        )
+        time_frame.pack(side="right", padx=14, pady=12)
+        ctk.CTkLabel(
+            time_frame,
+            text=f"🕒  {appt.get('time', '')}",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=D["kpi_blue"],
+        ).pack(padx=10, pady=5)
+
+
+class _AlertaRow(ctk.CTkFrame):
+    """Linha de estudante em alerta."""
+    _PRIORITY_COLOR = {0: D["kpi_amber"], 1: "#F97316", 2: D["kpi_red"], 3: D["kpi_red"]}
+    _PRIORITY_LABEL = {0: "Moderado", 1: "Alto", 2: "Crítico", 3: "Crítico"}
+    _PRIORITY_ICON  = {0: "🟡", 1: "🟠", 2: "🔴", 3: "🔴"}
+
+    def __init__(self, parent, student: dict):
+        super().__init__(
+            parent,
+            fg_color=D["alerta_row_bg"],
+            corner_radius=10,
+        )
+        self._build(student)
+
+    def _build(self, student):
+        priority = student.get("priority_level", 0)
+        bar_color = self._PRIORITY_COLOR.get(priority, D["kpi_amber"])
+
+        ctk.CTkFrame(
+            self, width=3, corner_radius=2, fg_color=bar_color,
+        ).pack(side="left", fill="y", padx=(10, 12), pady=10)
+
+        info = ctk.CTkFrame(self, fg_color="transparent")
+        info.pack(side="left", pady=12, fill="x", expand=True)
+
+        ctk.CTkLabel(
+            info, text=student.get("name", "?"),
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color=D["text"], anchor="w",
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            info, text=student.get("attention_reason", ""),
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=D["alerta_text"], anchor="w",
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Chip de prioridade
+        chip = ctk.CTkFrame(
+            self, fg_color=D["kpi_red_soft"], corner_radius=8,
+        )
+        chip.pack(side="right", padx=14, pady=12)
+        ctk.CTkLabel(
+            chip,
+            text=f"{self._PRIORITY_ICON[priority]}  {self._PRIORITY_LABEL.get(priority, '')}",
+            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            text_color=D["kpi_red"],
+        ).pack(padx=8, pady=4)
+
+
+class _BemEstarBar(ctk.CTkFrame):
+    """Barra de progresso de dimensão de bem-estar."""
+    def __init__(self, parent, nome: str, valor: float, color: str, soft: str):
         super().__init__(parent, fg_color="transparent")
-        self._build(icon, label, val)
+        self._build(nome, max(0.0, min(1.0, valor)), color, soft)
 
-    def _build(self, icon, label, val):
-        ctk.CTkLabel(self, text=icon, font=themed_font("h3")).pack()
+    def _build(self, nome, valor, color, soft):
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(fill="x")
+
         ctk.CTkLabel(
-            self, text=label,
-            font=themed_font("overline"), text_color=THEME["text_muted"]
-        ).pack()
+            row, text=nome,
+            font=ctk.CTkFont("Segoe UI", 12),
+            text_color=D["text"], anchor="w",
+        ).pack(side="left")
+
+        pct_frame = ctk.CTkFrame(row, fg_color=soft, corner_radius=6)
+        pct_frame.pack(side="right")
         ctk.CTkLabel(
-            self, text=val,
-            font=themed_font("body", "bold"), text_color=THEME["text"]
-        ).pack()
+            pct_frame,
+            text=f"{int(valor * 100)}%",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=color,
+        ).pack(padx=8, pady=2)
+
+        bar_bg = ctk.CTkFrame(self, fg_color="#F3F4F6", corner_radius=4, height=7)
+        bar_bg.pack(fill="x", pady=(6, 0))
+        bar_bg.pack_propagate(False)
+
+        fill_w = max(1, int(valor * 1000))  # proporcional em 1000 unidades
+        fill_frame = ctk.CTkFrame(
+            bar_bg, fg_color=color, corner_radius=4, height=7,
+            width=fill_w,
+        )
+        fill_frame.pack(side="left", fill="y")
 
 
 class NotificationPanel(ctk.CTkToplevel):
-    """Modal de notificações (ajuda ou alertas)."""
+    """Modal de notificações."""
     def __init__(self, parent, titulo: str, notificacoes: list, tipo: str,
                  on_mark_read=None, on_mark_all_read=None):
         super().__init__(parent)
@@ -149,91 +331,108 @@ class NotificationPanel(ctk.CTkToplevel):
         self.tipo = tipo
         self.on_mark_read = on_mark_read
         self.on_mark_all_read = on_mark_all_read
-        self._setup_window()
+        self._setup()
         self._build()
 
-    def _setup_window(self):
+    def _setup(self):
         self.title(self.titulo)
-        self.geometry("540x460")
+        self.geometry("520x480")
         self.resizable(False, False)
-        self.configure(fg_color=THEME["surface"])
+        self.configure(fg_color="#FFFFFF")
         self.attributes("-topmost", True)
         self.transient(self.winfo_toplevel())
-
         self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - 270
-        y = (self.winfo_screenheight() // 2) - 230
-        self.geometry(f"540x460+{x}+{y}")
+        x = self.winfo_screenwidth() // 2 - 260
+        y = self.winfo_screenheight() // 2 - 240
+        self.geometry(f"520x480+{x}+{y}")
 
     def _build(self):
-        icon_color = THEME["info"] if self.tipo == "ajuda" else THEME["danger"]
+        is_ajuda = self.tipo == "ajuda"
+        accent   = D["kpi_blue"] if is_ajuda else D["kpi_red"]
+        soft     = D["kpi_blue_soft"] if is_ajuda else D["kpi_red_soft"]
+        icon_txt = "🤝" if is_ajuda else "🔔"
 
-        header = ctk.CTkFrame(self, fg_color=THEME["bg"])
-        header.pack(fill="x", padx=24, pady=(18, 0))
+        # Cabeçalho
+        header = ctk.CTkFrame(self, fg_color=soft, corner_radius=0)
+        header.pack(fill="x")
+
+        hinner = ctk.CTkFrame(header, fg_color="transparent")
+        hinner.pack(fill="x", padx=24, pady=14)
 
         ctk.CTkLabel(
-            header, text=self.titulo,
-            font=themed_font("h3", "bold"), text_color=THEME["text"]
+            hinner, text=f"{icon_txt}  {self.titulo}",
+            font=ctk.CTkFont("Segoe UI", 15, "bold"),
+            text_color=accent,
         ).pack(side="left")
 
-        GhostButton(
-            header, text="Marcar todas como lidas",
-            command=self._mark_all_read, width=160
+        ctk.CTkButton(
+            hinner, text="Marcar todas como lidas",
+            command=self._mark_all_read,
+            height=30, corner_radius=8,
+            font=ctk.CTkFont("Segoe UI", 11),
+            fg_color=accent, hover_color=blend_color(accent, 0.8),
+            text_color="white",
         ).pack(side="right")
 
-        list_frame = ctk.CTkScrollableFrame(self, fg_color="transparent")
-        list_frame.pack(fill="both", expand=True, padx=24, pady=16)
+        # Lista
+        lst = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        lst.pack(fill="both", expand=True, padx=20, pady=12)
 
         if not self.notificacoes:
             EmptyState(
-                list_frame, icon="📭", title="Sem alertas",
-                subtitle=f"Nenhuma notificação de {self.tipo} no momento"
-            ).pack(pady=36)
+                lst, icon="📭", title="Sem notificações",
+                subtitle=f"Nenhuma notificação de {self.tipo} no momento",
+            ).pack(pady=40)
         else:
             for notif in self.notificacoes:
-                self._create_item(list_frame, notif)
+                self._create_item(lst, notif, accent, soft, icon_txt)
 
-    def _create_item(self, parent, notif: dict):
-        item_frame = Card(parent)
-        item_frame.pack(fill="x", pady=6, padx=4)
-
-        icon_text = "🤝" if self.tipo == "ajuda" else "🔔"
-        icon_color = THEME["info"] if self.tipo == "ajuda" else THEME["danger"]
-
-        icon_bg = ctk.CTkFrame(
-            item_frame.body, fg_color=blend_color(icon_color, 0.12),
-            width=34, height=34, corner_radius=RADIUS["sm"]
+    def _create_item(self, parent, notif, accent, soft, icon_txt):
+        row = ctk.CTkFrame(
+            parent, fg_color=soft,
+            corner_radius=10,
         )
-        icon_bg.pack(side="left", padx=(0, 12))
-        icon_bg.pack_propagate(False)
+        row.pack(fill="x", pady=4)
+        row.pack_propagate(False)
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=14, pady=10)
+        inner.grid_columnconfigure(1, weight=1)
+
+        # Ícone
+        icon_bg = ctk.CTkFrame(
+            inner, width=34, height=34, corner_radius=8, fg_color=accent,
+        )
+        icon_bg.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="n", pady=(2, 0))
+        icon_bg.grid_propagate(False)
         ctk.CTkLabel(
-            icon_bg, text=icon_text, font=themed_font("body")
+            icon_bg, text=icon_txt,
+            font=ctk.CTkFont("Segoe UI", 14),
+            text_color="white",
         ).place(relx=0.5, rely=0.5, anchor="center")
 
-        text_frame = ctk.CTkFrame(item_frame.body, fg_color="transparent")
-        text_frame.pack(side="left", fill="both", expand=True)
+        ctk.CTkLabel(
+            inner, text=notif.get("titulo", ""),
+            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            text_color=D["text"], anchor="w",
+        ).grid(row=0, column=1, sticky="w")
 
         ctk.CTkLabel(
-            text_frame, text=notif.get("titulo", ""),
-            font=themed_font("body", "bold"), text_color=THEME["text"]
-        ).pack(anchor="w")
+            inner, text=notif.get("descricao", ""),
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=D["text_muted"], anchor="w",
+        ).grid(row=1, column=1, sticky="w")
 
         ctk.CTkLabel(
-            text_frame, text=notif.get("descricao", ""),
-            font=themed_font("body_sm"), text_color=THEME["text_muted"]
-        ).pack(anchor="w", pady=(2, 0))
+            inner, text=notif.get("data", ""),
+            font=ctk.CTkFont("Segoe UI", 10),
+            text_color=D["text_light"], anchor="e",
+        ).grid(row=0, column=2, sticky="ne", padx=(8, 0))
 
-        ctk.CTkLabel(
-            text_frame, text=notif.get("data", ""),
-            font=themed_font("overline"), text_color=THEME["text_disabled"]
-        ).pack(anchor="w", pady=(3, 0))
+        row.bind("<Button-1>",
+                 lambda e, nid=notif["id"], t=self.tipo: self._on_click(nid, t))
 
-        item_frame.bind(
-            "<Button-1>",
-            lambda e, nid=notif["id"], t=self.tipo: self._on_click_item(nid, t)
-        )
-
-    def _on_click_item(self, notif_id, tipo):
+    def _on_click(self, notif_id, tipo):
         if self.on_mark_read:
             self.on_mark_read(notif_id, tipo)
         self.destroy()
@@ -248,42 +447,47 @@ class ProfileModal(ctk.CTkToplevel):
     """Modal de perfil do usuário."""
     def __init__(self, parent, user_data: dict, on_edit=None):
         super().__init__(parent)
-        self.user_data = user_data
+        self.user_data = user_data or {}
         self.on_edit = on_edit
-        self._setup_window()
+        self._setup()
         self._build()
 
-    def _setup_window(self):
-        self.title("Perfil do Usuário")
-        self.geometry("440x360")
+    def _setup(self):
+        self.title("Meu Perfil")
+        self.geometry("440x380")
         self.resizable(False, False)
-        self.configure(fg_color=THEME["surface"])
+        self.configure(fg_color="#FFFFFF")
         self.attributes("-topmost", True)
         self.transient(self.winfo_toplevel())
-
         self.update_idletasks()
-        x = (self.winfo_screenwidth() // 2) - 220
-        y = (self.winfo_screenheight() // 2) - 180
-        self.geometry(f"440x360+{x}+{y}")
+        x = self.winfo_screenwidth() // 2 - 220
+        y = self.winfo_screenheight() // 2 - 190
+        self.geometry(f"440x380+{x}+{y}")
 
     def _build(self):
-        if not self.user_data:
-            return
-
-        top = ctk.CTkFrame(self, fg_color="transparent")
-        top.pack(fill="x", padx=24, pady=(24, 12))
+        # Banner de topo
+        banner = ctk.CTkFrame(self, fg_color=D["kpi_blue_soft"], corner_radius=0, height=80)
+        banner.pack(fill="x")
 
         initials = (
             (self.user_data.get("first_name", "") or "")[0:1] +
-            (self.user_data.get("last_name", "") or "")[0:1]
+            (self.user_data.get("last_name",  "") or "")[0:1]
         ).upper() or self.user_data.get("username", "?")[:2].upper()
 
-        Avatar(top, initials=initials, size=56, color=THEME["primary"]).pack(
-            side="left", padx=(0, 14)
+        av = ctk.CTkFrame(
+            self, width=64, height=64,
+            corner_radius=32, fg_color=D["kpi_blue"],
         )
+        av.place(x=28, y=48)
+        av.pack_propagate(False)
+        ctk.CTkLabel(
+            av, text=initials,
+            font=ctk.CTkFont("Segoe UI", 22, "bold"),
+            text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
 
-        info = ctk.CTkFrame(top, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True)
+        body = ctk.CTkFrame(self, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=28, pady=(40, 20))
 
         nome = (
             f"{self.user_data.get('first_name', '')} "
@@ -291,86 +495,96 @@ class ProfileModal(ctk.CTkToplevel):
         ).strip() or self.user_data.get("username", "Usuário")
 
         ctk.CTkLabel(
-            info, text=nome,
-            font=themed_font("h3", "bold"), text_color=THEME["text"]
+            body, text=nome,
+            font=ctk.CTkFont("Segoe UI", 16, "bold"),
+            text_color=D["text"], anchor="w",
         ).pack(anchor="w")
 
         ctk.CTkLabel(
-            info, text=self.user_data.get("email", ""),
-            font=themed_font("body"), text_color=THEME["text_muted"]
-        ).pack(anchor="w", pady=(2, 0))
+            body, text=self.user_data.get("email", ""),
+            font=ctk.CTkFont("Segoe UI", 12),
+            text_color=D["text_muted"], anchor="w",
+        ).pack(anchor="w", pady=(2, 6))
 
-        Pill(
-            info, text="Analista Escolar",
-            color=THEME["primary_soft"], text_color=THEME["primary"]
-        ).pack(anchor="w", pady=(6, 0))
+        # Chip de função
+        chip = ctk.CTkFrame(body, fg_color=D["kpi_blue_soft"], corner_radius=8)
+        chip.pack(anchor="w")
+        ctk.CTkLabel(
+            chip, text="Analista Escolar",
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=D["kpi_blue"],
+        ).pack(padx=10, pady=4)
 
-        self._profile_section()
-        PrimaryButton(
-            self, text="Editar Perfil", command=self._edit, width=160
-        ).pack(pady=(22, 14))
+        ctk.CTkFrame(body, height=1, fg_color=D["card_border"]).pack(
+            fill="x", pady=12
+        )
 
-    def _profile_section(self):
-        if not self.user_data:
-            return
-        frame = ctk.CTkFrame(self, fg_color=THEME["bg"], corner_radius=RADIUS["lg"])
-        frame.pack(fill="x", padx=24, pady=8)
+        # Rows de info
+        for label, value in [
+            ("Usuário",  self.user_data.get("username", "")),
+            ("Função",   "Analista Escolar"),
+            ("Módulos",  "Dashboard, Estudantes, Agenda, Bem-Estar"),
+        ]:
+            self._row(body, label, value)
 
-        self._profile_row(frame, "Nome de usuário", self.user_data.get("username", ""))
-        self._profile_row(frame, "Função", "Analista Escolar")
-        self._profile_row(frame, "Módulos", "Dashboard, Estudantes, Agenda, Bem-Estar")
+        ctk.CTkButton(
+            self, text="Editar Perfil",
+            command=lambda: self.on_edit() if self.on_edit else None,
+            height=38, corner_radius=10, width=160,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            fg_color=D["kpi_blue"], hover_color="#4338CA",
+            text_color="white",
+        ).pack(pady=(4, 20))
 
-    def _profile_row(self, parent, label, value):
+    def _row(self, parent, label, value):
         row = ctk.CTkFrame(parent, fg_color="transparent")
-        row.pack(fill="x", padx=20, pady=(10, 0))
+        row.pack(fill="x", pady=3)
 
         ctk.CTkLabel(
-            row, text=label,
-            font=themed_font("overline"), text_color=THEME["text_muted"]
-        ).pack(anchor="w")
+            row, text=label, width=90,
+            font=ctk.CTkFont("Segoe UI", 11),
+            text_color=D["text_muted"], anchor="w",
+        ).pack(side="left")
 
         ctk.CTkLabel(
             row, text=value,
-            font=themed_font("body", "bold"), text_color=THEME["text"]
-        ).pack(anchor="w", pady=(1, 0))
-
-    def _edit(self):
-        if self.on_edit:
-            self.on_edit()
+            font=ctk.CTkFont("Segoe UI", 11, "bold"),
+            text_color=D["text"], anchor="w",
+        ).pack(side="left")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Frame Principal – Dashboard
+#  Frame principal – DashboardFrame
 # ══════════════════════════════════════════════════════════════════════════════
 
 class DashboardFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=THEME["bg"])
+        super().__init__(
+            parent,
+            fg_color=D["page_bg"],
+            scrollbar_button_color="#C7D2FE",
+            scrollbar_button_hover_color="#A5B4FC",
+        )
         self.controller = controller
         self.servico_dashboard = ServicoDashboard()
-        self.grid_columnconfigure(0, weight=1)
 
         self._criar_cabecalho()
-        self._criar_container_kpi()
+        self._criar_kpi_container()
         self._criar_grid_principal()
         self._carregar_dados()
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Ciclo de vida e dados
+    #  Dados
     # ──────────────────────────────────────────────────────────────────────
-
     def _carregar_dados(self):
         self._mostrar_skeletons()
-
         def fetch():
             data = self.servico_dashboard.obter_kpis()
             self.after(0, lambda: self._atualizar_dashboard(data))
-            self.after(0, lambda: self._atualizar_badge_notificacoes())
-
+            self.after(0, self._atualizar_badge_notificacoes)
         threading.Thread(target=fetch, daemon=True).start()
 
     def _atualizar_dashboard(self, data):
-        """Atualiza toda a interface do dashboard com os dados recebidos."""
         self._render_kpis(data)
         self._atualizar_secao_agenda(data)
         self._atualizar_secao_alertas(data)
@@ -378,436 +592,395 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._atualizar_secao_humor(data)
 
     # ──────────────────────────────────────────────────────────────────────
-    #  KPIs
+    #  Cabeçalho
     # ──────────────────────────────────────────────────────────────────────
+    def _criar_cabecalho(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=28, pady=(20, 4))
 
-    def _criar_container_kpi(self):
-        self.kpi_container = ctk.CTkFrame(self, fg_color="transparent")
-        self.kpi_container.pack(
-            fill="x", padx=SPACING["page_x"],
-            pady=(16, SPACING["section_gap"])
+        # Saudação
+        left = ctk.CTkFrame(bar, fg_color="transparent")
+        left.pack(side="left")
+
+        ctk.CTkLabel(
+            left, text="Dashboard Central",
+            font=ctk.CTkFont("Segoe UI", 22, "bold"),
+            text_color=D["text"],
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            left,
+            text="Visão geral do acompanhamento discente",
+            font=ctk.CTkFont("Segoe UI", 13),
+            text_color=D["text_muted"],
+        ).pack(anchor="w", pady=(2, 0))
+
+        # Botões do lado direito
+        right = ctk.CTkFrame(bar, fg_color="transparent")
+        right.pack(side="right")
+
+        # Ícone ajuda
+        help_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=10,
+                               fg_color=D["kpi_blue_soft"], cursor="hand2")
+        help_f.pack(side="left", padx=4)
+        help_f.pack_propagate(False)
+        help_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_ajuda())
+        ctk.CTkLabel(
+            help_f, text="🤝",
+            font=ctk.CTkFont("Segoe UI", 16),
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        self.help_badge = self._criar_badge(help_f)
+
+        # Ícone alertas
+        alert_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=10,
+                                fg_color=D["kpi_red_soft"], cursor="hand2")
+        alert_f.pack(side="left", padx=4)
+        alert_f.pack_propagate(False)
+        alert_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_alertas())
+        ctk.CTkLabel(
+            alert_f, text="🔔",
+            font=ctk.CTkFont("Segoe UI", 16),
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        self.alert_badge = self._criar_badge(alert_f)
+
+        # Avatar
+        name = ""
+        if self.controller.usuario_logado:
+            name = self.controller.usuario_logado.get("username", "?")[:2].upper()
+        av_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=10,
+                             fg_color=D["kpi_blue"], cursor="hand2")
+        av_f.pack(side="left", padx=(8, 0))
+        av_f.pack_propagate(False)
+        av_f.bind("<Button-1>", lambda e: self._abrir_perfil())
+        ctk.CTkLabel(
+            av_f, text=name,
+            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
+
+        # Divider
+        ctk.CTkFrame(self, height=1, fg_color=D["card_border"]).pack(
+            fill="x", padx=28, pady=(12, 0)
         )
+
+    def _criar_badge(self, parent) -> ctk.CTkFrame:
+        badge = ctk.CTkFrame(
+            parent, width=18, height=18,
+            corner_radius=9, fg_color=D["badge_bg"],
+        )
+        ctk.CTkLabel(
+            badge, text="0",
+            font=ctk.CTkFont("Segoe UI", 9, "bold"),
+            text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        return badge
+
+    # ──────────────────────────────────────────────────────────────────────
+    #  KPI row
+    # ──────────────────────────────────────────────────────────────────────
+    def _criar_kpi_container(self):
+        self.kpi_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.kpi_frame.pack(fill="x", padx=28, pady=(18, 0))
 
     def _mostrar_skeletons(self):
-        kpis = [
-            {"titulo": "Atendimentos do Dia"},
-            {"titulo": "Vagas Disponíveis"},
-            {"titulo": "Alertas Ativos"},
-            {"titulo": "Total de Estudantes"},
-            {"titulo": "Humor Médio"},
-        ]
-
-        self._limpar_container(self.kpi_container)
-        for i, kpi in enumerate(kpis):
-            self.kpi_container.grid_columnconfigure(i, weight=1)
+        self._limpar(self.kpi_frame)
+        for i in range(5):
+            self.kpi_frame.grid_columnconfigure(i, weight=1)
             SkeletonLoader(
-                self.kpi_container, width=180, height=110, variant="card"
-            ).grid(row=0, column=i, sticky="ew", padx=6)
-
-        self._mostrar_skeletons_secao_agenda()
-        self._mostrar_skeletons_secao_alertas()
-        self._mostrar_skeletons_secao_bem_estar()
-
-    def _mostrar_skeletons_secao_agenda(self):
-        card = self._criar_container_card(
-            self.left_col, "📅  Próximos Atendimentos", "Ver agenda completa →"
-        )
-        self._limpar_container(card.body)
-        for _ in range(3):
-            SkeletonLoader(card.body, width=400, height=64, variant="card").pack(
-                fill="x", pady=4
-            )
-
-    def _mostrar_skeletons_secao_alertas(self):
-        card = self._criar_container_card(
-            self.right_col, "🔔  Estudantes em Alerta", status="Alerta"
-        )
-        self._limpar_container(card.body)
-        for _ in range(2):
-            SkeletonLoader(card.body, width=260, height=64, variant="card").pack(
-                fill="x", pady=4
-            )
-
-    def _mostrar_skeletons_secao_bem_estar(self):
-        card = self._criar_container_card(
-            self.right_col, "❤  Bem-Estar por Dimensão"
-        )
-        self._limpar_container(card.body)
-        for _ in range(3):
-            SkeletonLoader(card.body, width=260, height=48, variant="text").pack(
-                fill="x", pady=6
-            )
+                self.kpi_frame, width=180, height=110, variant="card"
+            ).grid(row=0, column=i, sticky="ew", padx=5)
 
     def _render_kpis(self, data):
-        self._limpar_container(self.kpi_container)
-
+        self._limpar(self.kpi_frame)
         media_humor = data.get("media_humor")
-        humor_emoji = self.get_humor_emoji(media_humor)
+        humor_emoji = self._humor_emoji(media_humor)
 
         kpis = [
-            {"titulo": "Atendimentos do Dia", "valor": str(data.get("appointments_today", 0)),
-             "icone": "👥", "cor": THEME["primary"], "trend": "Hoje", "unit": ""},
-            {"titulo": "Vagas Disponíveis",   "valor": str(data.get("available_slots", 0)),
-             "icone": "📅", "cor": THEME["success"], "trend": "Slots livres", "unit": ""},
-            {"titulo": "Alertas Ativos",       "valor": str(data.get("alerts", 0)),
-             "icone": "🔔", "cor": THEME["danger"], "trend": "Requer ação", "unit": ""},
-            {"titulo": "Total de Estudantes",  "valor": str(data.get("total_students", 0)),
-             "icone": "👥", "cor": THEME["accent"], "trend": "Cadastrados", "unit": ""},
-            {"titulo": "Humor Médio",          "valor": f"{media_humor:.1f}" if media_humor else "—",
-             "icone": humor_emoji, "cor": THEME["warning"], "trend": "Média", "unit": "/ 5"},
+            ("Atendimentos Hoje", str(data.get("appointments_today", 0)),
+             "👥", D["kpi_blue"],   D["kpi_blue_soft"],  "Atendimentos marcados"),
+            ("Vagas Disponíveis", str(data.get("available_slots", 0)),
+             "📅", D["kpi_green"],  D["kpi_green_soft"], "Horários livres"),
+            ("Alertas Ativos",    str(data.get("alerts", 0)),
+             "🔔", D["kpi_red"],    D["kpi_red_soft"],   "Requerem atenção"),
+            ("Total de Estudantes", str(data.get("total_students", 0)),
+             "🎓", D["kpi_violet"], D["kpi_violet_soft"],"Alunos cadastrados"),
+            ("Humor Médio",
+             f"{media_humor:.1f}/5" if media_humor else "—",
+             humor_emoji, D["kpi_amber"], D["kpi_amber_soft"], "Média dos últimos 30 dias"),
         ]
 
-        for i, kpi in enumerate(kpis):
-            self.kpi_container.grid_columnconfigure(i, weight=1)
-            card = KPICard(
-                self.kpi_container, title=kpi["titulo"], value=kpi["valor"],
-                icon=kpi["icone"], accent=kpi["cor"], trend=kpi.get("trend", ""),
-                unit=kpi.get("unit", ""), size="default" if i < 3 else "compact"
-            )
-            card.grid(row=0, column=i, sticky="ew", padx=6)
-            card.bind("<Enter>",   lambda e, c=card: c.configure(cursor="hand2"))
-            card.bind("<Leave>",   lambda e, c=card: c.configure(cursor=""))
+        for i, (title, value, icon, accent, soft, sub) in enumerate(kpis):
+            self.kpi_frame.grid_columnconfigure(i, weight=1)
+            _KPICard(
+                self.kpi_frame, title, value, icon, accent, soft, sub,
+            ).grid(row=0, column=i, sticky="ew", padx=5)
+
+    # ──────────────────────────────────────────────────────────────────────
+    #  Grid principal
+    # ──────────────────────────────────────────────────────────────────────
+    def _criar_grid_principal(self):
+        grid = ctk.CTkFrame(self, fg_color="transparent")
+        grid.pack(fill="both", expand=True, padx=28, pady=18)
+        grid.grid_columnconfigure(0, weight=3)
+        grid.grid_columnconfigure(1, weight=2)
+
+        self.left_col = ctk.CTkFrame(grid, fg_color="transparent")
+        self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        self.right_col = ctk.CTkFrame(grid, fg_color="transparent")
+        self.right_col.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+        # Card do gráfico (na esquerda)
+        self._criar_card_chart()
+
+    def _criar_card_chart(self):
+        self.chart_card = _SectionCard(self.left_col, "📈  Humor dos Estudantes — últimos 30 dias")
+        self.chart_card.pack(fill="x", pady=(0, 14))
+
+        self.canvas = ctk.CTkCanvas(
+            self.chart_card.body,
+            bg=D["card_bg"],
+            height=230,
+            highlightthickness=0,
+        )
+        self.canvas.pack(fill="both", expand=True, padx=4, pady=(4, 8))
+        self.chart_card.body.bind("<Configure>", lambda e: self._draw_chart())
 
     # ──────────────────────────────────────────────────────────────────────
     #  Seções
     # ──────────────────────────────────────────────────────────────────────
-
     def _atualizar_secao_agenda(self, data):
-        card = self._criar_container_card(
-            self.left_col, "📅  Próximos Atendimentos", "Ver agenda completa →"
+        self._limpar(self.left_col)
+        # Recria o card do gráfico (que foi limpo)
+        self._criar_card_chart()
+
+        card = _SectionCard(
+            self.left_col, "📅  Próximos Atendimentos",
+            action_text="Ver agenda →",
+            action_cmd=self.controller.mostrar_agenda,
         )
-        self._limpar_container(card.body)
+        card.pack(fill="x", pady=(0, 14))
 
         appointments = data.get("upcoming_appointments", [])
         if appointments:
             for appt in appointments:
-                AgendaItemRow(card.body, appt).pack(fill="x", pady=5)
+                _AgendaRow(card.body, appt).pack(fill="x", pady=3)
         else:
-            self._render_empty_agenda(card.body)
+            EmptyState(
+                card.body, icon="📅",
+                title="Nenhum atendimento próximo",
+                subtitle="Não há agendamentos futuros",
+            ).pack(pady=10)
 
     def _atualizar_secao_alertas(self, data):
-        card = self._criar_container_card(
-            self.right_col, "🔔  Estudantes em Alerta", status="Alerta"
+        n_alerts = len(data.get("attention_students", []))
+        card = _SectionCard(
+            self.right_col, "🔴  Estudantes em Alerta",
+            badge_text=str(n_alerts) if n_alerts else "",
+            action_text="Ver todos →",
+            action_cmd=self.controller.mostrar_estudantes,
         )
-        self._limpar_container(card.body)
+        card.pack(fill="x", pady=(0, 14))
 
-        attention_students = data.get("attention_students", [])
-        if attention_students:
-            for student in attention_students:
-                AlertaItemRow(card.body, student).pack(fill="x", pady=5)
+        students = data.get("attention_students", [])
+        if students:
+            for s in students:
+                _AlertaRow(card.body, s).pack(fill="x", pady=3)
         else:
-            self._render_empty_alerts(card.body)
+            EmptyState(
+                card.body, icon="✔",
+                title="Tudo sob controle",
+                subtitle="Nenhum estudante em alerta",
+            ).pack(pady=10)
 
     def _atualizar_secao_bem_estar(self, data):
-        card = self._criar_container_card(
-            self.right_col, "❤  Bem-Estar por Dimensão"
-        )
-        self._limpar_container(card.body)
+        card = _SectionCard(self.right_col, "💚  Bem-Estar por Dimensão")
+        card.pack(fill="x", pady=(0, 14))
 
-        bem_estar = data.get("bem_estar_dimensions", {})
-        rows = [
-            ("📁  Acadêmico", bem_estar.get("academico", 0) / 5, THEME["primary"]),
-            ("❤  Emocional",  bem_estar.get("emocional", 0) / 5, THEME["danger"]),
-            ("👥  Social",    bem_estar.get("social", 0) / 5,    THEME["success"]),
+        be = data.get("bem_estar_dimensions", {})
+        dims = [
+            ("📁  Acadêmico", be.get("academico", 0) / 5, D["be_academic"], D["kpi_blue_soft"]),
+            ("💗  Emocional",  be.get("emocional", 0) / 5, D["be_emotional"], "#FCE7F3"),
+            ("👥  Social",    be.get("social",    0) / 5, D["be_social"],   D["kpi_green_soft"]),
         ]
-        for nome, val, color in rows:
-            BemEstarDimensionBar(card.body, nome, val, color).pack(fill="x", pady=10)
+        for nome, val, color, soft in dims:
+            _BemEstarBar(card.body, nome, val, color, soft).pack(
+                fill="x", padx=4, pady=8
+            )
 
     def _atualizar_secao_humor(self, data):
         humor_history = data.get("humor_history", [])
-        if humor_history:
-            self._draw_chart(humor_history)
-            self._limpar_container(self.stats_side)
-
-            total = sum(item["media_humor"] for item in humor_history)
-            media_geral = round(total / len(humor_history), 2) if humor_history else 0
-            IndicatorFooter(
-                self.stats_side,
-                self.get_humor_emoji(media_geral), "Média Geral", f"{media_geral}/5"
-            ).pack()
-        else:
-            self._draw_chart()
+        self._draw_chart(humor_history if humor_history else None)
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Chart (canvas 2D)
+    #  Gráfico canvas
     # ──────────────────────────────────────────────────────────────────────
-
     def _draw_chart(self, humor_history=None):
         self.canvas.delete("all")
-        w = self.canvas.winfo_width()
-        h = self.canvas.winfo_height()
-        if w < 80 or h < 80:
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw < 80 or ch < 80:
             return
 
-        if humor_history is None or not humor_history:
-            pts = [2.8, 3.1, 2.9, 3.2, 2.7, 3.5, 3.2, 2.9, 3.0, 3.8, 3.4, 3.6, 3.2, 3.1, 3.9]
-            dates = [
-                "05/01", "07/01", "09/01", "11/01", "13/01", "15/01",
-                "17/01", "19/01", "21/01", "23/01", "25/01", "27/01",
-                "28/01", "29/01", "30/01"
-            ]
+        if not humor_history:
+            pts   = [2.8, 3.1, 2.9, 3.2, 2.7, 3.5, 3.2, 2.9, 3.0, 3.8, 3.4, 3.6, 3.2, 3.1, 3.9]
+            dates = ["05/01", "07/01", "09/01", "11/01", "13/01", "15/01",
+                     "17/01", "19/01", "21/01", "23/01", "25/01", "27/01",
+                     "28/01", "29/01", "30/01"]
         else:
-            pts = [item["media_humor"] for item in humor_history]
+            pts   = [item["media_humor"] for item in humor_history]
             dates = [item.get("data", "") for item in humor_history]
             if len(pts) < 2:
-                pts = [pts[0], pts[0]]
+                pts   = [pts[0], pts[0]]
                 dates = [dates[0], dates[0]]
 
-        margin_x, margin_y = 42, 30
-        chart_w, chart_h = w - 2 * margin_x, h - 2 * margin_y
+        mx, my = 44, 24
+        cw2 = cw - 2 * mx
+        ch2 = ch - 2 * my
 
-        coords = []
-        for i, v in enumerate(pts):
-            x = margin_x + (i * chart_w / (len(pts) - 1))
-            y = (h - margin_y) - ((v - 1) * chart_h / 4)
-            coords.append((x, y))
-
-        # Área do gráfico
+        # Fundo
         self.canvas.create_rectangle(
-            margin_x, margin_y, w - margin_x, h - margin_y,
-            fill=DASH_COLORS["chart_bg"], outline=THEME["border"]
+            mx, my, cw - mx, ch - my,
+            fill=D["card_bg"], outline=D["chart_grid"], width=1,
         )
 
-        # Linhas de grade horizontais
-        for i in range(5):
-            gy = margin_y + (i * chart_h / 4)
+        # Grades horizontais e labels Y
+        for i in range(6):
+            val = 1 + i
+            gy  = (ch - my) - (i * ch2 / 5)
             self.canvas.create_line(
-                margin_x, gy, w - margin_x, gy,
-                fill=THEME["border"], dash=(3, 4)
+                mx, gy, cw - mx, gy,
+                fill=D["chart_grid"], dash=(3, 5),
+            )
+            self.canvas.create_text(
+                mx - 6, gy, text=str(val),
+                font=("Segoe UI", 8), fill=D["text_muted"], anchor="e",
             )
 
-        # Linha e área preenchida
-        for i, (x, y) in enumerate(coords[:-1]):
-            nx, ny = coords[i + 1]
+        # Coordenadas dos pontos
+        n = len(pts)
+        coords = [
+            (mx + i * cw2 / (n - 1), (ch - my) - ((v - 1) * ch2 / 4))
+            for i, v in enumerate(pts)
+        ]
+
+        # Área preenchida (gradiente simulado com polygon)
+        poly_pts = []
+        for x, y in coords:
+            poly_pts += [x, y]
+        poly_pts += [coords[-1][0], ch - my, coords[0][0], ch - my]
+        self.canvas.create_polygon(poly_pts, fill=D["chart_fill"], outline="")
+
+        # Linha principal
+        for i in range(len(coords) - 1):
+            x1, y1 = coords[i]
+            x2, y2 = coords[i + 1]
             self.canvas.create_line(
-                x, y, nx, ny, fill=DASH_COLORS["chart_line"],
-                width=2, capstyle="round", joinstyle="round"
-            )
-            self.canvas.create_polygon(
-                x, y, nx, ny, nx, h - margin_y, x, h - margin_y,
-                fill=DASH_COLORS["chart_fill"], outline=""
+                x1, y1, x2, y2,
+                fill=D["chart_line"], width=2,
+                capstyle="round", joinstyle="round",
             )
 
         # Pontos
         for i, (x, y) in enumerate(coords):
-            val = pts[i]
-            dot_color = (
-                DASH_COLORS["dot_bad"] if val < 2.5 else
-                DASH_COLORS["dot_warn"] if val < 3.5 else
-                DASH_COLORS["dot_good"]
-            )
+            v = pts[i]
+            dot = (D["dot_bad"] if v < 2.5 else
+                   D["dot_warn"] if v < 3.5 else D["dot_good"])
             self.canvas.create_oval(
-                x - 5, y - 5, x + 5, y + 5,
-                fill=dot_color, outline=THEME["surface"], width=2
+                x - 4, y - 4, x + 4, y + 4,
+                fill=dot, outline="#FFFFFF", width=2,
             )
 
-        # Labels de data
-        for i, (x, y) in enumerate(coords):
-            if i % max(1, len(coords) // 7) == 0:
+        # Labels X (datas)
+        step = max(1, n // 7)
+        for i, (x, _) in enumerate(coords):
+            if i % step == 0:
                 self.canvas.create_text(
-                    x, h - 8, text=dates[i],
-                    font=("Inter", 8), fill=THEME["text_muted"]
+                    x, ch - 8, text=dates[i],
+                    font=("Segoe UI", 8), fill=D["text_muted"],
                 )
 
-    # ──────────────────────────────────────────────────────────────────────
-    #  Cabeçalho e grid principal
-    # ──────────────────────────────────────────────────────────────────────
+        # Legenda no canto
+        legend = [("● Bom", D["dot_good"]), ("● Atenção", D["dot_warn"]), ("● Baixo", D["dot_bad"])]
+        lx = cw - mx - 4
+        for j, (lbl, lcolor) in enumerate(reversed(legend)):
+            self.canvas.create_text(
+                lx, my + 12 + j * 14, text=lbl,
+                font=("Segoe UI", 8), fill=lcolor, anchor="e",
+            )
 
-    def _criar_cabecalho(self):
-        header = PageHeader(
-            self, title="Dashboard Central",
-            subtitle="Visão geral do acompanhamento discente",
-            show_breadcrumb=True, breadcrumb_parts=["Início", "Dashboard"],
+    # ──────────────────────────────────────────────────────────────────────
+    #  Notificações e badges
+    # ──────────────────────────────────────────────────────────────────────
+    def _abrir_notificacoes_ajuda(self):
+        notifs = self.servico_dashboard.obter_notificacoes_ajuda()
+        NotificationPanel(
+            self, "Notificações de Ajuda", notifs, "ajuda",
+            on_mark_read=self._marcar_lida,
+            on_mark_all_read=self._marcar_todas_lidas,
         )
-        header.pack(fill="x", padx=SPACING["page_x"], pady=(0, SPACING["section_gap"]))
 
-        icons_frame = ctk.CTkFrame(header, fg_color="transparent")
-        icons_frame.pack(side="right", padx=(0, 14))
-
-        # Ícone ajuda
-        help_f = ctk.CTkFrame(icons_frame, fg_color="transparent", width=40, height=40, cursor="hand2")
-        help_f.pack(side="left", padx=6)
-        help_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_ajuda())
-        ctk.CTkLabel(help_f, text="🤝", font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
-        self.help_badge = Badge(help_f, text="0")
-        self.help_badge.place(x=24, y=2)
-
-        # Ícone alertas
-        alert_f = ctk.CTkFrame(icons_frame, fg_color="transparent", width=40, height=40, cursor="hand2")
-        alert_f.pack(side="left", padx=6)
-        alert_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_alertas())
-        ctk.CTkLabel(
-            alert_f, text="🔔", font=themed_font("h3"),
-            text_color=THEME["text_secondary"]
-        ).place(relx=0.5, rely=0.5, anchor="center")
-        self.alert_badge = Badge(alert_f, text="0")
-        self.alert_badge.place(x=24, y=2)
-
-        # Avatar do usuário
-        profile_f = ctk.CTkFrame(icons_frame, fg_color="transparent", width=40, height=40, cursor="hand2")
-        profile_f.pack(side="left", padx=6)
-        profile_f.bind("<Button-1>", lambda e: self._abrir_perfil())
-        name = ""
-        if self.controller.usuario_logado:
-            name = self.controller.usuario_logado.get("username", "?")[:2].upper()
-        Avatar(profile_f, initials=name, size=36)
-
-        # Logout
-        logout_f = ctk.CTkFrame(icons_frame, fg_color="transparent", width=40, height=40, cursor="hand2")
-        logout_f.pack(side="left", padx=6)
-        logout_f.bind("<Button-1>", lambda e: self._fazer_logout())
-        ctk.CTkLabel(
-            logout_f, text="🚪", font=themed_font("h3"),
-            text_color=THEME["text_secondary"]
-        ).place(relx=0.5, rely=0.5, anchor="center")
-
-    def _criar_grid_principal(self):
-        main_grid = ctk.CTkFrame(self, fg_color="transparent")
-        main_grid.pack(fill="x", padx=SPACING["page_x"], pady=10)
-        main_grid.grid_columnconfigure(0, weight=3)
-        main_grid.grid_columnconfigure(1, weight=2)
-
-        self.left_col = ctk.CTkFrame(main_grid, fg_color="transparent")
-        self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, 16))
-
-        self._criar_secao_chart(self.left_col)
-
-        self.right_col = ctk.CTkFrame(main_grid, fg_color="transparent")
-        self.right_col.grid(row=0, column=1, sticky="nsew", padx=(16, 0))
-
-    def _criar_secao_chart(self, parent):
-        card = self._criar_container_card(parent, "📈  Humor dos Estudantes (30 dias)")
-        chart_layout = ctk.CTkFrame(card.body, fg_color="transparent")
-        chart_layout.pack(fill="both", expand=True, padx=20, pady=(0, 20))
-
-        self.canvas = ctk.CTkCanvas(
-            chart_layout, bg=THEME["surface"], height=260, highlightthickness=0
+    def _abrir_notificacoes_alertas(self):
+        notifs = self.servico_dashboard.obter_notificacoes_alertas()
+        NotificationPanel(
+            self, "Notificações de Alerta", notifs, "alerta",
+            on_mark_read=self._marcar_lida,
+            on_mark_all_read=self._marcar_todas_lidas,
         )
-        self.canvas.pack(fill="both", expand=True)
 
-        self.stats_side = ctk.CTkFrame(chart_layout, fg_color="transparent")
-        self.stats_side.pack_forget()
+    def _abrir_perfil(self):
+        ProfileModal(self, self.controller.usuario_logado, on_edit=self._editar_perfil)
 
-        card.body.bind("<Configure>", lambda e: self._draw_chart())
+    def _editar_perfil(self):
+        print("Editar perfil")
+
+    def _atualizar_badge_notificacoes(self):
+        ajuda   = self.servico_dashboard.obter_notificacoes_ajuda()
+        alertas = self.servico_dashboard.obter_notificacoes_alertas()
+        n_ajuda   = sum(1 for n in ajuda   if not n.get("lida", True))
+        n_alertas = sum(1 for n in alertas if not n.get("lida", True))
+        self._set_badge(self.help_badge,  n_ajuda)
+        self._set_badge(self.alert_badge, n_alertas)
+
+    def _set_badge(self, badge: ctk.CTkFrame, count: int):
+        lbl = next((c for c in badge.winfo_children()
+                    if isinstance(c, ctk.CTkLabel)), None)
+        if lbl:
+            lbl.configure(text=str(count) if count else "")
+        if count > 0:
+            badge.place(relx=0.72, rely=0.05)
+        else:
+            badge.place_forget()
+
+    def _marcar_lida(self, notif_id, tipo):
+        self.servico_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
+        self._atualizar_badge_notificacoes()
+
+    def _marcar_todas_lidas(self, tipo):
+        notifs = (self.servico_dashboard.obter_notificacoes_ajuda()
+                  if tipo == "ajuda"
+                  else self.servico_dashboard.obter_notificacoes_alertas())
+        for n in notifs:
+            self.servico_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
+        self._atualizar_badge_notificacoes()
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Helpers de construção de cards
+    #  Utilitários
     # ──────────────────────────────────────────────────────────────────────
-
-    def _criar_container_card(self, parent, titulo, link_txt=None, status=None) -> Card:
-        card = Card(parent, title=titulo, status=status)
-        card.pack(fill="x", pady=(0, SPACING["section_gap"]))
-        if link_txt:
-            first = card.body.winfo_children()[0] if card.body.winfo_children() else None
-            if first:
-                h = first.master if hasattr(first, "master") and isinstance(first.master, ctk.CTkFrame) else card.body
-                link_lbl = ctk.CTkLabel(
-                    h, text=link_txt, font=themed_font("caption"),
-                    text_color=THEME["primary"], cursor="hand2"
-                )
-                link_lbl.pack(side="right")
-        return card
-
     @staticmethod
-    def _limpar_container(widget):
+    def _limpar(widget):
         for child in widget.winfo_children():
             child.destroy()
 
     @staticmethod
-    def _render_empty_agenda(parent):
-        EmptyState(
-            parent, icon="📅", title="Nenhum atendimento próximo",
-            subtitle="Não há agendamentos futuros"
-        ).pack(pady=10)
-
-    @staticmethod
-    def _render_empty_alerts(parent):
-        EmptyState(
-            parent, icon="✔", title="Tudo sob controle",
-            subtitle="Nenhum estudante em alerta no momento"
-        ).pack(pady=10)
-
-    # ──────────────────────────────────────────────────────────────────────
-    #  ações do cabeçalho
-    # ──────────────────────────────────────────────────────────────────────
-
-    def _abrir_notificacoes_ajuda(self):
-        notificacoes = self.servico_dashboard.obter_notificacoes_ajuda()
-        self._abrir_painel_notificacoes("Notificações de Ajuda", notificacoes, "ajuda", THEME["info"])
-
-    def _abrir_notificacoes_alertas(self):
-        notificacoes = self.servico_dashboard.obter_notificacoes_alertas()
-        self._abrir_painel_notificacoes("Notificações de Alertas", notificacoes, "alerta", THEME["danger"])
-
-    def _abrir_painel_notificacoes(self, titulo, notificacoes, tipo, color):
-        NotificationPanel(
-            self, titulo, notificacoes, tipo,
-            on_mark_read=self._marcar_notificacao_como_lida,
-            on_mark_all_read=self._marcar_todas_como_lidas
-        )
-
-    def _abrir_perfil(self):
-        user_data = self.controller.usuario_logado
-        ProfileModal(self, user_data, on_edit=self.editar_perfil)
-
-    def editar_perfil(self):
-        print("Editar perfil")
-
-    def _fazer_logout(self):
-        from tkinter import messagebox
-        if messagebox.askyesno("Logout", "Deseja realmente sair do SerPleno?"):
-            self.controller.mostrar_login()
-
-    # ──────────────────────────────────────────────────────────────────────
-    #  Badges de notificação
-    # ──────────────────────────────────────────────────────────────────────
-
-    def _atualizar_badge_notificacoes(self):
-        ajuda = self.servico_dashboard.obter_notificacoes_ajuda()
-        alertas = self.servico_dashboard.obter_notificacoes_alertas()
-        nao_lidas_ajuda = sum(1 for n in ajuda if not n.get("lida", True))
-        nao_lidas_alertas = sum(1 for n in alertas if not n.get("lida", True))
-
-        self._update_badge(self.help_badge, nao_lidas_ajuda)
-        self._update_badge(self.alert_badge, nao_lidas_alertas)
-
-    def _update_badge(self, badge, count):
-        label = next((c for c in badge.winfo_children() if isinstance(c, ctk.CTkLabel)), None)
-        if label is None:
-            return
-        label.configure(text=str(count) if count > 0 else "")
-        badge.configure(width=max(22, len(str(count)) * 10 + 12))
-        badge.place_forget()
-        if count > 0:
-            badge.place(x=24, y=0)
-
-    def _marcar_notificacao_como_lida(self, notif_id, tipo):
-        self.servico_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
-        self._atualizar_badge_notificacoes()
-
-    def _marcar_todas_como_lidas(self, tipo):
-        notificacoes = (
-            self.servico_dashboard.obter_notificacoes_ajuda()
-            if tipo == "ajuda"
-            else self.servico_dashboard.obter_notificacoes_alertas()
-        )
-        for notif in notificacoes:
-            self.servico_dashboard.marcar_notificacao_como_lida(notif["id"], tipo)
-        self._atualizar_badge_notificacoes()
-
-    # ──────────────────────────────────────────────────────────────────────
-    #  Helpers utilitários
-    # ──────────────────────────────────────────────────────────────────────
-
-    @staticmethod
-    def get_humor_emoji(media_humor):
-        """Retorna emoji correspondente à faixa de humor médio."""
-        if media_humor is None:
-            return "😐"
-        if media_humor < 2.0:
-            return "😢"
-        if media_humor < 3.0:
-            return "😕"
-        if media_humor < 4.0:
-            return "😊"
+    def _humor_emoji(media) -> str:
+        if media is None: return "😐"
+        if media < 2.0:   return "😢"
+        if media < 3.0:   return "😕"
+        if media < 4.0:   return "😊"
         return "😄"
+
+    # Alias legado
+    @staticmethod
+    def get_humor_emoji(media):
+        return DashboardFrame._humor_emoji.__func__(None, media)
