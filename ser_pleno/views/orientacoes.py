@@ -1,13 +1,10 @@
-from __future__ import annotations
-
+import logging
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox, filedialog
 from datetime import datetime, date
-import threading
-import json
-import logging
 from typing import Any
+from utils.async_runner import AsyncRunner
 from services.orientacoes import servico_orientacoes
 from services.estudantes import ServicoEstudante
 from ui_theme import THEME, SPACING, RADIUS, font, themed_font
@@ -25,25 +22,6 @@ logger = logging.getLogger("apps.desktop")
 # ============================================================================
 #  Paleta dedicada
 # ============================================================================
-ORIENTACOES_COLORS: dict[str, str] = {
-    "bg":            THEME["bg"],
-    "card":          THEME["card"],
-    "card_alt":      THEME["bg_alt"],
-    "border":        THEME["border"],
-    "border_strong": THEME["border_strong"],
-    "primary":       THEME["primary"],
-    "primary_light": THEME["primary_light"],
-    "primary_soft":  THEME["primary_soft"],
-    "text":          THEME["text"],
-    "text_muted":    THEME["text_muted"],
-    "text_secondary": THEME["text_secondary"],
-    "danger":        THEME["danger"],
-    "danger_soft":   THEME["danger_soft"],
-    "success":       THEME["success"],
-    "success_soft":  THEME["success_soft"],
-    "warning":       THEME["warning"],
-    "warning_soft":  THEME["warning_soft"],
-}
 
 # ============================================================================
 #  Componentes de apoio
@@ -55,7 +33,7 @@ class FormField(ctk.CTkFrame):
     _BORDER_FOCUS  = THEME["primary"]
     _BORDER_ERROR  = THEME["danger"]
     _BG_NORMAL     = THEME["bg_alt"]
-    _BG_FOCUS      = THEME["card"]
+    _BG_FOCUS      = THEME["surface"]
 
     def __init__(self, parent, label: str, placeholder: str = "",
                  icon: str = "", password: bool = False,
@@ -66,7 +44,7 @@ class FormField(ctk.CTkFrame):
         self._label = ctk.CTkLabel(
             self, text=label,
             font=themed_font("caption", "bold"),
-            text_color=ORIENTACOES_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
             anchor="w",
         )
         self._label.pack(fill="x", pady=(0, 4))
@@ -86,7 +64,7 @@ class FormField(ctk.CTkFrame):
             ctk.CTkLabel(
                 box, text=icon,
                 font=themed_font("body"),
-                text_color=ORIENTACOES_COLORS["text_muted"],
+                text_color=THEME["text_muted"],
                 width=36,
             ).grid(row=0, column=0, padx=(10, 4), pady=8)
 
@@ -149,31 +127,30 @@ class FormField(ctk.CTkFrame):
     def set_error(self, msg: str = ""):
         self._box.configure(
             border_color=self._BORDER_ERROR,
-            fg_color=ORIENTACOES_COLORS["danger_soft"],
+            fg_color=THEME["danger_soft"],
         )
-        self._label.configure(text_color=ORIENTACOES_COLORS["danger"])
+        self._label.configure(text_color=THEME["danger"])
 
     def clear_state(self):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=ORIENTACOES_COLORS["text_muted"])
+        self._label.configure(text_color=THEME["text_muted"])
 
     def _on_focus_in(self, _=None):
         self._box.configure(
             border_color=self._BORDER_FOCUS,
             fg_color=self._BG_FOCUS,
         )
-        self._label.configure(text_color=ORIENTACOES_COLORS["primary"])
+        self._label.configure(text_color=THEME["primary"])
 
     def _on_focus_out(self, _=None):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=ORIENTACOES_COLORS["text_muted"])
-
+        self._label.configure(text_color=THEME["text_muted"])
 
 class StudentCard(ctk.CTkFrame):
     """Card compacto de estudante para a lista lateral."""
@@ -181,10 +158,10 @@ class StudentCard(ctk.CTkFrame):
     def __init__(self, parent, student: dict[str, Any], on_select):
         super().__init__(
             parent,
-            fg_color=ORIENTACOES_COLORS["card"],
+            fg_color=THEME["surface"],
             corner_radius=RADIUS["input"],
             border_width=1,
-            border_color=ORIENTACOES_COLORS["border"],
+            border_color=THEME["border"],
         )
         self._student = student
         self._on_select = on_select
@@ -199,31 +176,30 @@ class StudentCard(ctk.CTkFrame):
         inner.pack(fill="x", padx=14, pady=10)
         avatar = ctk.CTkFrame(
             inner, width=36, height=36,
-            fg_color=ORIENTACOES_COLORS["primary_soft"],
+            fg_color=THEME["primary_soft"],
             corner_radius=18,
         )
         avatar.pack(side="left", padx=(0, 10))
         avatar.pack_propagate(False)
         ctk.CTkLabel(
             avatar, text=initials, font=font(12, "bold"),
-            text_color=ORIENTACOES_COLORS["primary"],
+            text_color=THEME["primary"],
         ).place(relx=0.5, rely=0.5, anchor="center")
         txt = ctk.CTkFrame(inner, fg_color="transparent")
         txt.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(txt, text=nome, font=font(13, "bold"),
-                     text_color=ORIENTACOES_COLORS["text"]).pack(anchor="w")
+                     text_color=THEME["text"]).pack(anchor="w")
         ctk.CTkLabel(txt, text=course, font=font(11),
-                     text_color=ORIENTACOES_COLORS["text_muted"]).pack(anchor="w")
+                     text_color=THEME["text_muted"]).pack(anchor="w")
         for w in (self, inner):
             w.bind("<Button-1>", lambda _: self._on_select(self._student, self))
 
     def set_selected(self, selected: bool) -> None:
         self._selected = selected
         self.configure(
-            fg_color=ORIENTACOES_COLORS["primary_soft"]
-            if selected else ORIENTACOES_COLORS["card"]
+            fg_color=THEME["primary_soft"]
+            if selected else THEME["surface"]
         )
-
 
 class TabButton(ctk.CTkButton):
     """Botão de tab com estilo ativo/inativo."""
@@ -232,15 +208,14 @@ class TabButton(ctk.CTkButton):
         super().__init__(
             parent,
             text=text,
-            fg_color=ORIENTACOES_COLORS["card"] if initial else "transparent",
-            text_color=ORIENTACOES_COLORS["text"] if initial else ORIENTACOES_COLORS["text_muted"],
+            fg_color=THEME["surface"] if initial else "transparent",
+            text_color=THEME["text"] if initial else THEME["text_muted"],
             font=font(12, "bold" if initial else "normal"),
             width=140,
             height=32,
             corner_radius=6,
             command=command,
         )
-
 
 class OrientationHistoryCard(ctk.CTkFrame):
     """Card de orientação exibido no histórico."""
@@ -251,7 +226,7 @@ class OrientationHistoryCard(ctk.CTkFrame):
             fg_color="white",
             corner_radius=RADIUS["card"],
             border_width=1,
-            border_color=ORIENTACOES_COLORS["border"],
+            border_color=THEME["border"],
         )
         self._orientation = orientation
         self._on_view = on_view
@@ -273,29 +248,29 @@ class OrientationHistoryCard(ctk.CTkFrame):
                 pass
         date_circle = ctk.CTkFrame(
             inner, width=40, height=40,
-            fg_color=ORIENTACOES_COLORS["primary_soft"],
+            fg_color=THEME["primary_soft"],
             corner_radius=20,
         )
         date_circle.pack(side="left", padx=(0, 12))
         date_circle.pack_propagate(False)
         ctk.CTkLabel(
             date_circle, text=str(day), font=font(14, "bold"),
-            text_color=ORIENTACOES_COLORS["primary"],
+            text_color=THEME["primary"],
         ).place(relx=0.5, rely=0.5, anchor="center")
         # Info
         info = ctk.CTkFrame(inner, fg_color="transparent")
         info.pack(side="left", fill="x", expand=True)
         title = self._orientation.get("title", "Orientação")
         ctk.CTkLabel(info, text=title, font=font(14, "bold"),
-                     text_color=ORIENTACOES_COLORS["text"]).pack(anchor="w")
+                     text_color=THEME["text"]).pack(anchor="w")
         theme = self._orientation.get("theme", "Geral")
-        Badge(info, text=theme, color=ORIENTACOES_COLORS["primary"]).pack(anchor="w", pady=(4, 0))
+        Badge(info, text=theme, color=THEME["primary"]).pack(anchor="w", pady=(4, 0))
         content = self._orientation.get("content", "")
         if content:
             preview = content[:120] + ("..." if len(content) > 120 else "")
             ctk.CTkLabel(
                 info, text=preview, font=font(10),
-                text_color=ORIENTACOES_COLORS["text_muted"],
+                text_color=THEME["text_muted"],
                 wraplength=320, justify="left",
             ).pack(anchor="w", pady=(4, 0))
         # Ações
@@ -313,10 +288,9 @@ class OrientationHistoryCard(ctk.CTkFrame):
             btns, text="Excluir",
             command=lambda o=orientation_id: self._on_delete(o),
             width=56, height=28,
-            text_color=ORIENTACOES_COLORS["danger"],
-            hover_color=ORIENTACOES_COLORS["danger_soft"],
+            text_color=THEME["danger"],
+            hover_color=THEME["danger_soft"],
         ).pack(side="left")
-
 
 class OrientacoesFrame(ctk.CTkScrollableFrame):
     """Frame principal da página Orientações."""
@@ -349,7 +323,7 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
             wrapper,
             text="Carregando orientações...",
             font=font(12),
-            text_color=ORIENTACOES_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
         )
         self._placeholder.grid(row=0, column=0, pady=20)
 
@@ -357,10 +331,24 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
 
     def _carregar_dados(self):
         def fetch():
-            resultado = self.servico_orientacoes.listar_orientacoes()
-            self.after(0, lambda: self._renderizar(resultado))
+            return self.servico_orientacoes.listar_orientacoes()
 
-        threading.Thread(target=fetch, daemon=True).start()
+        def on_success(resultado):
+            self._renderizar(resultado)
+
+        def on_error(exc):
+            ctk.CTkMessagebox(
+                self, title="Erro",
+                message=f"Não foi possível carregar orientações.\n{exc}",
+                icon="error",
+            )
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
 
     def _renderizar(self, resultado):
         if not self._placeholder.winfo_exists():

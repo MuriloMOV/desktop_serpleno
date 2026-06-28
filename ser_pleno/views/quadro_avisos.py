@@ -22,30 +22,9 @@ from components.ui_components import (
 
 logger = logging.getLogger("apps.desktop")
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Paleta dedicada
 # ═══════════════════════════════════════════════════════════════════════════════
-AVISOS_COLORS: dict[str, str] = {
-    "bg":            THEME["bg"],
-    "card":          THEME["card"],
-    "card_alt":      THEME["bg_alt"],
-    "border":        THEME["border"],
-    "border_strong": THEME["border_strong"],
-    "primary":       THEME["primary"],
-    "primary_light": THEME["primary_light"],
-    "primary_soft":  THEME["primary_soft"],
-    "text":          THEME["text"],
-    "text_muted":    THEME["text_muted"],
-    "text_secondary":THEME["text_secondary"],
-    "danger":        THEME["danger"],
-    "danger_soft":   THEME["danger_soft"],
-    "success":       THEME["success"],
-    "success_soft":  THEME["success_soft"],
-    "warning":       THEME["warning"],
-    "warning_soft":  THEME["warning_soft"],
-}
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Helpers
@@ -54,7 +33,6 @@ def escape_html(s: str | None) -> str:
     if s is None:
         return ""
     return html.escape(str(s))
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Componentes reutilizáveis da tela de avisos
@@ -69,7 +47,7 @@ class FormField(ctk.CTkFrame):
     _BORDER_FOCUS  = THEME["primary"]
     _BORDER_ERROR  = THEME["danger"]
     _BG_NORMAL     = THEME["bg_alt"]
-    _BG_FOCUS      = THEME["card"]
+    _BG_FOCUS      = THEME["surface"]
 
     def __init__(self, parent, label: str, placeholder: str = "",
                  icon: str = "", password: bool = False,
@@ -80,7 +58,7 @@ class FormField(ctk.CTkFrame):
         self._label = ctk.CTkLabel(
             self, text=label,
             font=themed_font("caption", "bold"),
-            text_color=AVISOS_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
             anchor="w",
         )
         self._label.pack(fill="x", pady=(0, 4))
@@ -100,7 +78,7 @@ class FormField(ctk.CTkFrame):
             ctk.CTkLabel(
                 box, text=icon,
                 font=themed_font("body"),
-                text_color=AVISOS_COLORS["text_muted"],
+                text_color=THEME["text_muted"],
                 width=36,
             ).grid(row=0, column=0, padx=(10, 4), pady=8)
 
@@ -160,16 +138,16 @@ class FormField(ctk.CTkFrame):
     def set_error(self, msg: str = ""):
         self._box.configure(
             border_color=self._BORDER_ERROR,
-            fg_color=AVISOS_COLORS["danger_soft"],
+            fg_color=THEME["danger_soft"],
         )
-        self._label.configure(text_color=AVISOS_COLORS["danger"])
+        self._label.configure(text_color=THEME["danger"])
 
     def clear_state(self):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=AVISOS_COLORS["text_muted"])
+        self._label.configure(text_color=THEME["text_muted"])
 
     # Internos ----------------------------------------------------------------
     def _on_focus_in(self, _=None):
@@ -177,15 +155,14 @@ class FormField(ctk.CTkFrame):
             border_color=self._BORDER_FOCUS,
             fg_color=self._BG_FOCUS,
         )
-        self._label.configure(text_color=AVISOS_COLORS["primary"])
+        self._label.configure(text_color=THEME["primary"])
 
     def _on_focus_out(self, _=None):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=AVISOS_COLORS["text_muted"])
-
+        self._label.configure(text_color=THEME["text_muted"])
 
 class PublicacaoModal(ctk.CTkToplevel):
     """
@@ -200,7 +177,7 @@ class PublicacaoModal(ctk.CTkToplevel):
 
         self.title("Publicação do Mural")
         self.resizable(False, False)
-        self.configure(fg_color=AVISOS_COLORS["card"])
+        self.configure(fg_color=THEME["surface"])
         self.withdraw()
 
         largura, altura = 940, 720
@@ -222,7 +199,7 @@ class PublicacaoModal(ctk.CTkToplevel):
     def _build(self, w, h):
         outer = ctk.CTkFrame(
             self,
-            fg_color=AVISOS_COLORS["card_alt"],
+            fg_color=THEME["card_alt"],
             corner_radius=RADIUS["xl"],
             width=w - 20, height=h - 20,
             border_width=0,
@@ -231,32 +208,32 @@ class PublicacaoModal(ctk.CTkToplevel):
 
         container = ctk.CTkFrame(
             outer,
-            fg_color=AVISOS_COLORS["card"],
+            fg_color=THEME["surface"],
             corner_radius=RADIUS["lg"],
             width=w - 40, height=h - 40,
-            border_width=1, border_color=AVISOS_COLORS["border"],
+            border_width=1, border_color=THEME["border"],
         )
         container.place(relx=0.5, rely=0.5, anchor="center")
 
         # Header
-        stripe = ctk.CTkFrame(container, fg_color=AVISOS_COLORS["primary_light"], height=56, corner_radius=RADIUS["lg"])
+        stripe = ctk.CTkFrame(container, fg_color=THEME["primary_light"], height=56, corner_radius=RADIUS["lg"])
         stripe.place(relx=0.02, rely=0.02, relwidth=0.96)
 
         ctk.CTkLabel(
             stripe, text="📝  Nova Publicação",
             font=themed_font("h3", "bold"),
-            text_color=AVISOS_COLORS["primary"],
+            text_color=THEME["primary"],
         ).place(relx=0.025, rely=0.18)
         ctk.CTkLabel(
             stripe, text="Campos à esquerda · pré-visualização à direita",
             font=themed_font("overline"),
-            text_color=AVISOS_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
         ).place(relx=0.025, rely=0.58)
 
         ctk.CTkButton(
             stripe, text="✕", width=36, height=36,
-            fg_color="white", text_color=AVISOS_COLORS["text_muted"],
-            hover_color=AVISOS_COLORS["border"],
+            fg_color="white", text_color=THEME["text_muted"],
+            hover_color=THEME["border"],
             corner_radius=RADIUS["sm"],
             command=self._fechar,
         ).place(relx=0.95, rely=0.1, anchor="ne")
@@ -308,12 +285,12 @@ class PublicacaoModal(ctk.CTkToplevel):
 
         ctk.CTkLabel(frm, text="Blocos (apenas para layouts grid-*):",
                      font=themed_font("body", "bold"),
-                     text_color=AVISOS_COLORS["text"]).pack(anchor="w", pady=(6, 4))
+                     text_color=THEME["text"]).pack(anchor="w", pady=(6, 4))
 
         self.blocos_container = ctk.CTkScrollableFrame(
-            frm, fg_color=AVISOS_COLORS["card_alt"],
+            frm, fg_color=THEME["card_alt"],
             corner_radius=RADIUS["md"],
-            border_width=1, border_color=AVISOS_COLORS["border"],
+            border_width=1, border_color=THEME["border"],
             height=180,
         )
         self.blocos_container.pack(fill="x", pady=(0, 8))
@@ -338,23 +315,23 @@ class PublicacaoModal(ctk.CTkToplevel):
     def _build_preview(self, parent):
         ctk.CTkLabel(parent, text="Pré-visualização",
                      font=themed_font("h3", "bold"),
-                     text_color=AVISOS_COLORS["text"]).pack(anchor="nw", pady=(6, 6), padx=6)
+                     text_color=THEME["text"]).pack(anchor="nw", pady=(6, 6), padx=6)
 
         self.preview_area = Card(parent, elevated=True)
         self.preview_area.pack(fill="both", expand=True, padx=8, pady=6)
 
         self._prev_title = ctk.CTkLabel(self.preview_area.body, text="Título da Publicação",
-                                         font=themed_font("h3", "bold"), text_color=AVISOS_COLORS["text"])
+                                         font=themed_font("h3", "bold"), text_color=THEME["text"])
         self._prev_title.pack(anchor="nw", pady=(14, 6), padx=14)
 
         self._prev_author = ctk.CTkLabel(self.preview_area.body, text="Analista SerPleno",
-                                          font=themed_font("overline"), text_color=AVISOS_COLORS["text_muted"])
+                                          font=themed_font("overline"), text_color=THEME["text_muted"])
         self._prev_author.pack(anchor="nw", padx=14)
 
         self._prev_content = ctk.CTkLabel(self.preview_area.body,
                                            text="O conteúdo aparecerá aqui enquanto você digita...",
                                            wraplength=260, justify="left",
-                                           font=themed_font("body"), text_color=AVISOS_COLORS["text_secondary"])
+                                           font=themed_font("body"), text_color=THEME["text_secondary"])
         self._prev_content.pack(anchor="nw", pady=(10, 8), padx=14)
 
         self._prev_blocks = ctk.CTkFrame(self.preview_area.body, fg_color="transparent")
@@ -480,25 +457,25 @@ class PublicacaoModal(ctk.CTkToplevel):
             card.pack(fill="x", pady=4, padx=4)
 
             ctk.CTkLabel(card.body, text=f"Bloco #{i + 1} - Título",
-                         font=themed_font("body", "bold"), text_color=AVISOS_COLORS["text"]).pack(anchor="w", pady=(6, 0), padx=8)
+                         font=themed_font("body", "bold"), text_color=THEME["text"]).pack(anchor="w", pady=(6, 0), padx=8)
             entry_t = ctk.CTkEntry(card.body, placeholder_text="Título",
                                    height=32, corner_radius=RADIUS["sm"],
-                                   fg_color=AVISOS_COLORS["card_alt"], border_width=1, border_color=AVISOS_COLORS["border"])
+                                   fg_color=THEME["card_alt"], border_width=1, border_color=THEME["border"])
             entry_t.pack(fill="x", padx=8, pady=(0, 6))
             entry_t.insert(0, ex.get("titulo", ""))
 
             ctk.CTkLabel(card.body, text="Conteúdo do Bloco",
-                         font=themed_font("body"), text_color=AVISOS_COLORS["text"]).pack(anchor="w", padx=8)
+                         font=themed_font("body"), text_color=THEME["text"]).pack(anchor="w", padx=8)
             txt = ctk.CTkTextbox(card.body, height=70, corner_radius=RADIUS["sm"],
-                                 fg_color=AVISOS_COLORS["card_alt"], border_width=1, border_color=AVISOS_COLORS["border"])
+                                 fg_color=THEME["card_alt"], border_width=1, border_color=THEME["border"])
             txt.pack(fill="x", padx=8, pady=(0, 6))
             txt.insert("1.0", ex.get("conteudo", ""))
 
             ctk.CTkLabel(card.body, text="Ícone (Lucide)",
-                         font=themed_font("body"), text_color=AVISOS_COLORS["text"]).pack(anchor="w", padx=8)
+                         font=themed_font("body"), text_color=THEME["text"]).pack(anchor="w", padx=8)
             comb = ctk.CTkComboBox(card.body, values=icons, width=200,
-                                   fg_color=AVISOS_COLORS["card_alt"], button_color=AVISOS_COLORS["border"],
-                                   dropdown_fg_color=AVISOS_COLORS["card"])
+                                   fg_color=THEME["card_alt"], button_color=THEME["border"],
+                                   dropdown_fg_color=THEME["surface"])
             comb.pack(anchor="w", padx=8, pady=(4, 8))
             comb.set(ex.get("icon", ""))
 
@@ -637,23 +614,22 @@ class PublicacaoModal(ctk.CTkToplevel):
             for i in range(n):
                 b = blocks[i] if i < len(blocks) else {"titulo": "", "conteudo": ""}
                 frame = tk.Frame(wrap, bg="white", bd=1, relief="flat",
-                                 highlightthickness=1, highlightbackground=AVISOS_COLORS["border"])
+                                 highlightthickness=1, highlightbackground=THEME["border"])
                 frame.grid(row=0, column=i, padx=6, pady=6, sticky="n")
                 tk.Label(frame, text=b.get("titulo", ""), font=("Segoe UI", 10, "bold"),
                          bg="white", anchor="w").pack(fill="x", padx=10, pady=(8, 2))
                 tk.Label(frame, text=b.get("conteudo", ""), font=("Segoe UI", 9),
-                         bg="white", fg=AVISOS_COLORS["text_secondary"],
+                         bg="white", fg=THEME["text_secondary"],
                          justify="left", wraplength=200).pack(fill="both", padx=10, pady=(0, 10))
             for i in range(n):
                 wrap.grid_columnconfigure(i, weight=1)
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Frame principal
 # ═══════════════════════════════════════════════════════════════════════════════
 class QuadroAvisosFrame(ctk.CTkFrame):
     def __init__(self, master, app):
-        super().__init__(master, fg_color=AVISOS_COLORS["bg"])
+        super().__init__(master, fg_color=THEME["bg"])
         self.app = app
         self.pack(fill="both", expand=True)
 
@@ -701,7 +677,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def carregar_avisos_async(self):
         self._limpar_lista()
         ctk.CTkLabel(self.lista, text="Carregando publicações...",
-                     text_color=AVISOS_COLORS["text_muted"]).pack(pady=12)
+                     text_color=THEME["text_muted"]).pack(pady=12)
 
         self._run_in_thread(
             servico_mural.listar_mensagens,
@@ -741,7 +717,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def _on_load_error(self, e):
         self._limpar_lista()
         ctk.CTkLabel(self.lista, text=f"Erro ao carregar avisos: {e}",
-                     text_color=AVISOS_COLORS["danger"]).pack(pady=12)
+                     text_color=THEME["danger"]).pack(pady=12)
 
     def _parse_posts(self, res) -> list[dict[str, Any]]:
         if isinstance(res, dict):
@@ -765,7 +741,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(top, text=escape_html(titulo or ""),
                      font=themed_font("h3", "bold"),
-                     text_color=AVISOS_COLORS["text"]).pack(side="left")
+                     text_color=THEME["text"]).pack(side="left")
 
         btns = ctk.CTkFrame(top, fg_color="transparent")
         btns.pack(side="right")
@@ -775,13 +751,13 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         if descricao:
             ctk.CTkLabel(card.body, text=escape_html(descricao or ""),
                          wraplength=780, justify="left",
-                         font=themed_font("body"), text_color=AVISOS_COLORS["text_secondary"]).pack(anchor="w", pady=(0, 10))
+                         font=themed_font("body"), text_color=THEME["text_secondary"]).pack(anchor="w", pady=(0, 10))
 
         footer = ctk.CTkFrame(card.body, fg_color="transparent")
         footer.pack(fill="x")
         ctk.CTkLabel(footer, text=f"{escape_html(autor)} • {escape_html(data)}",
                      font=themed_font("overline"),
-                     text_color=AVISOS_COLORS["text_muted"]).pack(side="left")
+                     text_color=THEME["text_muted"]).pack(side="left")
 
     # ── editar ----------------------------------------------------------------
     def _on_edit(self, post_id):

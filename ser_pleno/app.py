@@ -1,3 +1,18 @@
+import os
+import sys
+
+# Carrega .env da raiz do projeto antes de qualquer import que use os.getenv()
+_base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_env_path = os.path.join(_base_dir, '.env')
+if os.path.exists(_env_path):
+    with open(_env_path, 'r', encoding='utf-8') as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if not _line or _line.startswith('#') or '=' not in _line:
+                continue
+            _k, _v = _line.split('=', 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
+
 import customtkinter as ctk
 
 from services.connectivity import atualizar_disponibilidade_api_async

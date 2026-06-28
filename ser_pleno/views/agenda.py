@@ -14,11 +14,11 @@ from components.ui_components import (
 #  Paleta dedicada à tela de Agenda
 # ══════════════════════════════════════════════════════════════════════════════
 AGENDA_COLORS = {
-    "cell_ocupado_bg":   blend_color(THEME["accent"], 0.07),
-    "cell_ocupado_border": blend_color(THEME["accent"], 0.22),
+    "cell_ocupado_bg":   blend_color(THEME["primary"], 0.07),
+    "cell_ocupado_border": blend_color(THEME["primary"], 0.22),
     "cell_livre_bg":    blend_color(THEME["success"], 0.07),
     "cell_livre_border": blend_color(THEME["success"], 0.22),
-    "cell_hover":       blend_color(THEME["accent"], 0.18),
+    "cell_hover":       blend_color(THEME["primary"], 0.18),
     "nav_bg":           THEME["bg_alt"],
 }
 
@@ -53,7 +53,7 @@ class ScheduleCell(ctk.CTkFrame):
         self.info = info
         self.on_open = on_open
         ocupado = info is not None
-        cor = THEME["accent"] if ocupado else THEME["success"]
+        cor = THEME["primary"] if ocupado else THEME["success"]
 
         super().__init__(
             parent, height=120, corner_radius=RADIUS["md"], border_width=1,

@@ -1,270 +1,741 @@
+import logging
 import customtkinter as ctk
+from utils.async_runner import AsyncRunner
 from services.bem_estar import ServicoBemEstar
-import threading
-from ui_theme import THEME, SPACING, RADIUS, font, themed_font
+
+from ui_theme import (
+    THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, FONT_FAMILY,
+    font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
+)
 from components.ui_components import (
-    PageHeader,
-    Card,
-    Divider,
-    EmptyState,
-    Pill,
-    blend_color,
+    Card, PrimaryButton, DangerButton, GhostButton, Avatar,
+    Badge, Pill, EmptyState, Toast, Tabs, Divider
 )
 
+logger = logging.getLogger(__name__)
 
+
+
+
+# Avatar cores por inicial (ciclo)
+AV_COLORS = [
+    "#4F46E5", "#7C3AED", "#059669",
+    "#D97706", "#DC2626", "#0891B2",
+]
+
+
+
+
+# Configuração das colunas de risco
+_RISK_COLS = [
+    ("Crítico",  THEME["critico"],    THEME["critico_soft"], "critico"),
+    ("Alto",     THEME["alto"],       THEME["alto_soft"],    "alto"),
+    ("Médio",    THEME["medio"],      THEME["medio_soft"],   "medio"),
+    ("Normal",   THEME["normal"],     THEME["normal_soft"],  "normal"),
+]
+
+# Emojis por nível de humor (1–5)
+_MOOD_EMOJI = {1: "😢", 2: "😕", 3: "😐", 4: "😊", 5: "😄"}
+_MOOD_COLOR = {
+    1: THEME["danger"], 2: THEME["alto"], 3: THEME["medio"],
+    4: THEME["success"], 5: THEME["primary"],
+}
+_MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo"}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def _av_color(name: str) -> str:
+    idx = sum(ord(c) for c in name) % len(AV_COLORS)
+    return AV_COLORS[idx]
+
+
+def _card(parent, **kw) -> ctk.CTkFrame:
+    return ctk.CTkFrame(
+        parent,
+        fg_color=THEME["surface"],
+        corner_radius=RADIUS["card"],
+        border_width=1,
+        border_color=THEME["border"],
+        **kw,
+    )
+
+
+def _section_card(parent, title: str,
+                  action_text: str = "", action_cmd=None) -> ctk.CTkFrame:
+    """Card de seção com cabeçalho, divider e body."""
+    outer = _card(parent)
+
+    hdr = ctk.CTkFrame(outer, fg_color="transparent")
+    hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["section_gap"], 0))
+
+    ctk.CTkLabel(
+        hdr, text=title,
+        font=themed_font("body", "bold"),
+        text_color=THEME["text"],
+    ).pack(side="left")
+
+    if action_text and action_cmd:
+        GhostButton(
+            hdr, text=action_text, command=action_cmd,
+            height=28, corner_radius=RADIUS["button"],
+            text_color=THEME["primary"],
+        ).pack(side="right")
+
+    Divider(outer).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
+
+    body = ctk.CTkFrame(outer, fg_color="transparent")
+    body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=(SPACING["label_gap"], SPACING["section_gap"]))
+    outer.body = body
+    return outer
+
+
+def _avatar(parent, initials: str, color: str, size: int = 36) -> ctk.CTkFrame:
+    av = ctk.CTkFrame(parent, width=size, height=size,
+                      corner_radius=size // 2, fg_color=color)
+    av.pack_propagate(False)
+    ctk.CTkLabel(
+        av, text=initials[:2].upper(),
+        font=themed_font("body", "bold"),
+        text_color="#FFFFFF",
+    ).place(relx=0.5, rely=0.5, anchor="center")
+    return av
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  BemEstarFrame
+# ══════════════════════════════════════════════════════════════════════════════
 class BemEstarFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=THEME["bg"])
-        self.controller = controller
+        super().__init__(
+            parent,
+            fg_color=THEME["bg"],
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
+        )
+        self.controller        = controller
         self.servico_bem_estar = ServicoBemEstar()
+        self.colunas_risco: dict = {}
+        self._chart_data: list  = []
 
-        self.grid_columnconfigure(0, weight=1)
-
-        self.criar_cabecalho()
-        self.criar_cards_humor()
-        self.criar_analise_mensal()
-        self.criar_visao_risco()
-        self.criar_lista_checkins()
+        self._criar_cabecalho()
+        self._criar_kpis()
+        self._criar_secao_grafico()
+        self._criar_visao_risco()
+        self._criar_lista_checkins()
 
         self.load_data()
 
+    # ══════════════════════════════════════
+    #  Dados
+    # ══════════════════════════════════════
     def load_data(self):
-        def fetch():
-            dash = self.servico_bem_estar.obter_dashboard()
-            checkins = self.servico_bem_estar.listar_checkins()
-            risks = self.servico_bem_estar.listar_estudantes_risco()
-            self.after(0, lambda: self.update_ui(dash, checkins, risks))
+        self._set_status_carregando()
 
-        threading.Thread(target=fetch, daemon=True).start()
+        def fetch():
+            dash     = self.servico_bem_estar.obter_dashboard()
+            checkins = self.servico_bem_estar.listar_checkins()
+            risks    = self.servico_bem_estar.listar_estudantes_risco()
+            return dash, checkins, risks
+
+        def on_success(result):
+            dash, checkins, risks = result
+            self.update_ui(dash, checkins, risks)
+
+        def on_error(exc):
+            ctk.CTkMessagebox(
+                self,
+                title="Erro de conexão",
+                message=f"Não foi possível carregar os dados de bem-estar.\n{exc}",
+                icon="error",
+            )
+            self._set_status_erro()
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            on_complete=lambda: None,  # mantém status carregando até sucesso/erro
+            widget_ref=self,
+        )
+
+    # ══════════════════════════════════════
+    #  STATUS HELPERS
+    # ══════════════════════════════════════
+    def _set_status_carregando(self):
+        try:
+            self._kpi_humor.set_value("...")
+            self._kpi_part.set_value("...")
+            self._kpi_crit.set_value("...")
+        except Exception:
+            pass
+
+    def _set_status_erro(self):
+        try:
+            self._kpi_humor.set_value("—")
+            self._kpi_part.set_value("—")
+            self._kpi_crit.set_value("—")
+        except Exception:
+            pass
 
     def update_ui(self, dash_res, checkins_res, risks_res):
-        if dash_res.get('success'):
-            self.update_metrics(dash_res.get('data', {}))
+        if dash_res.get("success"):
+            self.update_metrics(dash_res.get("data", {}))
+        else:
+            logger.warning("Dashboard retornou erro: %s", dash_res)
 
-        if checkins_res.get('success'):
-            data = checkins_res.get('data', {})
-            checkins = data.get('checkins') if isinstance(data, dict) else []
-            if checkins is None:
-                checkins = []
-            self.populate_checkins(checkins)
+        if checkins_res.get("success"):
+            data     = checkins_res.get("data", {})
+            checkins = data.get("checkins") if isinstance(data, dict) else []
+            self.populate_checkins(checkins or [])
+        else:
+            logger.warning("Check-ins retornaram erro: %s", checkins_res)
 
-        if risks_res.get('success'):
-            data = risks_res.get('data', {})
-            groups = data.get('groups', {})
-
-            flat_risks = []
-            mapping = {
-                'critical': 'critico',
-                'high': 'alto',
-                'medium': 'medio',
-                'low': 'normal'
-            }
-            for backend_level, ui_level in mapping.items():
-                for student in groups.get(backend_level, []):
-                    student['level'] = ui_level
-                    student['msg'] = ", ".join(student.get('reasons', [])) or "Requer atenção"
-                    flat_risks.append(student)
-
-            self.populate_risks(flat_risks)
+        if risks_res.get("success"):
+            data   = risks_res.get("data", {})
+            groups = data.get("groups", {})
+            mapping = {"critical": "critico", "high": "alto",
+                       "medium": "medio",   "low": "normal"}
+            flat = []
+            for bk, ui in mapping.items():
+                for s in groups.get(bk, []):
+                    s["level"] = ui
+                    s["msg"]   = ", ".join(s.get("reasons", [])) or "Requer atenção"
+                    flat.append(s)
+            self.populate_risks(flat)
+        else:
+            logger.warning("Risco retornou erro: %s", risks_res)
 
     def update_metrics(self, data):
-        summary = data.get('summary', {})
-        pass
+        summary = data.get("summary", {})
+        humor   = summary.get("avg_mood")
+        if humor and hasattr(self, "_kpi_humor"):
+            emoji = _MOOD_EMOJI.get(round(humor), "😐")
+            self._kpi_humor.set_value(f"{emoji}  {humor:.1f}")
+        part = summary.get("participation_rate")
+        if part and hasattr(self, "_kpi_part"):
+            self._kpi_part.set_value(f"{part:.0f}%")
+        crit = summary.get("critical_count")
+        if crit is not None and hasattr(self, "_kpi_crit"):
+            self._kpi_crit.set_value(str(crit))
 
-    def criar_cabecalho(self):
-        header = PageHeader(self, title="Bem-Estar e Humor", subtitle="Monitoramento emocional e social dos estudantes")
-        header.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 16))
+        history = data.get("history") or data.get("mood_history") or []
+        if history:
+            self._chart_data = history
+            self._draw_chart()
 
-    def criar_cards_humor(self):
-        container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="x", padx=SPACING["page_x"], pady=10)
-        for i in range(3):
-            container.grid_columnconfigure(i, weight=1)
+    # ══════════════════════════════════════
+    #  CABEÇALHO
+    # ══════════════════════════════════════
+    def _criar_cabecalho(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
 
-        metricas = [
-            {"label": "Humor Médio", "value": "Bom (4.2)", "icon": "😊", "accent": THEME["success"], "trend": "Últimos 7 dias"},
-            {"label": "Participação", "value": "85%", "icon": "📈", "accent": THEME["info"], "trend": "Check-ins"},
-            {"label": "Alertas Críticos", "value": "2", "icon": "🚨", "accent": THEME["danger"], "trend": "Requer ação"},
+        left = ctk.CTkFrame(bar, fg_color="transparent")
+        left.pack(side="left")
+        ctk.CTkLabel(left, text="Bem-Estar e Humor",
+                     font=themed_font("h2", "bold"),
+                     text_color=THEME["text"]).pack(anchor="w")
+        ctk.CTkLabel(left, text="Monitoramento emocional e social dos estudantes",
+                     font=themed_font("body"),
+                     text_color=THEME["text_secondary"]).pack(anchor="w", pady=(2, 0))
+
+        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).pack(
+            fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0)
+        )
+
+    # ══════════════════════════════════════
+    #  KPI CARDS
+    # ══════════════════════════════════════
+    def _criar_kpis(self):
+        row = ctk.CTkFrame(self, fg_color="transparent")
+        row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+
+        kpis = [
+            ("Humor Médio",       "😊  —",  "💚", THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "_kpi_humor",
+             "Média dos últimos 7 dias"),
+            ("Participação",      "—%",    "📈", THEME["kpi_pink"],  THEME["kpi_pink_soft"],  "_kpi_part",
+             "Taxa de check-ins"),
+            ("Alertas Críticos",  "—",     "🚨", THEME["kpi_red"],   THEME["kpi_red_soft"],   "_kpi_crit",
+             "Estudantes em situação crítica"),
         ]
 
-        for i, m in enumerate(metricas):
-            card = Card(container)
-            card.grid(row=0, column=i, sticky="ew", padx=6)
+        for i, (title, initial, icon, accent, soft, attr, sub) in enumerate(kpis):
+            row.grid_columnconfigure(i, weight=1)
+            card = _KPICard(row, title, initial, icon, accent, soft, sub)
+            card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
+            setattr(self, attr, card)
 
-            content = ctk.CTkFrame(card.body, fg_color="transparent")
-            content.pack(fill="both", expand=True, pady=4)
+    # ══════════════════════════════════════
+    #  GRÁFICO DE TENDÊNCIA
+    # ══════════════════════════════════════
+    def _criar_secao_grafico(self):
+        outer = _section_card(self, "📈  Tendência de Bem-Estar — últimos 30 dias")
+        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
-            ctk.CTkLabel(content, text=m["icon"], font=themed_font("h2")).pack(side="left", padx=(0, 12))
-            txts = ctk.CTkFrame(content, fg_color="transparent")
-            txts.pack(side="left")
-            ctk.CTkLabel(txts, text=m["value"], font=themed_font("h2", "bold"), text_color=THEME["text"]).pack(anchor="w")
-            ctk.CTkLabel(txts, text=m["label"], font=themed_font("body"), text_color=THEME["text_muted"]).pack(anchor="w", pady=(2, 0))
-            ctk.CTkLabel(txts, text=m["trend"], font=themed_font("overline"), text_color=THEME["text_disabled"]).pack(anchor="w", pady=(2, 0))
+        # Canvas
+        self.canvas_30d = ctk.CTkCanvas(
+            outer.body, bg=THEME["surface"],
+            height=200, highlightthickness=0,
+        )
+        self.canvas_30d.pack(fill="both", expand=True, padx=4, pady=(4, 12))
+        outer.body.bind("<Configure>", lambda e: self._draw_chart())
 
-    def criar_analise_mensal(self):
-        card = Card(self, title="📈 Tendência de Bem-Estar (30 dias)")
-        card.pack(fill="x", padx=SPACING["page_x"], pady=10)
+        # Barras de distribuição de humor
+        dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
+        dist_row.pack(fill="x", pady=(4, 4))
 
-        chart_area = ctk.CTkFrame(card.body, fg_color=THEME["bg_alt"], height=220, corner_radius=RADIUS["md"])
-        chart_area.pack(fill="x", pady=(0, 12))
-        self.canvas_30d = ctk.CTkCanvas(chart_area, bg=THEME["bg_alt"], height=220, highlightthickness=0)
-        self.canvas_30d.pack(fill="both", expand=True)
-        chart_area.bind("<Configure>", self.draw_30day_chart)
+        self._dist_bars: dict[str, ctk.CTkFrame] = {}
+        self._dist_pcts: dict[str, ctk.CTkLabel] = {}
 
-        perc_container = ctk.CTkFrame(card.body, fg_color="transparent")
-        perc_container.pack(fill="x", pady=(0, 4))
+        for label, color, pct_key, default in [
+            ("😊  Bom",     THEME["success"], "bom",  65),
+            ("😐  Neutro",  THEME["warning"], "med",  25),
+            ("😢  Baixo",   THEME["danger"],  "mau",  10),
+        ]:
+            col = ctk.CTkFrame(dist_row, fg_color="transparent")
+            col.pack(side="left", expand=True, padx=SPACING["grid_gap"])
 
-        percs = [
-            {"label": "Felicidade/Bom", "value": "65%", "color": THEME["success"]},
-            {"label": "Neutralidade", "value": "25%", "color": THEME["warning"]},
-            {"label": "Tristeza/Ruim", "value": "10%", "color": THEME["danger"]},
-        ]
+            ctk.CTkLabel(col, text=label,
+                         font=themed_font("body", "bold"),
+                         text_color=THEME["text_secondary"]).pack(anchor="w")
 
-        for p in percs:
-            item = ctk.CTkFrame(perc_container, fg_color="transparent")
-            item.pack(side="left", expand=True)
-            ctk.CTkLabel(item, text=p["label"], font=themed_font("body", "bold"), text_color=THEME["text_muted"]).pack()
-            bar_bg = ctk.CTkFrame(item, width=110, height=8, fg_color=THEME["border"], corner_radius=RADIUS["pill"])
-            bar_bg.pack(pady=5)
+            bar_bg = ctk.CTkFrame(col, height=8, fg_color=THEME["chart_grid"],
+                                  corner_radius=RADIUS["pill"])
+            bar_bg.pack(fill="x", pady=(5, 4))
             bar_bg.pack_propagate(False)
-            ctk.CTkFrame(bar_bg, width=int(110 * (int(p["value"][:-1]) / 100)), height=8, fg_color=p["color"], corner_radius=RADIUS["pill"]).pack(side="left")
-            ctk.CTkLabel(item, text=p["value"], font=themed_font("body", "bold"), text_color=THEME["text"]).pack()
 
-    def draw_30day_chart(self, event=None):
+            fill = ctk.CTkFrame(bar_bg, height=8, fg_color=color, corner_radius=RADIUS["pill"])
+            fill.pack(side="left", fill="y")
+            self._dist_bars[pct_key] = fill
+
+            pct_lbl = ctk.CTkLabel(col, text=f"{default}%",
+                                   font=themed_font("body", "bold"),
+                                   text_color=THEME["text"])
+            pct_lbl.pack(anchor="w")
+            self._dist_pcts[pct_key] = pct_lbl
+
+    def _draw_chart(self, data=None):
+        if data:
+            self._chart_data = data
+
         self.canvas_30d.delete("all")
-        w = self.canvas_30d.winfo_width()
-        h = self.canvas_30d.winfo_height()
-        if w < 50:
+        cw = self.canvas_30d.winfo_width()
+        ch = self.canvas_30d.winfo_height()
+        if cw < 80 or ch < 60:
             return
 
-        data = [3.5, 3.2, 3.8, 3.4, 3.1, 3.0, 3.6, 3.9, 4.2, 4.0, 3.8, 4.1, 4.3, 4.2, 4.5]
-        pad_x, pad_y = 36, 28
-        chart_w, chart_h = w - 2 * pad_x, h - 2 * pad_y
+        pts  = ([d.get("avg_mood") or d.get("media_humor", 3.0)
+                  for d in self._chart_data]
+                if self._chart_data
+                else [3.5, 3.2, 3.8, 3.4, 3.1, 3.0, 3.6, 3.9,
+                      4.2, 4.0, 3.8, 4.1, 4.3, 4.2, 4.5])
 
-        points = []
-        for i, val in enumerate(data):
-            x = pad_x + (i * chart_w / (len(data) - 1))
-            y = h - pad_y - (val * chart_h / 5)
-            points.append((x, y))
+        mx, my = 40, 20
+        cw2    = cw - 2 * mx
+        ch2    = ch - 2 * my
+        n      = len(pts)
 
-        poly = [pad_x, h - pad_y]
-        for x, y in points:
-            poly.extend([x, y])
-        poly.extend([w - pad_x, h - pad_y])
-        self.canvas_30d.create_polygon(poly, fill=THEME["primary_light"], outline="")
+        # Grades + labels Y
+        for i in range(6):
+            v  = 1 + i
+            gy = (ch - my) - (i * ch2 / 5)
+            self.canvas_30d.create_line(mx, gy, cw - mx, gy,
+                                        fill=THEME["chart_grid"], dash=(3, 5))
+            self.canvas_30d.create_text(mx - 6, gy, text=str(v),
+                                        font=(FONT_FAMILY, 8),
+                                        fill=THEME["text_muted"], anchor="e")
 
-        for i in range(len(points) - 1):
-            self.canvas_30d.create_line(points[i], points[i + 1], fill=THEME["primary"], width=2)
+        # Coordenadas
+        coords = [
+            (mx + i * cw2 / max(n - 1, 1),
+             (ch - my) - ((v - 1) * ch2 / 4))
+            for i, v in enumerate(pts)
+        ]
 
-        for x, y in points:
-            self.canvas_30d.create_oval(x - 3, y - 3, x + 3, y + 3, fill="white", outline=THEME["primary"], width=1)
+        # Área preenchida
+        poly = []
+        for x, y in coords:
+            poly += [x, y]
+        poly += [coords[-1][0], ch - my, coords[0][0], ch - my]
+        self.canvas_30d.create_polygon(poly, fill=THEME["chart_fill"], outline="")
 
-    def criar_visao_risco(self):
-        wrapper = ctk.CTkFrame(self, fg_color="transparent")
-        wrapper.pack(fill="x", padx=SPACING["page_x"], pady=10)
+        # Linha
+        for i in range(len(coords) - 1):
+            x1, y1 = coords[i]
+            x2, y2 = coords[i + 1]
+            self.canvas_30d.create_line(
+                x1, y1, x2, y2,
+                fill=THEME["chart_line"], width=2.5,
+                capstyle="round", joinstyle="round",
+            )
 
-        header = ctk.CTkFrame(wrapper, fg_color="transparent")
-        header.pack(fill="x", pady=(10, 12))
-        ctk.CTkLabel(header, text="🛡 Visão de Risco dos Estudantes", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(side="left")
+        # Pontos coloridos
+        for i, (x, y) in enumerate(coords):
+            v     = pts[i]
+            dot_c = (THEME["dot_bad"] if v < 2.5 else
+                     THEME["dot_mid"] if v < 3.5 else THEME["dot_good"])
+            self.canvas_30d.create_oval(
+                x - 4, y - 4, x + 4, y + 4,
+                fill=dot_c, outline="#FFFFFF", width=2,
+            )
 
-        cols = ctk.CTkFrame(wrapper, fg_color="transparent")
-        cols.pack(fill="x")
+        # Labels X (a cada 4 pontos)
+        step = max(1, n // 7)
+        for i, (x, _) in enumerate(coords):
+            if i % step == 0 and self._chart_data:
+                raw = self._chart_data[i]
+                lbl = raw.get("data") or raw.get("date") or ""
+                if len(lbl) > 5:
+                    lbl = lbl[5:]   # só MM-DD
+                self.canvas_30d.create_text(
+                    x, ch - 6, text=lbl,
+                    font=(FONT_FAMILY, 8), fill=THEME["text_secondary"],
+                )
+
+    # ══════════════════════════════════════
+    #  VISÃO DE RISCO (kanban 4 colunas)
+    # ══════════════════════════════════════
+    def _criar_visao_risco(self):
+        # Título externo ao card
+        title_row = ctk.CTkFrame(self, fg_color="transparent")
+        title_row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 10))
+
+        ctk.CTkLabel(
+            title_row, text="🛡  Visão de Risco dos Estudantes",
+            font=themed_font("h4", "bold"),
+            text_color=THEME["text"],
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            title_row, text="Classificação por nível de atenção necessária",
+            font=themed_font("body_sm"),
+            text_color=THEME["text_secondary"],
+        ).pack(side="left", padx=(10, 0), pady=(2, 0))
+
+        # Grid de colunas
+        cols_wrap = ctk.CTkFrame(self, fg_color="transparent")
+        cols_wrap.pack(fill="x", padx=SPACING["page_x"])
         for i in range(4):
-            cols.grid_columnconfigure(i, weight=1)
+            cols_wrap.grid_columnconfigure(i, weight=1)
 
         self.colunas_risco = {}
-        config_cols = [
-            {"title": "Crítico", "color": THEME["danger"], "key": "critico"},
-            {"title": "Alto", "color": "#f97316", "key": "alto"},
-            {"title": "Médio", "color": THEME["warning"], "key": "medio"},
-            {"title": "Normal", "color": THEME["success"], "key": "normal"},
-        ]
 
-        for i, config in enumerate(config_cols):
-            frame = Card(cols)
-            frame.grid(row=0, column=i, sticky="nsew", padx=6)
+        for i, (title, color, soft, key) in enumerate(_RISK_COLS):
+            col_card = _card(cols_wrap)
+            col_card.grid(row=0, column=i, sticky="nsew", padx=SPACING["grid_gap"] // 2)
 
-            h = ctk.CTkFrame(frame.body, fg_color="transparent")
-            h.pack(fill="x", padx=14, pady=14)
-            ctk.CTkLabel(h, text="●", text_color=config["color"], font=themed_font("h3")).pack(side="left")
-            ctk.CTkLabel(h, text=config["title"], font=themed_font("body", "bold"), text_color=THEME["text_muted"]).pack(side="left", padx=6)
-            count_lbl = ctk.CTkLabel(h, text="0", font=themed_font("body", "bold"), text_color=THEME["text"])
-            count_lbl.pack(side="right")
+            # Cabeçalho da coluna
+            col_hdr = ctk.CTkFrame(
+                col_card, fg_color=soft,
+                corner_radius=0, height=44,
+            )
+            col_hdr.pack(fill="x")
+            col_hdr.pack_propagate(False)
+            col_hdr.grid_columnconfigure(1, weight=1)
 
-            content = ctk.CTkFrame(frame.body, fg_color="transparent")
-            content.pack(fill="both", expand=True, padx=10, pady=(0, 14))
+            # Ponto colorido
+            ctk.CTkFrame(
+                col_hdr, width=10, height=10,
+                corner_radius=5, fg_color=color,
+            ).grid(row=0, column=0, padx=(14, 8))
 
-            self.colunas_risco[config["key"]] = {
-                "content": content,
+            ctk.CTkLabel(
+                col_hdr, text=title,
+                font=themed_font("body", "bold"),
+                text_color=color,
+            ).grid(row=0, column=1, sticky="w")
+
+            count_lbl = ctk.CTkLabel(
+                col_hdr, text="0",
+                font=themed_font("body", "bold"),
+                text_color=color,
+            )
+            count_lbl.grid(row=0, column=2, padx=(0, 14))
+
+            # Corpo scrollável
+            body = ctk.CTkScrollableFrame(
+                col_card, fg_color="transparent",
+                height=220,
+                scrollbar_button_color=THEME["border_strong"],
+                scrollbar_button_hover_color=THEME["text_muted"],
+            )
+            body.pack(fill="both", expand=True, padx=8, pady=8)
+
+            self.colunas_risco[key] = {
+                "content": body,
                 "count_lbl": count_lbl,
-                "color": config["color"],
+                "color": color,
+                "soft": soft,
             }
 
-    def populate_risks(self, risks):
+    def populate_risks(self, risks: list):
         for col in self.colunas_risco.values():
-            for child in col["content"].winfo_children():
-                child.destroy()
+            for w in col["content"].winfo_children():
+                w.destroy()
             col["count_lbl"].configure(text="0")
 
+        counts = {k: 0 for k in self.colunas_risco}
+
         if not risks:
-            for key in ["critico", "alto", "medio", "normal"]:
-                ctk.CTkLabel(self.colunas_risco[key]["content"], text="Nenhum estudante", text_color=THEME["text_disabled"], font=themed_font("overline")).pack(pady=10)
+            for key in self.colunas_risco:
+                ctk.CTkLabel(
+                    self.colunas_risco[key]["content"],
+                    text="Nenhum estudante",
+                    font=themed_font("body"),
+                    text_color=THEME["text_muted"],
+                ).pack(pady=12)
             return
 
-        counts = {"critico": 0, "alto": 0, "medio": 0, "normal": 0}
         for s in risks:
-            nivel = s.get('level', 'normal').lower()
+            nivel = s.get("level", "normal").lower()
             if nivel not in self.colunas_risco:
-                nivel = 'normal'
+                nivel = "normal"
             counts[nivel] += 1
-            self.criar_card_estudante_risco(self.colunas_risco[nivel]["content"], s, self.colunas_risco[nivel]["color"])
+            self._criar_card_risco(
+                self.colunas_risco[nivel]["content"], s,
+                self.colunas_risco[nivel]["color"],
+                self.colunas_risco[nivel]["soft"],
+            )
 
         for key, count in counts.items():
             self.colunas_risco[key]["count_lbl"].configure(text=str(count))
             if count == 0:
-                ctk.CTkLabel(self.colunas_risco[key]["content"], text="Nenhum estudante", text_color=THEME["text_disabled"], font=themed_font("overline")).pack(pady=10)
+                ctk.CTkLabel(
+                    self.colunas_risco[key]["content"],
+                    text="Nenhum estudante",
+                    font=themed_font("body"),
+                    text_color=THEME["text_muted"],
+                ).pack(pady=12)
 
+    def _criar_card_risco(self, parent, student: dict,
+                          color: str, soft: str):
+        nome  = student.get("name", "Estudante")
+        curso = student.get("course", "Geral")
+        msg   = student.get("msg", "Requer atenção")
+
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=THEME["surface"],
+            corner_radius=RADIUS["lg"],
+            border_width=1,
+            border_color=THEME["border"],
+        )
+        card.pack(fill="x", pady=SPACING["item_gap"] // 2)
+
+        inner = ctk.CTkFrame(card, fg_color="transparent")
+        inner.pack(fill="x", padx=10, pady=8)
+        inner.grid_columnconfigure(1, weight=1)
+
+        # Avatar colorido
+        av = _avatar(inner, nome[:2], _av_color(nome), 34)
+        av.grid(row=0, column=0, rowspan=2, padx=(0, 8), sticky="ns")
+
+        ctk.CTkLabel(
+            inner, text=nome,
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).grid(row=0, column=1, sticky="w")
+
+        ctk.CTkLabel(
+            inner, text=curso,
+            font=themed_font("caption"),
+            text_color=THEME["text_secondary"], anchor="w",
+        ).grid(row=1, column=1, sticky="w")
+
+        # Chip de motivo
+        if msg:
+            chip = ctk.CTkFrame(card, fg_color=soft, corner_radius=RADIUS["sm"])
+            chip.pack(fill="x", padx=10, pady=(0, 8))
+            ctk.CTkLabel(
+                chip, text=msg,
+                font=themed_font("caption", "bold"),
+                text_color=color, wraplength=140, anchor="w",
+            ).pack(padx=8, pady=4, anchor="w")
+
+    # Alias legado
     def criar_card_estudante_risco(self, parent, student, color):
-        card = Card(parent)
-        card.pack(fill="x", pady=4)
+        soft = {
+            THEME["critico"]: THEME["critico_soft"], THEME["alto"]: THEME["alto_soft"],
+            THEME["medio"]:   THEME["medio_soft"],   THEME["normal"]: THEME["normal_soft"],
+        }.get(color, THEME["primary_soft"])
+        self._criar_card_risco(parent, student, color, soft)
 
-        indicator = ctk.CTkFrame(card.body, width=4, fg_color=color, corner_radius=0)
-        indicator.pack(side="left", fill="y")
-        info = ctk.CTkFrame(card.body, fg_color="transparent")
-        info.pack(side="left", fill="both", expand=True, padx=12, pady=10)
-        ctk.CTkLabel(info, text=student.get("name", "Nome"), font=themed_font("body", "bold"), text_color=THEME["text"], anchor="w").pack(fill="x")
-        ctk.CTkLabel(info, text=student.get("course", "Geral"), font=themed_font("overline"), text_color=THEME["text_muted"], anchor="w").pack(fill="x")
-        ctk.CTkLabel(info, text=student.get("msg", ""), font=themed_font("overline", "bold"), text_color=THEME["danger_strong"], anchor="w").pack(fill="x", pady=(6, 0))
+    # ══════════════════════════════════════
+    #  LISTA DE CHECK-INS
+    # ══════════════════════════════════════
+    def _criar_lista_checkins(self):
+        outer = _section_card(self, "📝  Check-ins Recentes")
+        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
+        self._checkins_body = outer.body
 
-    def criar_lista_checkins(self):
-        container = ctk.CTkFrame(self, fg_color="transparent")
-        container.pack(fill="x", padx=SPACING["page_x"], pady=20)
-        ctk.CTkLabel(container, text="📝 Check-ins Recentes", font=themed_font("h3", "bold"), text_color=THEME["text"]).pack(anchor="w", pady=(0, 10))
-
-        self.checkins_container = ctk.CTkFrame(container, fg_color="transparent")
-        self.checkins_container.pack(fill="both", expand=True)
-
-    def populate_checkins(self, checkins):
-        for w in self.checkins_container.winfo_children():
+    def populate_checkins(self, checkins: list):
+        if not hasattr(self, "_checkins_body"):
+            return
+        for w in self._checkins_body.winfo_children():
             w.destroy()
 
         if not isinstance(checkins, list):
             checkins = []
 
         if not checkins:
-            EmptyState(self.checkins_container, icon="📝", title="Nenhum check-in registrado", subtitle="Os registros de humor aparecerão aqui").pack(pady=10)
+            EmptyState(
+                self._checkins_body, icon="📝",
+                title="Nenhum check-in registrado",
+                subtitle="Os check-ins aparecerão aqui quando forem realizados",
+            ).pack(pady=20)
             return
 
         for c in checkins:
             if not isinstance(c, dict):
                 continue
+            self._criar_row_checkin(c)
 
-            card = Card(self.checkins_container)
-            card.pack(fill="x", pady=4)
-            inner = ctk.CTkFrame(card.body, fg_color="transparent")
-            inner.pack(fill="x", padx=14, pady=10)
+    def _criar_row_checkin(self, c: dict):
+        nome  = c.get("student_name", "Estudante")
+        mood  = c.get("mood_score") or c.get("mood") or 3
+        mood  = max(1, min(5, int(mood)))
+        texto = c.get("mood_text") or _MOOD_LABEL.get(mood, "Neutro")
+        data  = c.get("date", "Hoje")
+        curso = c.get("course", "")
 
-            ctk.CTkLabel(inner, text="📝", font=themed_font("h3")).pack(side="left", padx=(0, 10))
-            ctk.CTkLabel(inner, text=c.get('student_name', 'Estudante'), font=themed_font("body", "bold"), text_color=THEME["text"]).pack(side="left")
-            ctk.CTkLabel(inner, text=c.get('mood_text', 'Neutro'), font=themed_font("body"), text_color=THEME["text_muted"]).pack(side="left", padx=14)
-            ctk.CTkLabel(inner, text=c.get('date', 'Hoje'), font=themed_font("overline"), text_color=THEME["text_muted"]).pack(side="right")
+        color = _MOOD_COLOR.get(mood, THEME["text_muted"])
+        emoji = _MOOD_EMOJI.get(mood, "😐")
+
+        row = ctk.CTkFrame(
+            self._checkins_body,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        row.pack(fill="x", pady=SPACING["item_gap"] // 2)
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=12, pady=8)
+        inner.grid_columnconfigure(1, weight=1)
+
+        # Avatar
+        av = _avatar(inner, nome[:2], _av_color(nome), 38)
+        av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="ns")
+
+        # Nome + curso
+        ctk.CTkLabel(
+            inner, text=nome,
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).grid(row=0, column=1, sticky="w")
+
+        if curso:
+            ctk.CTkLabel(
+                inner, text=curso,
+                font=themed_font("caption"),
+                text_color=THEME["text_secondary"], anchor="w",
+            ).grid(row=1, column=1, sticky="w")
+
+        # Mood chip
+        mood_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        mood_frame.grid(row=0, column=2, rowspan=2, padx=(8, 0), sticky="e")
+
+        chip_bg = ctk.CTkFrame(
+            mood_frame,
+            fg_color=blend_color(color, 0.15),
+            corner_radius=RADIUS["button"],
+        )
+        chip_bg.pack(anchor="e")
+        ctk.CTkLabel(
+            chip_bg,
+            text=f"{emoji}  {texto}",
+            font=themed_font("body", "bold"),
+            text_color=color,
+        ).pack(padx=10, pady=5)
+
+        # Data
+        ctk.CTkLabel(
+            mood_frame, text=data,
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"],
+        ).pack(anchor="e", pady=(4, 0))
+
+    # ══════════════════════════════════════
+    #  Aliases legados
+    # ══════════════════════════════════════
+    def criar_cabecalho(self):
+        pass
+
+    def criar_cards_humor(self):
+        pass
+
+    def criar_analise_mensal(self):
+        pass
+
+    def draw_30day_chart(self, event=None):
+        self._draw_chart()
+
+    def criar_visao_risco(self):
+        pass
+
+    def criar_lista_checkins(self):
+        pass
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  KPI Card
+# ══════════════════════════════════════════════════════════════════════════════
+class _KPICard(ctk.CTkFrame):
+    def __init__(self, parent, title: str, initial: str, icon: str,
+                 accent: str, soft: str, sub: str = ""):
+        super().__init__(
+            parent,
+            fg_color=THEME["surface"],
+            corner_radius=RADIUS["card"],
+            border_width=1,
+            border_color=THEME["border"],
+        )
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["card_pad"])
+
+        top = ctk.CTkFrame(inner, fg_color="transparent")
+        top.pack(fill="x")
+
+        icon_bg = ctk.CTkFrame(top, width=44, height=44,
+                               corner_radius=RADIUS["lg"], fg_color=soft)
+        icon_bg.pack(side="left")
+        icon_bg.pack_propagate(False)
+        ctk.CTkLabel(icon_bg, text=icon,
+                     font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
+
+        self._val = ctk.CTkLabel(
+            top, text=initial,
+            font=themed_font("h2", "bold"),
+            text_color=THEME["text"],
+        )
+        self._val.pack(side="right", anchor="e")
+
+        ctk.CTkLabel(inner, text=title,
+                     font=themed_font("body", "bold"),
+                     text_color=THEME["text"], anchor="w").pack(fill="x", pady=(10, 2))
+
+        if sub:
+            ctk.CTkLabel(inner, text=sub,
+                         font=themed_font("caption"),
+                         text_color=THEME["text_secondary"], anchor="w").pack(fill="x")
+
+        ctk.CTkFrame(self, height=3, corner_radius=0,
+                     fg_color=accent).pack(side="bottom", fill="x")
+
+    def set_value(self, v: str):
+        self._val.configure(text=v)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Utilitário: pastel de cor
+# ──────────────────────────────────────────────────────────────────────────────
+def _soft_from_color(color: str) -> str:
+    mapping = {
+        THEME["danger"]:  THEME["danger_soft"],
+        THEME["alto"]:    THEME["alto_soft"],
+        THEME["medio"]:   THEME["medio_soft"],
+        THEME["success"]: THEME["normal_soft"],
+        THEME["primary"]: THEME["primary_soft"],
+    }
+    return mapping.get(color, THEME["primary_soft"])

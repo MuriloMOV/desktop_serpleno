@@ -340,7 +340,7 @@ class ServicoAgendamento:
                     logging.info(f"Agendamentos obtidos via API Desktop: {len(agendamentos)}")
                     return agendamentos
         except Exception as e:
-            logging.error(f"Erro ao buscar agendamentos via API: {e}")
+            logging.warning(f"Erro ao buscar agendamentos via API: {e}, usando banco local")
         
         return []
 

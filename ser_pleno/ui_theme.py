@@ -14,78 +14,176 @@ else:
 
 FONT_FAMILY_MONO = "JetBrains Mono"
 
+# Paleta semântica unificada (SerPleno Design System)
+# Família de cor principal: índigo (#4F46E5) alinhada com o design existente
+
 LIGHT_THEME = {
-    "bg": "#F8FAFC",
-    "bg_alt": "#F1F5F9",
-    "surface": "#FFFFFF",
+    # Neutros / superfície
+    "bg":               "#F8F7FF",
+    "page_bg":          "#F8F7FF",
+    "bg_alt":           "#F1F5F9",
+    "surface":          "#FFFFFF",
     "surface_elevated": "#FFFFFF",
-    "border": "#E2E8F0",
-    "border_strong": "#CBD5E1",
-    "divider": "#F1F5F9",
-    "text": "#0F172A",
-    "text_secondary": "#475569",
-    "text_muted": "#94A3B8",
-    "text_disabled": "#CBD5E1",
-    "text_on_primary": "#FFFFFF",
-    "primary": "#6366F1",
-    "primary_hover": "#4F46E5",
-    "primary_soft": "#EEF2FF",
-    "primary_medium": "#C7D2FE",
-    "primary_strong": "#4338CA",
-    "accent": "#8B5CF6",
-    "accent_soft": "#F5F3FF",
-    "accent_medium": "#DDD6FE",
-    "success": "#10B981",
-    "success_soft": "#D1FAE5",
-    "success_medium": "#A7F3D0",
-    "success_strong": "#047857",
-    "warning": "#F59E0B",
-    "warning_soft": "#FEF3C7",
-    "warning_medium": "#FDE68A",
-    "warning_strong": "#B45309",
-    "danger": "#EF4444",
-    "danger_soft": "#FEE2E2",
-    "danger_medium": "#FECACA",
-    "danger_strong": "#B91C1C",
-    "info": "#3B82F6",
-    "info_soft": "#DBEAFE",
-    "info_medium": "#BFDBFE",
-    "info_strong": "#1D4ED8",
-    "nav_bg": "#FFFFFF",
-    "nav_text": "#64748B",
-    "nav_muted": "#94A3B8",
-    "nav_active_bg": "#EEF2FF",
-    "nav_hover": "#F8FAFC",
-    "nav_active_text": "#6366F1",
-    "brand_accent": "#6366F1",
-    "brand_gradient_start": "#6366F1",
-    "brand_gradient_mid": "#8B5CF6",
-    "brand_gradient_end": "#A855F7",
-    "bg_chat": "#F8FAFC",
-    "card": "#FFFFFF",
-    "primary_light": "#EEF2FF",
-    "bubble_sent": "#6366F1",
-    "bubble_recv": "#FFFFFF",
-    "tag_bg": "#F1F5F9",
-    "tag_text": "#475569",
-    "status_online": "#10B981",
-    "status_offline": "#CBD5E1",
-    "status_busy": "#F59E0B",
-    "input_bg": "#FFFFFF",
-    "input_border": "#E2E8F0",
-    "input_border_focus": "#6366F1",
-    "input_placeholder": "#94A3B8",
-    "card_music": "#6366F1",
-    "border_music": "#4F46E5",
-    "purple": "#7E22CE",
-    "purple_light": "#F3E8FF",
-    "purple_soft": "#EDE9FE",
-    "chart_grid": "#F1F5F9",
-    "chart_line": "#6366F1",
-    "chart_area_start": "#6366F1",
-    "chart_area_end": "#FFFFFF",
-    "overlay": "#0F172A",
-    "overlay_light": "#F8FAFC",
+    "border":           "#E5E7EB",
+    "border_strong":    "#CBD5E1",
+    "divider":          "#F3F4F6",
+
+    # Tipografia
+    "text":             "#111827",
+    "text_secondary":   "#6B7280",
+    "text_muted":       "#9CA3AF",
+    "text_disabled":    "#D1D5DB",
+    "text_on_primary":  "#FFFFFF",
+
+    # Marca / primária (alinhada com o design existente nas views)
+    "primary":          "#4F46E5",
+    "primary_hover":    "#4338CA",
+    "primary_soft":     "#EEF2FF",
+    "primary_medium":   "#C7D2FE",
+    "primary_strong":   "#312E81",
+    "primary_light":    "#EEF2FF",
+
+    # Acento / secundária
+    "accent":           "#6366F1",
+    "accent_hover":     "#4F46E5",
+    "accent_soft":      "#EEF2FF",
+    "accent_medium":    "#A5B4FC",
+    "accent_strong":    "#3730A3",
+
+    # Semântico
+    "success":          "#059669",
+    "success_soft":     "#D1FAE5",
+    "success_medium":   "#A7F3D0",
+    "success_strong":   "#065F46",
+    "warning":          "#D97706",
+    "warning_soft":     "#FEF3C7",
+    "warning_medium":   "#FDE68A",
+    "warning_strong":   "#92400E",
+    "danger":           "#DC2626",
+    "danger_soft":      "#FEE2E2",
+    "danger_medium":    "#FECACA",
+    "danger_strong":    "#991B1B",
+    "info":             "#3B82F6",
+    "info_soft":        "#DBEAFE",
+    "info_medium":      "#BFDBFE",
+    "info_strong":      "#1D4ED8",
+
+    # Navegação
+    "nav_bg":           "#FFFFFF",
+    "nav_text":         "#64748B",
+    "nav_muted":        "#94A3B8",
+    "nav_active_bg":    "#EEF2FF",
+    "nav_hover":        "#F8FAFC",
+    "nav_active_text":  "#4F46E5",
+
+    # Marca / gradiente
+    "brand_accent":     "#4F46E5",
+    "brand_gradient_start": "#4F46E5",
+    "brand_gradient_mid":   "#6366F1",
+    "brand_gradient_end":   "#7C3AED",
+
+    # Chat
+    "bg_chat":          "#F8F7FF",
+    "bubble_sent":      "#4F46E5",
+    "bubble_recv":      "#FFFFFF",
+
+    # Tags / chips
+    "tag_bg":           "#F3F4F6",
+    "tag_text":         "#4B5563",
+
+    # Status
+    "status_online":    "#059669",
+    "status_offline":   "#D1D5DB",
+    "status_busy":      "#D97706",
+
+    # Inputs
+    "input_bg":         "#F9FAFB",
+    "input_border":     "#D1D5DB",
+    "input_border_focus":"#4F46E5",
+    "input_placeholder": "#9CA3AF",
+
+    # Música
+    "card_music":       "#4F46E5",
+    "border_music":     "#4338CA",
+
+    # Risco / bem-estar
+    "critico":          "#DC2626",
+    "critico_soft":     "#FEE2E2",
+    "alto":             "#EA580C",
+    "alto_soft":        "#FFEDD5",
+    "medio":            "#D97706",
+    "medio_soft":       "#FEF3C7",
+    "normal":           "#059669",
+    "normal_soft":      "#D1FAE5",
+
+    # KPI
+    "kpi_blue":         "#4F46E5",
+    "kpi_blue_soft":    "#EEF2FF",
+    "kpi_green":        "#059669",
+    "kpi_green_soft":   "#D1FAE5",
+    "kpi_red":          "#DC2626",
+    "kpi_red_soft":     "#FEE2E2",
+    "kpi_violet":       "#7C3AED",
+    "kpi_violet_soft":  "#EDE9FE",
+    "kpi_amber":        "#D97706",
+    "kpi_amber_soft":   "#FEF3C7",
+    "kpi_pink":         "#DB2777",
+    "kpi_pink_soft":    "#FCE7F3",
+
+    # Gráfico
+    "chart_grid":       "#E5E7EB",
+    "chart_line":       "#4F46E5",
+    "chart_fill":       "#EEF2FF",
+    "dot_good":         "#059669",
+    "dot_mid":          "#D97706",
+    "dot_bad":          "#DC2626",
+
+    # Chips / tags específicas de relatórios
+    "chip_geral_bg":    "#EEF2FF",
+    "chip_geral_text":  "#4F46E5",
+    "chip_estudante_bg":"#D1FAE5",
+    "chip_estudante_text":"#065F46",
+    "chip_agenda_bg":   "#FEF3C7",
+    "chip_agenda_text": "#92400E",
+    "chip_default_bg":  "#F3F4F6",
+    "chip_default_text":"#374151",
+    "chip_intervencoes_bg":"#EDE9FE",
+    "chip_intervencoes_text":"#5B21B6",
+    "chip_triagens_bg": "#FEF3C7",
+    "chip_triagens_text":"#92400E",
+    "chip_estatisticas_bg":"#F5F3FF",
+    "chip_estatisticas_text":"#4F46E5",
+
+    # Exportação
+    "export_item_bg":   "#F5F3FF",
+    "export_item_hover":"#EEF2FF",
+
+    # Lista de relatórios
+    "row_bg":           "#FAFAFA",
+    "row_hover":        "#F5F3FF",
+    "row_border":       "#F3F4F6",
+
+    # Gráfico de barras (relatórios)
+    "chart_bar_1":      "#4F46E5",
+    "chart_bar_2":      "#059669",
+    "chart_bar_3":      "#D97706",
+    "chart_bar_soft_1": "#C7D2FE",
+    "chart_bar_soft_2": "#6EE7B7",
+    "chart_bar_soft_3": "#FDE68A",
+
+    # Gráfico
+    "chart_grid":       "#E5E7EB",
+    "chart_line":       "#4F46E5",
+    "chart_fill":       "#EEF2FF",
+    "dot_good":         "#059669",
+    "dot_mid":          "#D97706",
+    "dot_bad":          "#DC2626",
+
+    # Overlay
+    "overlay":          "#0F172A",
+    "overlay_light":    "#F8FAFC",
+
+    # Shadows
     "shadow_xs": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
     "shadow_sm": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
     "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
@@ -93,84 +191,140 @@ LIGHT_THEME = {
     "shadow_xl": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
 }
 
+
 DARK_THEME = {
-    "bg": "#0F172A",
-    "bg_alt": "#1E293B",
-    "surface": "#1E293B",
+    # Neutros / superfície
+    "bg":               "#0F172A",
+    "page_bg":          "#0F172A",
+    "bg_alt":           "#1E293B",
+    "surface":          "#1E293B",
     "surface_elevated": "#334155",
-    "border": "#334155",
-    "border_strong": "#475569",
-    "divider": "#1E293B",
-    "text": "#F8FAFC",
-    "text_secondary": "#CBD5E1",
-    "text_muted": "#94A3B8",
-    "text_disabled": "#64748B",
-    "text_on_primary": "#FFFFFF",
-    "primary": "#818CF8",
-    "primary_hover": "#6366F1",
-    "primary_soft": "#1E1B4B",
-    "primary_medium": "#312E81",
-    "primary_strong": "#A5B4FC",
-    "accent": "#A78BFA",
-    "accent_soft": "#2E1065",
-    "accent_medium": "#4C1D95",
-    "success": "#34D399",
-    "success_soft": "#064E3B",
-    "success_medium": "#065F46",
-    "success_strong": "#6EE7B7",
-    "warning": "#FBBF24",
-    "warning_soft": "#78350F",
-    "warning_medium": "#92400E",
-    "warning_strong": "#FCD34D",
-    "danger": "#F87171",
-    "danger_soft": "#7F1D1D",
-    "danger_medium": "#991B1B",
-    "danger_strong": "#FCA5A5",
-    "info": "#60A5FA",
-    "info_soft": "#1E3A8A",
-    "info_medium": "#1E40AF",
-    "info_strong": "#93C5FD",
-    "nav_bg": "#1E293B",
-    "nav_text": "#94A3B8",
-    "nav_muted": "#64748B",
-    "nav_active_bg": "#312E81",
-    "nav_hover": "#334155",
-    "nav_active_text": "#A5B4FC",
-    "brand_accent": "#818CF8",
+    "border":           "#334155",
+    "border_strong":    "#475569",
+    "divider":          "#1E293B",
+
+    # Tipografia
+    "text":             "#F8FAFC",
+    "text_secondary":   "#CBD5E1",
+    "text_muted":       "#94A3B8",
+    "text_disabled":    "#64748B",
+    "text_on_primary":  "#FFFFFF",
+
+    # Marca / primária
+    "primary":          "#818CF8",
+    "primary_hover":    "#6366F1",
+    "primary_soft":     "#1E1B4B",
+    "primary_medium":   "#312E81",
+    "primary_strong":   "#A5B4FC",
+    "primary_light":    "#1E1B4B",
+
+    # Acento / secundária
+    "accent":           "#A78BFA",
+    "accent_hover":     "#8B5CF6",
+    "accent_soft":      "#2E1065",
+    "accent_medium":    "#4C1D95",
+    "accent_strong":    "#C4B5FD",
+
+    # Semântico
+    "success":          "#34D399",
+    "success_soft":     "#064E3B",
+    "success_medium":   "#065F46",
+    "success_strong":   "#6EE7B7",
+    "warning":          "#FBBF24",
+    "warning_soft":     "#78350F",
+    "warning_medium":   "#92400E",
+    "warning_strong":   "#FCD34D",
+    "danger":           "#F87171",
+    "danger_soft":      "#7F1D1D",
+    "danger_medium":    "#991B1B",
+    "danger_strong":    "#FCA5A5",
+    "info":             "#60A5FA",
+    "info_soft":        "#1E3A8A",
+    "info_medium":      "#1E40AF",
+    "info_strong":      "#93C5FD",
+
+    # Navegação
+    "nav_bg":           "#1E293B",
+    "nav_text":         "#94A3B8",
+    "nav_muted":        "#64748B",
+    "nav_active_bg":    "#312E81",
+    "nav_hover":        "#334155",
+    "nav_active_text":  "#A5B4FC",
+
+    # Marca / gradiente
+    "brand_accent":     "#818CF8",
     "brand_gradient_start": "#6366F1",
-    "brand_gradient_mid": "#8B5CF6",
-    "brand_gradient_end": "#A855F7",
-    "bg_chat": "#0F172A",
-    "card": "#1E293B",
-    "primary_light": "#1E1B4B",
-    "bubble_sent": "#6366F1",
-    "bubble_recv": "#334155",
-    "tag_bg": "#334155",
-    "tag_text": "#CBD5E1",
-    "status_online": "#34D399",
-    "status_offline": "#64748B",
-    "status_busy": "#FBBF24",
-    "input_bg": "#1E293B",
-    "input_border": "#334155",
-    "input_border_focus": "#818CF8",
+    "brand_gradient_mid":   "#8B5CF6",
+    "brand_gradient_end":   "#A855F7",
+
+    # Chat
+    "bg_chat":          "#0F172A",
+    "bubble_sent":      "#6366F1",
+    "bubble_recv":      "#334155",
+
+    # Tags / chips
+    "tag_bg":           "#334155",
+    "tag_text":         "#CBD5E1",
+
+    # Status
+    "status_online":    "#34D399",
+    "status_offline":   "#64748B",
+    "status_busy":      "#FBBF24",
+
+    # Inputs
+    "input_bg":         "#1E293B",
+    "input_border":     "#334155",
+    "input_border_focus":"#818CF8",
     "input_placeholder": "#64748B",
-    "card_music": "#6366F1",
-    "border_music": "#4F46E5",
-    "purple": "#A78BFA",
-    "purple_light": "#2E1065",
-    "purple_soft": "#4C1D95",
-    "chart_grid": "#1E293B",
-    "chart_line": "#818CF8",
-    "chart_area_start": "#818CF8",
-    "chart_area_end": "#1E293B",
-    "overlay": "#000000",
-    "overlay_light": "#F8FAFC",
+
+    # Música
+    "card_music":       "#6366F1",
+    "border_music":     "#4F46E5",
+
+    # Risco / bem-estar
+    "critico":          "#F87171",
+    "critico_soft":     "#7F1D1D",
+    "alto":             "#F97316",
+    "alto_soft":        "#7C2D12",
+    "medio":            "#FBBF24",
+    "medio_soft":       "#78350F",
+    "normal":           "#34D399",
+    "normal_soft":      "#064E3B",
+
+    # KPI
+    "kpi_blue":         "#818CF8",
+    "kpi_blue_soft":    "#1E1B4B",
+    "kpi_green":        "#34D399",
+    "kpi_green_soft":   "#064E3B",
+    "kpi_red":          "#F87171",
+    "kpi_red_soft":     "#7F1D1D",
+    "kpi_violet":       "#A78BFA",
+    "kpi_violet_soft":  "#2E1065",
+    "kpi_amber":        "#FBBF24",
+    "kpi_amber_soft":   "#78350F",
+    "kpi_pink":         "#F472B6",
+    "kpi_pink_soft":    "#831843",
+
+    # Gráfico
+    "chart_grid":       "#1E293B",
+    "chart_line":       "#818CF8",
+    "chart_fill":       "#1E1B4B",
+    "dot_good":         "#34D399",
+    "dot_mid":          "#FBBF24",
+    "dot_bad":          "#F87171",
+
+    # Overlay
+    "overlay":          "#000000",
+    "overlay_light":    "#F8FAFC",
+
+    # Shadows
     "shadow_xs": "0 1px 2px 0 rgb(0 0 0 / 0.3)",
     "shadow_sm": "0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4)",
     "shadow_md": "0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.4)",
     "shadow_lg": "0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4)",
     "shadow_xl": "0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5)",
 }
+
 
 THEME = LIGHT_THEME.copy()
 
@@ -210,7 +364,6 @@ def apply_global_style(mode: Literal["light", "dark"] = "light", color_theme: st
     except Exception:
         pass
     try:
-        # safe best-effort: built-in color themes include 'blue', 'green', etc.
         ctk.set_default_color_theme(color_theme)
     except Exception:
         pass
@@ -339,15 +492,15 @@ def shift_hue(hex_c: str, degrees: float) -> str:
 SEMANTIC_COLORS = {
     "positive": "#10B981",
     "negative": "#EF4444",
-    "neutral": "#6366F1",
-    "caution": "#F59E0B",
-    "info": "#3B82F6",
+    "neutral":  "#6366F1",
+    "caution":  "#F59E0B",
+    "info":     "#3B82F6",
 }
 
 STATUS_COLORS = {
-    "active": "#10B981",
+    "active":   "#10B981",
     "inactive": "#CBD5E1",
-    "pending": "#F59E0B",
-    "blocked": "#EF4444",
-    "review": "#6366F1",
+    "pending":  "#F59E0B",
+    "blocked":  "#EF4444",
+    "review":   "#6366F1",
 }

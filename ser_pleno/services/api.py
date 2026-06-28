@@ -67,64 +67,76 @@ class ClienteAPI:
 
     # ================= GET =================
 
-    def get(self, endpoint, params=None):
+    def get(self, endpoint, params=None, retries: int = 2, timeout: int = 6):
         logging.getLogger('apps.desktop.api').debug(f"GET {endpoint} params={params}")
 
         if not requests:
             return self._get_mock_response(endpoint, params)
 
-        try:
-            url = self._build_url(endpoint)
-            session = self._get_session()
-            response = session.get(url, params=params, timeout=6)
+        last_exception = None
+        for attempt in range(1, retries + 1):
+            try:
+                url = self._build_url(endpoint)
+                session = self._get_session()
+                response = session.get(url, params=params, timeout=timeout)
 
-            logging.getLogger('apps.desktop.api').debug(f"[GET] {url} -> {response.status_code}")
-            logging.getLogger('apps.desktop.api').debug(repr(getattr(response, "text", "")))
+                logging.getLogger('apps.desktop.api').debug(f"[GET] {url} -> {response.status_code} (attempt {attempt})")
 
-            if response.ok:
-                return self._safe_json(response)
+                if response.ok:
+                    return self._safe_json(response)
 
-            return {"success": False, "message": f"Erro na requisição: {response.status_code}", "status_code": response.status_code}
+                # Se for erro 4xx (cliente), não retry
+                if 400 <= response.status_code < 500:
+                    return {"success": False, "message": f"Erro na requisição: {response.status_code}", "status_code": response.status_code}
 
-        except requests.exceptions.ConnectionError as e:
-            marcar_api_indisponivel()
-            return {"success": False, "message": "Servidor indisponível no momento"}
-        except requests.exceptions.Timeout as e:
-            marcar_api_indisponivel()
-            return {"success": False, "message": "Tempo de conexão esgotado"}
-        except Exception as e:
-            logging.getLogger('apps.desktop.api').error(
-                "Erro GET inesperado: %s: %s", type(e).__name__, e
-            )
-            return {"success": False, "message": "Erro de conexão inesperado"}
+            except requests.exceptions.ConnectionError as e:
+                last_exception = e
+                marcar_api_indisponivel()
+            except requests.exceptions.Timeout as e:
+                last_exception = e
+                marcar_api_indisponivel()
+            except Exception as e:
+                logging.getLogger('apps.desktop.api').error(
+                    "Erro GET inesperado: %s: %s", type(e).__name__, e
+                )
+                return {"success": False, "message": "Erro de conexão inesperado"}
+
+        # Excedeu tentativas
+        msg = "Servidor indisponível no momento" if isinstance(last_exception, requests.exceptions.ConnectionError) else "Tempo de conexão esgotado"
+        return {"success": False, "message": msg}
 
     # ================= POST =================
 
-    def post(self, endpoint, data=None, json=None, files=None, headers=None):
+    def post(self, endpoint, data=None, json=None, files=None, headers=None, retries: int = 2, timeout: int = 8):
 
         if not requests:
             return {"success": False, "message": "Requests não disponível"}
 
-        try:
-            url = self._build_url(endpoint)
-            session = self._get_session()
+        last_exception = None
+        for attempt in range(1, retries + 1):
+            try:
+                url = self._build_url(endpoint)
+                session = self._get_session()
 
-            if files:
-                response = session.post(url, files=files, data=data, headers=headers, timeout=15)
-            else:
-                response = session.post(url, data=data, json=json, headers=headers, timeout=8)
+                if files:
+                    response = session.post(url, files=files, data=data, headers=headers, timeout=max(timeout, 15))
+                else:
+                    response = session.post(url, data=data, json=json, headers=headers, timeout=timeout)
 
-            logging.getLogger('apps.desktop.api').debug(f"[POST] {url} -> {response.status_code}")
-            logging.getLogger('apps.desktop.api').debug(repr(getattr(response, "text", "")))
+                logging.getLogger('apps.desktop.api').debug(f"[POST] {url} -> {response.status_code} (attempt {attempt})")
 
-            if response.ok:
-                return self._safe_json(response)
+                if response.ok:
+                    return self._safe_json(response)
 
-            return {"success": False, "message": f"Erro na requisição: {response.status_code}", "status_code": response.status_code}
+                if 400 <= response.status_code < 500:
+                    return {"success": False, "message": f"Erro na requisição: {response.status_code}", "status_code": response.status_code}
 
-        except Exception as e:
-            logging.getLogger('apps.desktop.api').exception("Erro POST")
-            return {"success": False, "message": f"Erro de conexão: {str(e)}"}
+            except Exception as e:
+                last_exception = e
+                logging.getLogger('apps.desktop.api').warning(f"Tentativa {attempt} falhou: {e}")
+
+        logging.getLogger('apps.desktop.api').exception("Erro POST após retries")
+        return {"success": False, "message": f"Erro de conexão: {str(last_exception)}"}
 
     # ================= MOCK =================
 

@@ -18,30 +18,9 @@ from components.ui_components import (
 
 logger = logging.getLogger("apps.desktop")
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Paleta dedicada + helpers de cor
 # ═══════════════════════════════════════════════════════════════════════════════
-CONFIG_COLORS: dict[str, str] = {
-    "bg":            THEME["bg"],
-    "card":          THEME["card"],
-    "border":        THEME["border"],
-    "border_strong": THEME["border_strong"],
-    "primary":       THEME["primary"],
-    "primary_light": THEME["primary_light"],
-    "primary_soft":  THEME["primary_soft"],
-    "text":          THEME["text"],
-    "text_muted":    THEME["text_muted"],
-    "text_secondary":THEME["text_secondary"],
-    "danger":        THEME["danger"],
-    "danger_soft":   THEME["danger_soft"],
-    "success":       THEME["success"],
-    "success_soft":  THEME["success_soft"],
-    "warning":       THEME["warning"],
-    "warning_soft":  THEME["warning_soft"],
-    "bg_alt":        THEME["bg_alt"],
-}
-
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Componentes reutilizáveis
@@ -55,7 +34,7 @@ class ConfigInputField(ctk.CTkFrame):
     _BORDER_FOCUS  = THEME["primary"]
     _BORDER_ERROR  = THEME["danger"]
     _BG_NORMAL     = THEME["bg_alt"]
-    _BG_FOCUS      = THEME["card"]
+    _BG_FOCUS      = THEME["surface"]
 
     def __init__(self, parent, label: str, value: str = "",
                  icon: str = "", placeholder: str = "",
@@ -65,7 +44,7 @@ class ConfigInputField(ctk.CTkFrame):
         self._label = ctk.CTkLabel(
             self, text=label,
             font=themed_font("caption", "bold"),
-            text_color=CONFIG_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
             anchor="w",
         )
         self._label.pack(fill="x", pady=(0, 4))
@@ -85,7 +64,7 @@ class ConfigInputField(ctk.CTkFrame):
             ctk.CTkLabel(
                 box, text=icon,
                 font=themed_font("body"),
-                text_color=CONFIG_COLORS["text_muted"],
+                text_color=THEME["text_muted"],
                 width=36,
             ).grid(row=0, column=0, padx=(10, 4), pady=8)
 
@@ -112,16 +91,16 @@ class ConfigInputField(ctk.CTkFrame):
     def set_error(self, msg: str = ""):
         self._box.configure(
             border_color=self._BORDER_ERROR,
-            fg_color=CONFIG_COLORS["danger_soft"],
+            fg_color=THEME["danger_soft"],
         )
-        self._label.configure(text_color=CONFIG_COLORS["danger"])
+        self._label.configure(text_color=THEME["danger"])
 
     def clear_state(self):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=CONFIG_COLORS["text_muted"])
+        self._label.configure(text_color=THEME["text_muted"])
 
     # Internos ----------------------------------------------------------------
     def _on_focus_in(self, _=None):
@@ -129,15 +108,14 @@ class ConfigInputField(ctk.CTkFrame):
             border_color=self._BORDER_FOCUS,
             fg_color=self._BG_FOCUS,
         )
-        self._label.configure(text_color=CONFIG_COLORS["primary"])
+        self._label.configure(text_color=THEME["primary"])
 
     def _on_focus_out(self, _=None):
         self._box.configure(
             border_color=self._BORDER_NORMAL,
             fg_color=self._BG_NORMAL,
         )
-        self._label.configure(text_color=CONFIG_COLORS["text_muted"])
-
+        self._label.configure(text_color=THEME["text_muted"])
 
 class ToggleRow(ctk.CTkFrame):
     """Linha com ícone + título + subtítulo + switch."""
@@ -154,17 +132,17 @@ class ToggleRow(ctk.CTkFrame):
         ctk.CTkLabel(
             txt, text=title,
             font=themed_font("body", "bold"),
-            text_color=CONFIG_COLORS["text"],
+            text_color=THEME["text"],
         ).pack(anchor="w")
         ctk.CTkLabel(
             txt, text=sub,
             font=themed_font("overline"),
-            text_color=CONFIG_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
         ).pack(anchor="w")
 
         self.switch = ctk.CTkSwitch(
             self, text="",
-            progress_color=CONFIG_COLORS["primary"],
+            progress_color=THEME["primary"],
         )
         self.switch.pack(side="right", padx=8)
         if initial:
@@ -177,7 +155,6 @@ class ToggleRow(ctk.CTkFrame):
         if self._on_toggle:
             self._on_toggle(self.switch.get())
 
-
 class ActionItemRow(ctk.CTkFrame):
     """Linha de item de ação com ícone, título, subtítulo e botão."""
 
@@ -189,7 +166,7 @@ class ActionItemRow(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self, text=icon, font=themed_font("h3"),
-            fg_color=CONFIG_COLORS["bg_alt"],
+            fg_color=THEME["bg_alt"],
             width=40, height=40,
             corner_radius=RADIUS["pill"],
         ).pack(side="left", padx=(0, 12))
@@ -200,16 +177,16 @@ class ActionItemRow(ctk.CTkFrame):
         ctk.CTkLabel(
             txt, text=title,
             font=themed_font("body", "bold"),
-            text_color=CONFIG_COLORS["text"],
+            text_color=THEME["text"],
         ).pack(anchor="w")
         ctk.CTkLabel(
             txt, text=sub,
             font=themed_font("overline"),
-            text_color=CONFIG_COLORS["text_muted"],
+            text_color=THEME["text_muted"],
         ).pack(anchor="w")
 
-        color = CONFIG_COLORS["danger"] if danger else CONFIG_COLORS["primary"]
-        hover = CONFIG_COLORS["danger_soft"] if danger else CONFIG_COLORS["primary_soft"]
+        color = THEME["danger"] if danger else THEME["primary"]
+        hover = THEME["danger_soft"] if danger else THEME["primary_soft"]
 
         btn = GhostButton(
             self, text=btn_text, width=150,
@@ -226,17 +203,16 @@ class ActionItemRow(ctk.CTkFrame):
         if self._on_action:
             self._on_action(btn_text)
 
-
 class SectionCard(ctk.CTkFrame):
     """Card de seção com ícone e título."""
 
     def __init__(self, parent, icon: str, title: str, badge: str = ""):
         super().__init__(
             parent,
-            fg_color=CONFIG_COLORS["card"],
+            fg_color=THEME["surface"],
             corner_radius=RADIUS["lg"],
             border_width=1,
-            border_color=CONFIG_COLORS["border"],
+            border_color=THEME["border"],
         )
         self._icon = icon
         self._title = title
@@ -248,13 +224,13 @@ class SectionCard(ctk.CTkFrame):
         ctk.CTkLabel(
             header, text=f"{icon}  {title}",
             font=themed_font("h3", "bold"),
-            text_color=CONFIG_COLORS["text"],
+            text_color=THEME["text"],
         ).pack(side="left")
 
         if badge:
             Badge(
                 header, text=badge,
-                color=CONFIG_COLORS["warning"],
+                color=THEME["warning"],
             ).pack(side="right")
 
         self._body = ctk.CTkFrame(self, fg_color="transparent")
@@ -264,7 +240,6 @@ class SectionCard(ctk.CTkFrame):
     def body(self) -> ctk.CTkFrame:
         return self._body
 
-
 class FormModal(ctk.CTkToplevel):
     """Modal reutilizável para formulários."""
 
@@ -273,7 +248,7 @@ class FormModal(ctk.CTkToplevel):
         self.title(title)
         self.geometry(f"{width}x{height}")
         self.resizable(False, False)
-        self.configure(fg_color=CONFIG_COLORS["card"])
+        self.configure(fg_color=THEME["surface"])
         self.withdraw()
 
         self._center(parent, width, height)
@@ -292,7 +267,7 @@ class FormModal(ctk.CTkToplevel):
         ctk.CTkLabel(
             inner, text=self.title(),
             font=themed_font("h3", "bold"),
-            text_color=CONFIG_COLORS["text"],
+            text_color=THEME["text"],
         ).pack(pady=(0, 18))
 
         self._fields_frame = ctk.CTkFrame(inner, fg_color="transparent")
@@ -314,7 +289,6 @@ class FormModal(ctk.CTkToplevel):
 
     def _on_confirm(self):
         raise NotImplementedError
-
 
 class AlterarSenhaModal(FormModal):
     def __init__(self, parent, on_save):
@@ -346,13 +320,12 @@ class AlterarSenhaModal(FormModal):
         self._on_save(atual, nova)
         self.destroy()
 
-
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Frame principal de configurações
 # ═══════════════════════════════════════════════════════════════════════════════
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=CONFIG_COLORS["bg"])
+        super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
         self.base_path  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self._images: dict[str, Any] = {}
@@ -432,10 +405,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         self.gallery_frame = ctk.CTkFrame(
             card.body,
-            fg_color=CONFIG_COLORS["bg_alt"],
+            fg_color=THEME["bg_alt"],
             corner_radius=RADIUS["md"],
             border_width=1,
-            border_color=CONFIG_COLORS["border"],
+            border_color=THEME["border"],
         )
         self.grid_galeria = ctk.CTkFrame(self.gallery_frame, fg_color="transparent")
         self.grid_galeria.pack(padx=10, pady=10)
@@ -467,7 +440,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 image=self._load_image(filename, (52, 52)),
                 width=52, height=52,
                 fg_color="white",
-                hover_color=CONFIG_COLORS["primary_light"],
+                hover_color=THEME["primary_light"],
                 corner_radius=RADIUS["md"],
                 command=lambda fn=filename: self._select_avatar(fn),
             ).grid(row=i // 3, column=i % 3, padx=3, pady=3)
@@ -521,10 +494,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._theme_select = ctk.CTkOptionMenu(
             row,
             values=["Modo Sereno (Claro)", "Modo Foco (Escuro)"],
-            fg_color=CONFIG_COLORS["bg_alt"],
-            text_color=CONFIG_COLORS["text"],
-            button_color=CONFIG_COLORS["border"],
-            button_hover_color=CONFIG_COLORS["border_strong"],
+            fg_color=THEME["bg_alt"],
+            text_color=THEME["text"],
+            button_color=THEME["border"],
+            button_hover_color=THEME["border_strong"],
             height=34,
             command=self._alterar_tema,
         )
@@ -533,10 +506,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._font_select = ctk.CTkOptionMenu(
             row,
             values=["Padrão (16px)", "Grande (18px)"],
-            fg_color=CONFIG_COLORS["bg_alt"],
-            text_color=CONFIG_COLORS["text"],
-            button_color=CONFIG_COLORS["border"],
-            button_hover_color=CONFIG_COLORS["border_strong"],
+            fg_color=THEME["bg_alt"],
+            text_color=THEME["text"],
+            button_color=THEME["border"],
+            button_hover_color=THEME["border_strong"],
             height=34,
             command=self._alterar_fonte,
         )
@@ -548,7 +521,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             tip.body,
             text="📝  O Modo Foco reduz a emissão de luz azul, ideal para sessões noturnas.",
             font=themed_font("body"),
-            text_color=CONFIG_COLORS["text_secondary"],
+            text_color=THEME["text_secondary"],
             wraplength=420, justify="left",
         ).pack(anchor="w", padx=14, pady=12)
 

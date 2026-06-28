@@ -2,92 +2,23 @@ import customtkinter as ctk
 from PIL import Image
 import os
 import datetime
-import threading
 import time
+from ui_theme import THEME, SPACING, RADIUS, themed_font
 from services.comunicacao import ServicoComunicacao
+from utils.async_runner import AsyncRunner
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Design tokens – família índigo (consistente com login/app/dashboard)
 # ══════════════════════════════════════════════════════════════════════════════
-C = {
-    # Layout
-    "page_bg":          "#F8F7FF",
-    "sidebar_bg":       "#FFFFFF",
-    "sidebar_border":   "#E5E7EB",
-    "sidebar_w":        300,
-
-    # Chat area
-    "chat_bg":          "#F3F4F8",
-    "header_bg":        "#FFFFFF",
-    "header_border":    "#E5E7EB",
-    "input_bg":         "#FFFFFF",
-    "input_border":     "#E5E7EB",
-    "input_focus":      "#4F46E5",
-
-    # Bolhas
-    "bubble_sent_bg":   "#4F46E5",   # índigo – mensagem enviada
-    "bubble_sent_text": "#FFFFFF",
-    "bubble_recv_bg":   "#FFFFFF",   # branco – mensagem recebida
-    "bubble_recv_text": "#111827",
-    "bubble_recv_border":"#E5E7EB",
-
-    # Timestamp / tick
-    "time_color":       "#9CA3AF",
-    "tick_read":        "#4F46E5",
-    "tick_sent":        "#9CA3AF",
-
-    # Contato ativo
-    "contact_active_bg":"#EEF2FF",
-    "contact_hover_bg": "#F5F3FF",
-
-    # Texto
-    "text":             "#111827",
-    "text_muted":       "#6B7280",
-    "text_light":       "#9CA3AF",
-
-    # Acento
-    "accent":           "#4F46E5",
-    "accent_soft":      "#EEF2FF",
-    "accent_hover":     "#4338CA",
-
-    # Status online
-    "online":           "#10B981",
-    "offline":          "#9CA3AF",
-
-    # Badge não-lidas
-    "badge_bg":         "#DC2626",
-    "badge_text":       "#FFFFFF",
-
-    # Data-label no chat
-    "date_label_bg":    "#E5E7EB",
-    "date_label_text":  "#6B7280",
-
-    # Avatar cores por papel
-    "avatar_admin":     "#7C3AED",
-    "avatar_analista":  "#4F46E5",
-    "avatar_coord":     "#059669",
-    "avatar_suporte":   "#D97706",
-    "avatar_group":     "#EC4899",
-
-    # Arquivo card
-    "file_card_bg":     "#F9FAFB",
-    "file_card_border": "#E5E7EB",
-
-    # Modal arquivos
-    "modal_bg":         "#FFFFFF",
-    "modal_border":     "#E5E7EB",
-    "modal_item_bg":    "#F5F3FF",
-    "modal_item_hover": "#EEF2FF",
-}
 
 # Cor de avatar por papel
-_AVATAR_COLOR = {
-    "admin":       C["avatar_admin"],
-    "analista":    C["avatar_analista"],
-    "coordenador": C["avatar_coord"],
-    "suporte":     C["avatar_suporte"],
-    "group":       C["avatar_group"],
+_CHAT_AVATAR_COLORS = {
+    "admin":       THEME["kpi_violet"],
+    "analista":    THEME["primary"],
+    "coordenador": THEME["success"],
+    "suporte":     THEME["warning"],
+    "group":       "#EC4899",
 }
 
 # Iniciais padrão por papel
@@ -125,7 +56,7 @@ def _make_avatar(parent, initials: str, color: str,
 # ══════════════════════════════════════════════════════════════════════════════
 class ComunicacaoInternaFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
-        super().__init__(parent, fg_color=C["page_bg"])
+        super().__init__(parent, fg_color=THEME["bg"])
         self.controller          = controller
         self.servico_comunicacao = ServicoComunicacao()
         self.contatos:     list  = []
@@ -193,8 +124,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def _criar_sidebar(self):
         sidebar = ctk.CTkFrame(
             self,
-            width=C["sidebar_w"],
-            fg_color=C["sidebar_bg"],
+            width=300,
+            fg_color=THEME["surface"],
             corner_radius=0,
             border_width=0,
         )
@@ -210,16 +141,16 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             hdr, text="Mensagens",
             font=ctk.CTkFont("Segoe UI", 17, "bold"),
-            text_color=C["text"],
+            text_color=THEME["text"],
         ).pack(side="left")
 
         # Botão nova conversa
         ctk.CTkButton(
             hdr, text="✏",
             width=34, height=34, corner_radius=10,
-            fg_color=C["accent_soft"],
-            hover_color=C["accent_hover"],
-            text_color=C["accent"],
+            fg_color=THEME["primary_soft"],
+            hover_color=THEME["primary_hover"],
+            text_color=THEME["primary"],
             font=ctk.CTkFont("Segoe UI", 15),
             command=lambda: None,
         ).pack(side="right")
@@ -234,7 +165,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             search_wrap, text="🔍",
             font=ctk.CTkFont("Segoe UI", 13),
-            text_color=C["text_light"],
+            text_color=THEME["text_muted"],
         ).pack(side="left", padx=(10, 0))
 
         self.entry_busca = ctk.CTkEntry(
@@ -242,8 +173,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             placeholder_text="Buscar conversas...",
             fg_color="transparent",
             border_width=0,
-            text_color=C["text"],
-            placeholder_text_color=C["text_light"],
+            text_color=THEME["text"],
+            placeholder_text_color=THEME["text_muted"],
             font=ctk.CTkFont("Segoe UI", 13),
             height=36,
         )
@@ -252,7 +183,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # ── Lista de contatos ───────────────────────────────────────
         ctk.CTkFrame(sidebar, height=1,
-                     fg_color=C["sidebar_border"]).grid(
+                     fg_color=THEME["border"]).grid(
             row=2, column=0, sticky="ew", padx=0, pady=0
         )
         self.scroll_contacts = ctk.CTkScrollableFrame(
@@ -314,7 +245,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar colorido com inicial
-        av_color = _AVATAR_COLOR.get(papel, C["accent"])
+        av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
         av_init  = nome[:2].upper() if papel != "group" else "👥"
         av = _make_avatar(inner, av_init, av_color, size=44)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="nsew")
@@ -323,7 +254,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             inner, text=nome,
             font=ctk.CTkFont("Segoe UI", 13, "bold"),
-            text_color=C["text"], anchor="w",
+            text_color=THEME["text"], anchor="w",
         ).grid(row=0, column=1, sticky="w")
 
         # Sub-label (papel)
@@ -331,14 +262,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             inner, text=sub,
             font=ctk.CTkFont("Segoe UI", 11),
-            text_color=C["text_muted"], anchor="w",
+            text_color=THEME["text_secondary"], anchor="w",
         ).grid(row=1, column=1, sticky="w")
 
         # Badge de não-lidas (oculto por padrão)
         unread = self.contador_nao_lidas.get(cid, 0)
         badge_frame = ctk.CTkFrame(
             inner, width=22, height=22,
-            corner_radius=11, fg_color=C["badge_bg"],
+            corner_radius=11, fg_color=THEME["danger"],
         )
         if unread > 0:
             badge_frame.grid(row=0, column=2, rowspan=2, padx=(6, 0))
@@ -346,14 +277,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             ctk.CTkLabel(
                 badge_frame, text=str(unread),
                 font=ctk.CTkFont("Segoe UI", 9, "bold"),
-                text_color=C["badge_text"],
+                text_color=THEME["text_on_primary"],
             ).place(relx=0.5, rely=0.5, anchor="center")
         row._badge_frame = badge_frame
 
         # Hover
-        row.bind("<Enter>",   lambda e, r=row: r.configure(fg_color=C["contact_hover_bg"]))
+        row.bind("<Enter>",   lambda e, r=row: r.configure(fg_color=THEME["primary_soft"]))
         row.bind("<Leave>",   lambda e, r=row, cid2=cid: r.configure(
-            fg_color=C["contact_active_bg"]
+            fg_color=THEME["primary_soft"]
             if self.conversa_ativa and self.conversa_ativa.get("id") == cid2
             else "transparent"
         ))
@@ -388,7 +319,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             if hasattr(w, "contato_data"):
                 w.configure(fg_color="transparent")
         if item_widget:
-            item_widget.configure(fg_color=C["contact_active_bg"])
+            item_widget.configure(fg_color=THEME["primary_soft"])
 
         self.conversa_ativa = contato
         self.conversa_atual = contato
@@ -402,7 +333,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.lbl_chat_status.configure(text=sub)
 
         # Atualiza avatar no header
-        av_color = _AVATAR_COLOR.get(papel, C["accent"])
+        av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
         av_init  = nome[:2].upper() if papel != "group" else "👥"
         for w in self._header_av_slot.winfo_children():
             w.destroy()
@@ -415,7 +346,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     #  CHAT AREA
     # ══════════════════════════════════════════
     def _criar_chat_area(self):
-        chat = ctk.CTkFrame(self, fg_color=C["chat_bg"], corner_radius=0)
+        chat = ctk.CTkFrame(self, fg_color=THEME["bg"], corner_radius=0)
         chat.grid(row=0, column=1, sticky="nsew")
         chat.grid_rowconfigure(1, weight=1)
         chat.grid_columnconfigure(0, weight=1)
@@ -428,7 +359,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def _criar_chat_header(self, parent):
         header = ctk.CTkFrame(
             parent,
-            fg_color=C["header_bg"],
+            fg_color=THEME["surface"],
             corner_radius=0,
             height=66,
         )
@@ -436,7 +367,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         header.grid_propagate(False)
         # Linha de separação base
         ctk.CTkFrame(header, height=1,
-                     fg_color=C["header_border"]).pack(side="bottom", fill="x")
+                     fg_color=THEME["border"]).pack(side="bottom", fill="x")
 
         inner = ctk.CTkFrame(header, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=20, pady=0)
@@ -449,7 +380,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self._header_av_slot.pack(side="left", padx=(0, 14))
         self._header_av_slot.pack_propagate(False)
         # Avatar inicial
-        _make_avatar(self._header_av_slot, "AN", C["avatar_analista"], 42).pack()
+        _make_avatar(self._header_av_slot, "AN", THEME["primary"], 42).pack()
 
         # Nome + status
         title_stack = ctk.CTkFrame(inner, fg_color="transparent")
@@ -458,7 +389,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.lbl_chat_nome = ctk.CTkLabel(
             title_stack, text="Selecione uma conversa",
             font=ctk.CTkFont("Segoe UI", 14, "bold"),
-            text_color=C["text"],
+            text_color=THEME["text"],
         )
         self.lbl_chat_nome.pack(anchor="w")
 
@@ -468,13 +399,13 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         # Ponto verde de status
         ctk.CTkFrame(
             status_row, width=8, height=8,
-            corner_radius=4, fg_color=C["online"],
+            corner_radius=4, fg_color=THEME["success"],
         ).pack(side="left", padx=(0, 5))
 
         self.lbl_chat_status = ctk.CTkLabel(
             status_row, text="Online",
             font=ctk.CTkFont("Segoe UI", 11),
-            text_color=C["online"],
+            text_color=THEME["success"],
         )
         self.lbl_chat_status.pack(side="left")
 
@@ -487,8 +418,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 actions, text=icon,
                 width=36, height=36, corner_radius=10,
                 fg_color="transparent",
-                hover_color=C["accent_soft"],
-                text_color=C["text_muted"],
+                hover_color=THEME["primary_soft"],
+                text_color=THEME["text_secondary"],
                 font=ctk.CTkFont("Segoe UI", 16),
             ).pack(side="left", padx=3)
 
@@ -506,14 +437,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def _criar_input_area(self, parent):
         input_bar = ctk.CTkFrame(
             parent,
-            fg_color=C["input_bg"],
+            fg_color=THEME["input_bg"],
             corner_radius=0,
             height=74,
         )
         input_bar.grid(row=2, column=0, sticky="ew")
         input_bar.grid_propagate(False)
         ctk.CTkFrame(input_bar, height=1,
-                     fg_color=C["header_border"]).pack(side="top", fill="x")
+                     fg_color=THEME["border"]).pack(side="top", fill="x")
 
         inner = ctk.CTkFrame(input_bar, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=16, pady=10)
@@ -524,7 +455,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             fg_color="#F9FAFB",
             corner_radius=14,
             border_width=1,
-            border_color=C["input_border"],
+            border_color=THEME["input_border"],
         )
         box.pack(fill="x", expand=True)
 
@@ -533,8 +464,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             box, text="📎",
             width=36, height=36, corner_radius=10,
             fg_color="transparent",
-            hover_color=C["accent_soft"],
-            text_color=C["text_muted"],
+            hover_color=THEME["primary_soft"],
+            text_color=THEME["text_secondary"],
             font=ctk.CTkFont("Segoe UI", 16),
             command=self.toggle_modal_arquivos,
         )
@@ -546,23 +477,23 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             placeholder_text="Digite sua mensagem...",
             fg_color="transparent",
             border_width=0,
-            text_color=C["text"],
-            placeholder_text_color=C["text_light"],
+            text_color=THEME["text"],
+            placeholder_text_color=THEME["text_muted"],
             font=ctk.CTkFont("Segoe UI", 13),
             height=42,
         )
         self.entry_mensagem.pack(side="left", fill="x", expand=True, padx=4)
         self.entry_mensagem.bind("<Return>", lambda e: self.enviar_mensagem())
-        self.entry_mensagem.bind("<FocusIn>",  lambda e: box.configure(border_color=C["input_focus"]))
-        self.entry_mensagem.bind("<FocusOut>", lambda e: box.configure(border_color=C["input_border"]))
+        self.entry_mensagem.bind("<FocusIn>",  lambda e: box.configure(border_color=THEME["input_border_focus"]))
+        self.entry_mensagem.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
 
         # Emoji
         ctk.CTkButton(
             box, text="😊",
             width=36, height=36, corner_radius=10,
             fg_color="transparent",
-            hover_color=C["accent_soft"],
-            text_color=C["text_muted"],
+            hover_color=THEME["primary_soft"],
+            text_color=THEME["text_secondary"],
             font=ctk.CTkFont("Segoe UI", 16),
         ).pack(side="left", padx=4)
 
@@ -570,8 +501,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.btn_enviar = ctk.CTkButton(
             box, text="➤",
             width=40, height=40, corner_radius=12,
-            fg_color=C["accent"],
-            hover_color=C["accent_hover"],
+            fg_color=THEME["primary"],
+            hover_color=THEME["primary_hover"],
             text_color="#FFFFFF",
             font=ctk.CTkFont("Segoe UI", 16, "bold"),
             command=self.enviar_mensagem,
@@ -587,10 +518,10 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def _criar_modal_arquivos(self, parent):
         self.modal_arquivos = ctk.CTkFrame(
             parent,
-            fg_color=C["modal_bg"],
+            fg_color=THEME["surface"],
             corner_radius=14,
             border_width=1,
-            border_color=C["modal_border"],
+            border_color=THEME["border"],
             width=280,
         )
         self.modal_arquivos.grid(row=2, column=0, sticky="sw",
@@ -614,7 +545,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             self.modal_arquivos,
             text="Enviar arquivo",
             font=ctk.CTkFont("Segoe UI", 13, "bold"),
-            text_color=C["text"],
+            text_color=THEME["text"],
         ).grid(row=0, column=0, columnspan=3, padx=14, pady=(12, 8), sticky="w")
 
         for i, (icon, nome, exts) in enumerate(categorias):
@@ -624,9 +555,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 font=ctk.CTkFont("Segoe UI", 11),
                 height=58, width=78,
                 corner_radius=10,
-                fg_color=C["modal_item_bg"],
-                hover_color=C["modal_item_hover"],
-                text_color=C["text"],
+                fg_color=THEME["bg_alt"],
+                hover_color=THEME["primary_soft"],
+                text_color=THEME["text"],
                 command=lambda c={"nome": nome, "extensao": exts}: self.selecionar_categoria(c),
             )
             row_i, col_i = divmod(i, 3)
@@ -690,14 +621,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         # Label de data
         date_lbl = ctk.CTkFrame(
             self.msg_area,
-            fg_color=C["date_label_bg"],
+            fg_color=THEME["bg_alt"],
             corner_radius=10,
         )
         date_lbl.pack(pady=(12, 8))
         ctk.CTkLabel(
             date_lbl, text="HOJE",
             font=ctk.CTkFont("Segoe UI", 10, "bold"),
-            text_color=C["date_label_text"],
+            text_color=THEME["text_secondary"],
         ).pack(padx=14, pady=4)
 
         for msg in self.mensagens:
@@ -725,10 +656,10 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 and self.conversa_ativa["role"] == "group"):
             av_row = ctk.CTkFrame(wrapper, fg_color="transparent")
             av_row.pack(anchor="w", pady=(0, 2))
-            av_color = C["accent"]
+            av_color = THEME["primary"]
             for c in self.contatos:
                 if c["id"] == msg["sender_id"]:
-                    av_color = _AVATAR_COLOR.get(c.get("role", ""), C["accent"])
+                    av_color = _CHAT_AVATAR_COLORS.get(c.get("role", ""), THEME["primary"])
                     break
             _make_avatar(av_row, remetente[:2].upper(), av_color, 22).pack(
                 side="left", padx=(0, 6)
@@ -736,20 +667,20 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             ctk.CTkLabel(
                 av_row, text=remetente,
                 font=ctk.CTkFont("Segoe UI", 11, "bold"),
-                text_color=C["text_muted"],
+                text_color=THEME["text_secondary"],
             ).pack(side="left")
 
         # Bolha
         bubble = ctk.CTkFrame(
             wrapper,
-            fg_color=C["bubble_sent_bg"] if is_mine else C["bubble_recv_bg"],
+            fg_color=THEME["primary"] if is_mine else THEME["surface"],
             corner_radius=14,
             border_width=0 if is_mine else 1,
-            border_color=C["bubble_recv_border"],
+            border_color=THEME["border"],
         )
         bubble.pack(anchor="e" if is_mine else "w")
 
-        txt_color = C["bubble_sent_text"] if is_mine else C["bubble_recv_text"]
+        txt_color = THEME["text_on_primary"] if is_mine else THEME["text"]
 
         if "caminho_arquivo" in msg:
             self._criar_mensagem_arquivo(bubble, msg, txt_color)
@@ -776,14 +707,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             meta, text=time_str,
             font=ctk.CTkFont("Segoe UI", 10),
-            text_color=C["time_color"],
+            text_color=THEME["text_muted"],
         ).pack(side="left")
 
         if is_mine:
             ctk.CTkLabel(
                 meta, text=" ✓✓",
                 font=ctk.CTkFont("Segoe UI", 10),
-                text_color=C["tick_read"] if msg.get("read") else C["tick_sent"],
+                text_color=THEME["primary"] if msg.get("read") else THEME["text_muted"],
             ).pack(side="left")
 
     def _criar_mensagem_arquivo(self, bubble, msg: dict, txt_color: str):
@@ -795,10 +726,10 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         card = ctk.CTkFrame(
             bubble,
-            fg_color=C["file_card_bg"],
+            fg_color=THEME["input_bg"],
             corner_radius=10,
             border_width=1,
-            border_color=C["file_card_border"],
+            border_color=THEME["border"],
         )
         card.pack(padx=12, pady=10, fill="x")
         card.grid_columnconfigure(1, weight=1)
@@ -811,13 +742,13 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             card, text=nome,
             font=ctk.CTkFont("Segoe UI", 12, "bold"),
-            text_color=C["text"], anchor="w", wraplength=220,
+            text_color=THEME["text"], anchor="w", wraplength=220,
         ).grid(row=0, column=1, sticky="w", pady=(10, 2))
 
         ctk.CTkLabel(
             card, text=tam,
             font=ctk.CTkFont("Segoe UI", 11),
-            text_color=C["text_muted"], anchor="w",
+            text_color=THEME["text_secondary"], anchor="w",
         ).grid(row=1, column=1, sticky="w", pady=(0, 10))
 
         btns = ctk.CTkFrame(card, fg_color="transparent")
@@ -830,9 +761,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             ctk.CTkButton(
                 btns, text=icon_btn,
                 width=30, height=30, corner_radius=8,
-                fg_color=C["accent_soft"],
-                hover_color=C["accent_hover"],
-                text_color=C["accent"],
+                fg_color=THEME["primary_soft"],
+                hover_color=THEME["primary_hover"],
+                text_color=THEME["primary"],
                 font=ctk.CTkFont("Segoe UI", 14),
                 command=cmd,
             ).pack(pady=3)
@@ -925,12 +856,16 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     #  Atualização periódica
     # ══════════════════════════════════════════
     def _iniciar_atualizacao_periodica(self):
-        def task():
-            while self.atualizacao_periodica:
-                time.sleep(5)
-                if not self.atualizando:
-                    self._atualizar_dados()
-        threading.Thread(target=task, daemon=True).start()
+        def ciclo():
+            AsyncRunner.run(
+                task=self._atualizar_dados,
+                on_error=lambda exc: logger.warning("Falha na atualização periódica: %s", exc),
+                widget_ref=self,
+            )
+            if self.atualizacao_periodica and self.winfo_exists():
+                self.after(5000, ciclo)
+
+        self.after(5000, ciclo)
 
     def iniciar_atualizacao_periodica(self):
         self._iniciar_atualizacao_periodica()
