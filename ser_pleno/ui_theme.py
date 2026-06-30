@@ -91,6 +91,15 @@ LIGHT_THEME = {
     "tag_bg":           "#F3F4F6",
     "tag_text":         "#4B5563",
 
+    # Chips específicos (relatórios)
+    "chip_geral_bg":        "#EEF2FF",
+    "chip_geral_text":      "#4F46E5",
+    "chip_estudante_bg":    "#D1FAE5",
+    "chip_estudante_text":  "#059669",
+    "chip_agenda_bg":       "#FEF3C7",
+    "chip_agenda_text":     "#D97706",
+    "export_item_bg":       "#EEF2FF",
+
     # Status
     "status_online":    "#059669",
     "status_offline":   "#D1D5DB",
@@ -127,49 +136,12 @@ LIGHT_THEME = {
     "kpi_violet_soft":  "#EDE9FE",
     "kpi_amber":        "#D97706",
     "kpi_amber_soft":   "#FEF3C7",
+
+    # Linhas de tabela
+    "row_bg":           "#F8FAFC",
+    "row_hover":        "#EEF2FF",
     "kpi_pink":         "#DB2777",
     "kpi_pink_soft":    "#FCE7F3",
-
-    # Gráfico
-    "chart_grid":       "#E5E7EB",
-    "chart_line":       "#4F46E5",
-    "chart_fill":       "#EEF2FF",
-    "dot_good":         "#059669",
-    "dot_mid":          "#D97706",
-    "dot_bad":          "#DC2626",
-
-    # Chips / tags específicas de relatórios
-    "chip_geral_bg":    "#EEF2FF",
-    "chip_geral_text":  "#4F46E5",
-    "chip_estudante_bg":"#D1FAE5",
-    "chip_estudante_text":"#065F46",
-    "chip_agenda_bg":   "#FEF3C7",
-    "chip_agenda_text": "#92400E",
-    "chip_default_bg":  "#F3F4F6",
-    "chip_default_text":"#374151",
-    "chip_intervencoes_bg":"#EDE9FE",
-    "chip_intervencoes_text":"#5B21B6",
-    "chip_triagens_bg": "#FEF3C7",
-    "chip_triagens_text":"#92400E",
-    "chip_estatisticas_bg":"#F5F3FF",
-    "chip_estatisticas_text":"#4F46E5",
-
-    # Exportação
-    "export_item_bg":   "#F5F3FF",
-    "export_item_hover":"#EEF2FF",
-
-    # Lista de relatórios
-    "row_bg":           "#FAFAFA",
-    "row_hover":        "#F5F3FF",
-    "row_border":       "#F3F4F6",
-
-    # Gráfico de barras (relatórios)
-    "chart_bar_1":      "#4F46E5",
-    "chart_bar_2":      "#059669",
-    "chart_bar_3":      "#D97706",
-    "chart_bar_soft_1": "#C7D2FE",
-    "chart_bar_soft_2": "#6EE7B7",
-    "chart_bar_soft_3": "#FDE68A",
 
     # Gráfico
     "chart_grid":       "#E5E7EB",
@@ -266,6 +238,15 @@ DARK_THEME = {
     "tag_bg":           "#334155",
     "tag_text":         "#CBD5E1",
 
+    # Chips específicos (relatórios)
+    "chip_geral_bg":        "#1E1B4B",
+    "chip_geral_text":      "#A5B4FC",
+    "chip_estudante_bg":    "#064E3B",
+    "chip_estudante_text":  "#6EE7B7",
+    "chip_agenda_bg":       "#78350F",
+    "chip_agenda_text":     "#FCD34D",
+    "export_item_bg":       "#1E1B4B",
+
     # Status
     "status_online":    "#34D399",
     "status_offline":   "#64748B",
@@ -304,6 +285,10 @@ DARK_THEME = {
     "kpi_amber_soft":   "#78350F",
     "kpi_pink":         "#F472B6",
     "kpi_pink_soft":    "#831843",
+
+    # Linhas de tabela
+    "row_bg":           "#1E293B",
+    "row_hover":        "#312E81",
 
     # Gráfico
     "chart_grid":       "#1E293B",
@@ -504,3 +489,20 @@ STATUS_COLORS = {
     "blocked":  "#EF4444",
     "review":   "#6366F1",
 }
+
+PRIORITY_COLORS = {
+    "Urgente": ("critico", "critico_soft"),
+    "Alta":    ("alto",    "alto_soft"),
+    "Média":   ("medio",   "medio_soft"),
+    "Baixa":   ("normal",  "normal_soft"),
+}
+
+MOOD_EMOJIS = {1: "😢", 2: "😕", 3: "😐", 4: "😊", 5: "😄"}
+MOOD_COLORS = {
+    1: "danger",
+    2: "alto",
+    3: "medio",
+    4: "success",
+    5: "primary",
+}
+MOOD_LABELS = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo"}

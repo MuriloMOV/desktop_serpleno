@@ -148,11 +148,22 @@ class Card(ctk.CTkFrame):
 
 
 class KPICard(ctk.CTkFrame):
-    """KPI card with icon, value, label and optional trend indicator."""
+    """KPI card with icon, value, label and optional trend indicator.
+    Variants: sm (compact), md (default), lg (prominent).
+    """
+
+    _SIZE_MAP = {
+        "sm": {"icon": 40, "value": "h3", "title": "caption", "sub": "overline", "pad": 14},
+        "md": {"icon": 52, "value": "h1", "title": "body", "sub": "caption", "pad": SPACING["card_pad"]},
+        "lg": {"icon": 64, "value": "display", "title": "h3", "sub": "body", "pad": 28},
+    }
 
     def __init__(self, parent, title: str, value: str, icon: str,
                  accent: str = THEME["primary"], trend: str = "",
-                 unit: str = "", size: str = "default"):
+                 unit: str = "", size: str = "md"):
+        if size not in self._SIZE_MAP:
+            size = "md"
+        self._size_cfg = self._SIZE_MAP[size]
         super().__init__(
             parent,
             fg_color=THEME["surface"],
@@ -165,8 +176,9 @@ class KPICard(ctk.CTkFrame):
         self._build(title, value, icon, trend, unit)
 
     def _build(self, title, value, icon, trend, unit):
+        pad = self._size_cfg["pad"]
         content = ctk.CTkFrame(self, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["card_pad"])
+        content.pack(fill="both", expand=True, padx=pad, pady=pad)
 
         row1 = ctk.CTkFrame(content, fg_color="transparent")
         row1.pack(fill="x")
@@ -174,24 +186,26 @@ class KPICard(ctk.CTkFrame):
         txt = ctk.CTkFrame(row1, fg_color="transparent")
         txt.pack(side="left", fill="both", expand=True)
 
-        ctk.CTkLabel(txt, text=title, font=themed_font("caption"),
+        ctk.CTkLabel(txt, text=title, font=themed_font(self._size_cfg["title"]),
                      text_color=THEME["text_muted"]).pack(anchor="w")
 
         value_frame = ctk.CTkFrame(txt, fg_color="transparent")
         value_frame.pack(anchor="w", pady=(4, 0))
-        ctk.CTkLabel(value_frame, text=value, font=themed_font("h1", "bold"),
-                     text_color=THEME["text"]).pack(side="left")
+        self._value_label = ctk.CTkLabel(value_frame, text=value, font=themed_font(self._size_cfg["value"], "bold"),
+                      text_color=THEME["text"])
+        self._value_label.pack(side="left")
         if unit:
-            ctk.CTkLabel(value_frame, text=unit, font=themed_font("body"),
+            ctk.CTkLabel(value_frame, text=unit, font=themed_font(self._size_cfg["sub"]),
                          text_color=THEME["text_muted"]).pack(side="left", padx=(6, 0), pady=(4, 0))
 
         if trend:
-            ctk.CTkLabel(txt, text=trend, font=themed_font("overline"),
+            ctk.CTkLabel(txt, text=trend, font=themed_font(self._size_cfg["sub"]),
                          text_color=THEME["text_muted"]).pack(anchor="w", pady=(4, 0))
 
+        icon_size = self._size_cfg["icon"]
         icon_bg = blend_color(self.accent, 0.15)
         icon_container = ctk.CTkFrame(row1, fg_color=icon_bg,
-                                      width=56, height=56, corner_radius=RADIUS["lg"])
+                                      width=icon_size, height=icon_size, corner_radius=RADIUS["lg"])
         icon_container.pack(side="right")
         icon_container.pack_propagate(False)
         ctk.CTkLabel(icon_container, text=icon, font=themed_font("h2"),
@@ -202,6 +216,9 @@ class KPICard(ctk.CTkFrame):
                                       fg_color=THEME["bg_alt"])
             pbar.pack(fill="x", pady=(14, 0))
             pbar.set(0.65)
+
+    def set_value(self, value: str):
+        self._value_label.configure(text=value)
 
 
 class MetricCard(ctk.CTkFrame):
@@ -330,10 +347,56 @@ class ListCard(ctk.CTkFrame):
                          text_color=THEME["text_muted"]).grid(row=1, column=1, sticky="w", pady=(4, 0))
 
 
+class _BaseIconButton(ctk.CTkButton):
+    """Base para botões que suportam texto, ícone e tooltip."""
+
+    def __init__(self, parent, text: str = "", icon: str = "", tooltip: str = "", **kwargs):
+        self._icon_only = bool(icon and not text)
+        display = icon if self._icon_only else f"{icon}  {text}" if icon else text
+        super().__init__(parent, text=display, **kwargs)
+        self._tooltip_text = tooltip or text
+        self._tooltip = None
+        if self._icon_only and tooltip:
+            self._bind_tooltip()
+
+    def _bind_tooltip(self):
+        self.bind("<Enter>", self._show_tooltip)
+        self.bind("<Leave>", self._hide_tooltip)
+
+    def _show_tooltip(self, _=None):
+        if self._tooltip or not self._tooltip_text:
+            return
+        self._tooltip = ctk.CTkToplevel(self)
+        self._tooltip.overrideredirect(True)
+        self._tooltip.attributes("-topmost", True)
+        lbl = ctk.CTkLabel(
+            self._tooltip, text=self._tooltip_text,
+            font=themed_font("caption", "bold"),
+            text_color=THEME["text_on_primary"], fg_color=THEME["overlay"],
+            corner_radius=RADIUS["xs"], padx=10, pady=6,
+        )
+        lbl.pack()
+        x = self.winfo_pointerx() + 14
+        y = self.winfo_pointery() + 14
+        self._tooltip.geometry(f"+{x}+{y}")
+
+    def _hide_tooltip(self, _=None):
+        if self._tooltip:
+            try:
+                self._tooltip.destroy()
+            except Exception:
+                pass
+            self._tooltip = None
+
+    @property
+    def button_text(self) -> str:
+        return self._icon_only and "" or self.cget("text")
+
+
 class PrimaryButton(ctk.CTkButton):
     """Primary button with optional icon, size variants and loading state."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 140,
+    def __init__(self, parent, text: str = "", command=None, width: int = 140,
                  height: int = 42, icon: str = "", size: str = "md",
                  loading: bool = False, **kwargs):
         self._loading = loading
@@ -358,6 +421,10 @@ class PrimaryButton(ctk.CTkButton):
             self._set_text_with_icon()
         if loading:
             self._show_loading()
+
+    @property
+    def button_text(self) -> str:
+        return self._text
 
     def _set_text_with_icon(self):
         self.configure(text=f"{self._icon}  {self._text}" if self._loading is False else self._icon)
@@ -391,11 +458,11 @@ class PrimaryButton(ctk.CTkButton):
             self.after(250, self._animate_loading)
 
 
-class SecondaryButton(ctk.CTkButton):
-    """Secondary / outlined button with icon support."""
+class SecondaryButton(_BaseIconButton):
+    """Secondary / outlined button with icon and optional tooltip."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 120,
-                 height: int = 38, icon: str = "", **kwargs):
+    def __init__(self, parent, text: str = "", command=None, width: int = 120,
+                 height: int = 38, icon: str = "", tooltip: str = "", **kwargs):
         corner = kwargs.pop("corner_radius", RADIUS["button"])
         fg = kwargs.pop("fg_color", "transparent")
         hover = kwargs.pop("hover_color", THEME["primary_soft"])
@@ -404,36 +471,36 @@ class SecondaryButton(ctk.CTkButton):
         bw = kwargs.pop("border_width", 1)
         bc = kwargs.pop("border_color", THEME["primary_medium"])
         super().__init__(
-            parent, text=f"{icon}  {text}" if icon else text,
-            command=command, width=width, height=height,
+            parent, text=text, icon=icon, tooltip=tooltip, command=command,
+            width=width, height=height,
             fg_color=fg, hover_color=hover, text_color=txtc,
             font=f, corner_radius=corner, border_width=bw, border_color=bc, **kwargs,
         )
 
 
-class GhostButton(ctk.CTkButton):
-    """Ghost button for low-emphasis actions."""
+class GhostButton(_BaseIconButton):
+    """Ghost button for low-emphasis actions with optional tooltip."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 100,
-                 height: int = 36, icon: str = "", **kwargs):
+    def __init__(self, parent, text: str = "", command=None, width: int = 100,
+                 height: int = 36, icon: str = "", tooltip: str = "", **kwargs):
         corner = kwargs.pop("corner_radius", RADIUS["button"])
         fg = kwargs.pop("fg_color", "transparent")
         hover = kwargs.pop("hover_color", THEME["bg_alt"])
         txtc = kwargs.pop("text_color", THEME["text_secondary"])
         f = kwargs.pop("font", themed_font("caption", "bold"))
         super().__init__(
-            parent, text=f"{icon}  {text}" if icon else text,
-            command=command, width=width, height=height,
+            parent, text=text, icon=icon, tooltip=tooltip, command=command,
+            width=width, height=height,
             fg_color=fg, hover_color=hover, text_color=txtc,
             font=f, corner_radius=corner, **kwargs,
         )
 
 
-class DangerButton(ctk.CTkButton):
-    """Destructive action button with optional icon."""
+class DangerButton(_BaseIconButton):
+    """Destructive action button with optional icon and tooltip."""
 
-    def __init__(self, parent, text: str, command=None, width: int = 120,
-                 height: int = 38, icon: str = "", **kwargs):
+    def __init__(self, parent, text: str = "", command=None, width: int = 120,
+                 height: int = 38, icon: str = "", tooltip: str = "", **kwargs):
         corner = kwargs.pop("corner_radius", RADIUS["button"])
         fg = kwargs.pop("fg_color", THEME["danger"])
         hover = kwargs.pop("hover_color", THEME["danger_strong"])
@@ -443,7 +510,8 @@ class DangerButton(ctk.CTkButton):
         display_text = f"{icon}  {text}" if icon else text
 
         super().__init__(
-            parent, text=display_text, command=command, width=width, height=height,
+            parent, text=text, icon=icon, tooltip=tooltip, command=command,
+            width=width, height=height,
             fg_color=fg, hover_color=hover, text_color=txtc, font=f,
             corner_radius=corner, **kwargs,
         )
@@ -962,3 +1030,54 @@ class Tooltip:
             except Exception:
                 pass
             self._win = None
+
+
+class ThemedScrollableFrame(ctk.CTkScrollableFrame):
+    """ScrollableFrame com estilos do tema já aplicados."""
+
+    def __init__(self, parent, **kwargs):
+        super().__init__(
+            parent,
+            fg_color="transparent",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
+            **kwargs,
+        )
+
+
+class BaseModal(ctk.CTkToplevel):
+    """Modal base centralizado, transient e com grab_set."""
+
+    def __init__(self, parent, title: str, width: int, height: int,
+                 fg_color: str = THEME["surface"]):
+        super().__init__(parent)
+        self.title(title)
+        self.configure(fg_color=fg_color)
+        self.resizable(False, False)
+
+        sx = self.winfo_screenwidth() // 2 - width // 2
+        sy = self.winfo_screenheight() // 2 - height // 2
+        self.geometry(f"{width}x{height}+{sx}+{sy}")
+
+        self.transient(self.winfo_toplevel())
+        self.grab_set()
+
+
+class ClickableFrame(ctk.CTkFrame):
+    """Frame clicável com suporte a mouse e teclado (<Return>, <space>)."""
+
+    def __init__(self, parent, on_click, **kwargs):
+        super().__init__(parent, **kwargs)
+        self._on_click = on_click
+        self.configure(cursor="hand2")
+        self.bind("<Button-1>", lambda e: self._on_click())
+        self.bind("<Return>", lambda e: self._on_click())
+        self.bind("<space>", lambda e: self._on_click())
+
+
+def bind_clickable(widget, on_click):
+    """Aplica comportamento clicável (mouse + teclado) a qualquer widget."""
+    widget.configure(cursor="hand2")
+    widget.bind("<Button-1>", lambda e: on_click())
+    widget.bind("<Return>", lambda e: on_click())
+    widget.bind("<space>", lambda e: on_click())

@@ -1,13 +1,19 @@
-import logging
-import customtkinter as ctk
-import tkinter as tk
-from utils.async_runner import AsyncRunner
-from services.dashboard import ServicoDashboard
-from ui_theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font, blend_color, darken, lighten
 from components.ui_components import (
     Card, EmptyState, PrimaryButton, GhostButton, Badge, Pill,
-    Divider, Avatar, Toast, Tabs
+    Divider, Avatar, Toast, Tabs, KPICard, ClickableFrame, bind_clickable
 )
+from utils.avatar_utils import get_avatar_color
+from utils.chart import draw_mood_line_chart
+from utils.async_runner import AsyncRunner
+
+import customtkinter as ctk
+from ui_theme import THEME, SPACING, RADIUS, themed_font, FONT_FAMILY
+from ui_theme_extensions import extend_theme
+from services.dashboard import ServicoDashboard
+
+DASH_TOKENS = extend_theme(THEME, {
+    "kpi_size": "wide",
+})
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -24,64 +30,6 @@ class _SectionCard(Card):
     def _build_extras(self, action_text, action_cmd, badge_text):
         # badge no header (sobrescreve comportamento padrão de Card para adicionar badge)
         pass
-
-
-class _KPICard(Card):
-    """Card de KPI redesenhado: ícone num círculo colorido, valor grande, label."""
-    def __init__(self, parent, title: str, value: str, icon: str,
-                 accent: str, soft: str, sub: str = ""):
-        super().__init__(parent)
-        self.accent = accent
-        self.soft = soft
-        self._build(title, value, icon, accent, soft, sub)
-
-    def _build(self, title, value, icon, accent, soft, sub):
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["card_pad"])
-
-        top = ctk.CTkFrame(inner, fg_color="transparent")
-        top.pack(fill="x")
-
-        # Círculo ícone
-        icon_bg = ctk.CTkFrame(
-            top, width=42, height=42,
-            corner_radius=RADIUS["lg"], fg_color=soft,
-        )
-        icon_bg.pack(side="left")
-        icon_bg.pack_propagate(False)
-        ctk.CTkLabel(
-            icon_bg, text=icon,
-            font=themed_font("h2"),
-        ).place(relx=0.5, rely=0.5, anchor="center")
-
-        # Valor numérico grande
-        ctk.CTkLabel(
-            top, text=value,
-            font=themed_font("h2", "bold"),
-            text_color=THEME["text"],
-        ).pack(side="right", anchor="e")
-
-        # Linha inferior: título + sub
-        ctk.CTkLabel(
-            inner, text=title,
-            font=themed_font("body", "bold"),
-            text_color=THEME["text"],
-            anchor="w",
-        ).pack(fill="x", pady=(10, 2))
-
-        if sub:
-            ctk.CTkLabel(
-                inner, text=sub,
-                font=themed_font("caption"),
-                text_color=THEME["text_secondary"],
-                anchor="w",
-            ).pack(fill="x")
-
-        # Barra de acento na base
-        ctk.CTkFrame(
-            self, height=3,
-            corner_radius=0, fg_color=accent,
-        ).pack(side="bottom", fill="x")
 
 
 class _AgendaRow(ctk.CTkFrame):
@@ -476,11 +424,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             self._atualizar_badge_notificacoes()
 
         def on_error(exc):
-            ctk.CTkMessagebox(
-                self, title="Erro",
-                message=f"Não foi possível carregar o dashboard.\n{exc}",
-                icon="error",
-            )
+            import tkinter.messagebox as mb
+            mb.showerror("Erro", f"Não foi possível carregar o dashboard.\n{exc}")
 
         AsyncRunner.run(
             task=fetch,
@@ -526,10 +471,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         # Ícone ajuda
         help_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                               fg_color=THEME["primary_soft"], cursor="hand2")
+                               fg_color=THEME["primary_soft"])
         help_f.pack(side="left", padx=4)
         help_f.pack_propagate(False)
-        help_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_ajuda())
+        bind_clickable(help_f, self._abrir_notificacoes_ajuda)
         ctk.CTkLabel(
             help_f, text="🤝",
             font=themed_font("body"),
@@ -538,10 +483,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         # Ícone alertas
         alert_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                                fg_color=THEME["danger_soft"], cursor="hand2")
+                                fg_color=THEME["danger_soft"])
         alert_f.pack(side="left", padx=4)
         alert_f.pack_propagate(False)
-        alert_f.bind("<Button-1>", lambda e: self._abrir_notificacoes_alertas())
+        bind_clickable(alert_f, self._abrir_notificacoes_alertas)
         ctk.CTkLabel(
             alert_f, text="🔔",
             font=themed_font("body"),
@@ -553,10 +498,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         if self.controller.usuario_logado:
             name = self.controller.usuario_logado.get("username", "?")[:2].upper()
         av_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                             fg_color=THEME["primary"], cursor="hand2")
+                             fg_color=THEME["primary"])
         av_f.pack(side="left", padx=(8, 0))
         av_f.pack_propagate(False)
-        av_f.bind("<Button-1>", lambda e: self._abrir_perfil())
+        bind_clickable(av_f, self._abrir_perfil)
         ctk.CTkLabel(
             av_f, text=name,
             font=themed_font("body", "bold"),
@@ -616,8 +561,9 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         for i, (title, value, icon, accent, soft, sub) in enumerate(kpis):
             self.kpi_frame.grid_columnconfigure(i, weight=1)
-            Card(
-                self.kpi_frame, title=title,
+            KPICard(
+                self.kpi_frame, title=title, value=value, icon=icon,
+                accent=accent, trend="", unit="", size=DASH_TOKENS.get("kpi_size", "wide"),
             ).grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
 
     # ──────────────────────────────────────────────────────────────────────
@@ -649,7 +595,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             highlightthickness=0,
         )
         self.canvas.pack(fill="both", expand=True, padx=4, pady=(4, 8))
-        self.chart_card.body.bind("<Configure>", lambda e: self._draw_chart())
+        self._chart_after_id = None
+        self.chart_card.body.bind("<Configure>", self._schedule_draw_chart)
+
+    def _schedule_draw_chart(self, event=None):
+        if self._chart_after_id:
+            self.after_cancel(self._chart_after_id)
+        self._chart_after_id = self.after(80, lambda: self._draw_chart())
 
     # ──────────────────────────────────────────────────────────────────────
     #  Seções
@@ -842,7 +794,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._set_badge(self.help_badge,  n_ajuda)
         self._set_badge(self.alert_badge, n_alertas)
 
-    def _set_badge(self, badge: tk.Frame, count: int):
+    def _set_badge(self, badge: ctk.CTkFrame, count: int):
         lbl = next((c for c in badge.winfo_children()
                     if isinstance(c, ctk.CTkLabel)), None)
         if lbl:

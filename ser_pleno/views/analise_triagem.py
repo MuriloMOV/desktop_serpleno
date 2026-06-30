@@ -4,15 +4,22 @@ from ui_theme import (
     THEME, SPACING, RADIUS, TYPO, FONT_FAMILY,
     font, themed_font, mono_font,
 )
+from ui_theme_extensions import extend_theme
 from components.ui_components import (
     Card, PrimaryButton, GhostButton, Divider, EmptyState,
-    Avatar, Badge, Pill,
+    Avatar, Badge, Pill, KPICard, SectionHeader, InputField, ClickableFrame, bind_clickable
 )
+from services.estudantes import ServicoEstudante
 from utils.async_runner import AsyncRunner
+from utils.avatar_utils import get_avatar_color
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Design tokens – mapeamentos semânticos específicos da triagem
 # ══════════════════════════════════════════════════════════════════════════════
+
+TRI_TOKENS = extend_theme(THEME, {
+    "kpi_size": "md",
+})
 
 _PRIORITY_CFG = {
     "Urgente": (THEME["critico"],       THEME["critico_soft"]),
@@ -30,16 +37,8 @@ _COL_HEADERS = ["Estudante", "Data", "Prioridade", "Status", "Ações"]
 _COL_WEIGHTS = [3, 2, 2, 2, 1]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  Helpers
-# ──────────────────────────────────────────────────────────────────────────────
-def _av_color(name: str) -> str:
-    # Usa hash do nome para escolher cor de avatar do tema
-    palette = [
-        THEME["kpi_blue"], THEME["kpi_violet"], THEME["kpi_green"],
-        THEME["kpi_amber"], THEME["kpi_red"], THEME["info"],
-    ]
-    return palette[sum(ord(c) for c in name) % len(palette)]
+# Helpers
+# Avatares usam utils.avatar_utils.get_avatar_color centralizado.
 
 
 def _chip(parent, text: str, color: str, soft: str) -> ctk.CTkFrame:
@@ -61,40 +60,6 @@ def _avatar(parent, initials: str, color: str, size: int = 36) -> ctk.CTkFrame:
 
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-#  KPI Card
-# ══════════════════════════════════════════════════════════════════════════════
-class _KPICard(ctk.CTkFrame):
-    def __init__(self, parent, title, value, icon, accent, soft, sub=""):
-        super().__init__(parent, fg_color=THEME["surface"],
-                         corner_radius=RADIUS["card"],
-                         border_width=1, border_color=THEME["border"])
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["card_pad"])
-
-        top = ctk.CTkFrame(inner, fg_color="transparent")
-        top.pack(fill="x")
-
-        ib = ctk.CTkFrame(top, width=44, height=44, corner_radius=RADIUS["button"], fg_color=soft)
-        ib.pack(side="left"); ib.pack_propagate(False)
-        ctk.CTkLabel(ib, text=icon,
-                     font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
-
-        ctk.CTkLabel(top, text=value,
-                     font=font(size=TYPO["display"], weight="bold", family=FONT_FAMILY),
-                     text_color=THEME["text"]).pack(side="right", anchor="e")
-
-        ctk.CTkLabel(inner, text=title,
-                     font=themed_font("body", "bold"),
-                     text_color=THEME["text"], anchor="w").pack(fill="x", pady=(SPACING["icon_gap"], SPACING["label_gap"]))
-        if sub:
-            ctk.CTkLabel(inner, text=sub,
-                         font=themed_font("body_sm"),
-                         text_color=THEME["text_secondary"], anchor="w").pack(fill="x")
-
-        ctk.CTkFrame(self, height=3, corner_radius=RADIUS["none"],
-                     fg_color=accent).pack(side="bottom", fill="x")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  Campo de entrada leve
@@ -109,7 +74,7 @@ class _DateField(ctk.CTkFrame):
                      text_color=THEME["text_secondary"]).pack(side="left", padx=(SPACING["icon_gap"], 0))
         self.entry = ctk.CTkEntry(
             self, placeholder_text=placeholder,
-            fg_color="transparent", border_width=0,
+            fg_color=THEME["input_bg"], border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
             font=themed_font("body"), height=36,
@@ -198,8 +163,10 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         ]
         for i, (title, val, icon, accent, soft, sub) in enumerate(kpis):
             row.grid_columnconfigure(i, weight=1)
-            _KPICard(row, title, val, icon, accent, soft, sub).grid(
-                row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
+            KPICard(
+                row, title=title, value=val, icon=icon,
+                accent=accent, unit="", size=TRI_TOKENS.get("kpi_size", "md"),
+            ).grid(row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
 
     # ══════════════════════════════════════════
     #  FILTROS
@@ -349,7 +316,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         row.bind("<Leave>",  lambda e, r=row: r.configure(fg_color=THEME["row_bg"]))
 
         nome     = item["student"]
-        av_color = _av_color(nome)
+        av_color = get_avatar_color(nome)
 
         # Col 0 – Estudante (avatar + nome)
         name_cell = ctk.CTkFrame(row, fg_color="transparent")
@@ -381,10 +348,10 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         # Col 4 – Ações
         acts = ctk.CTkFrame(row, fg_color="transparent")
         acts.grid(row=0, column=4, sticky="e", padx=(0, SPACING["icon_gap"]), pady=SPACING["icon_gap"])
-        for icon, cmd in [("👁", lambda s=item: self._ver_detalhe(s)),
-                          ("✏", lambda s=item: self._editar(s))]:
+        for icon, cmd, tip in [("👁", lambda s=item: self._ver_detalhe(s), "Ver detalhe"),
+                                ("✏", lambda s=item: self._editar(s), "Editar")]:
             GhostButton(
-                acts, text=icon, width=30, height=30,
+                acts, icon=icon, tooltip=tip, width=30, height=30,
                 corner_radius=RADIUS["xs"],
                 text_color=THEME["text_secondary"],
                 font=themed_font("body"),
@@ -478,7 +445,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
                              text_color=THEME["text_muted"],
                              width=32).pack(side="left", padx=(SPACING["icon_gap"], 0))
             en = ctk.CTkEntry(box, placeholder_text=placeholder,
-                              fg_color="transparent", border_width=0,
+                              fg_color=THEME["input_bg"], border_width=0,
                               text_color=THEME["text"],
                               placeholder_text_color=THEME["text_muted"],
                               font=themed_font("body"), height=40)
@@ -571,7 +538,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         modal.transient(self.winfo_toplevel()); modal.grab_set()
 
         nome     = item["student"]
-        av_color = _av_color(nome)
+        av_color = get_avatar_color(nome)
 
         # Banner
         banner = ctk.CTkFrame(modal, fg_color=THEME["primary_soft"],

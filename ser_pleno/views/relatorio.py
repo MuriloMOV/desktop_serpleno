@@ -3,7 +3,7 @@ import customtkinter as ctk
 from components.ui_components import Divider, PrimaryButton, GhostButton
 from services.relatorios import ServicoRelatorio
 from utils.async_runner import AsyncRunner
-from ui_theme import THEME, SPACING, RADIUS, font, themed_font
+from ui_theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
 
 logger = logging.getLogger(__name__)
 
@@ -150,10 +150,8 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         AsyncRunner.run(
             task=fetch,
             on_success=lambda res: self._atualizar_view(*res),
-            on_error=lambda exc: ctk.CTkMessagebox(
-                self, title="Erro",
-                message=f"Não foi possível carregar relatórios.\n{exc}",
-                icon="error",
+            on_error=lambda exc: __import__("tkinter.messagebox", fromlist=["showerror"]).showerror(
+                "Erro", f"Não foi possível carregar relatórios.\n{exc}"
             ),
             widget_ref=self,
         )
@@ -516,7 +514,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             text_color=THEME["text"],
         ).pack(side="left")
 
-        ctk.CTkOptionMenu(
+        self.filtro_tipo = ctk.CTkOptionMenu(
             hdr,
             values=["Todos os tipos", "Geral", "Estudante",
                     "Agendamentos", "Intervenções", "Triagens", "Estatísticas"],

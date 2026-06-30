@@ -1,29 +1,31 @@
 import logging
 import customtkinter as ctk
 from utils.async_runner import AsyncRunner
-from services.bem_estar import ServicoBemEstar
 
 from ui_theme import (
     THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, FONT_FAMILY,
     font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
 )
+from ui_theme_extensions import extend_theme
 from components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
-    Badge, Pill, EmptyState, Toast, Tabs, Divider
+    Badge, Pill, EmptyState, Toast, Tabs, Divider, KPICard, ClickableFrame, bind_clickable
 )
+from services.bem_estar import ServicoBemEstar
+from utils.avatar_utils import get_avatar_color
+from utils.mood import mood_emoji_from_score
 
 logger = logging.getLogger(__name__)
 
+BE_TOKENS = extend_theme(THEME, {
+    "kpi_size": "md",
+})
 
 
 
-# Avatar cores por inicial (ciclo)
-AV_COLORS = [
-    "#4F46E5", "#7C3AED", "#059669",
-    "#D97706", "#DC2626", "#0891B2",
-]
 
-
+# Avatar cores por inicial — agora via utils.avatar_utils.get_avatar_color.
+# _AV_COLORS e _av_color legados removidos; use utils.avatar_utils.get_avatar_color.
 
 
 # Configuração das colunas de risco
@@ -34,8 +36,7 @@ _RISK_COLS = [
     ("Normal",   THEME["normal"],     THEME["normal_soft"],  "normal"),
 ]
 
-# Emojis por nível de humor (1–5)
-_MOOD_EMOJI = {1: "😢", 2: "😕", 3: "😐", 4: "😊", 5: "😄"}
+# Emojis e labels por nível de humor (1–5) — agora via utils.mood.
 _MOOD_COLOR = {
     1: THEME["danger"], 2: THEME["alto"], 3: THEME["medio"],
     4: THEME["success"], 5: THEME["primary"],
@@ -43,12 +44,7 @@ _MOOD_COLOR = {
 _MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo"}
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  Helpers
-# ──────────────────────────────────────────────────────────────────────────────
-def _av_color(name: str) -> str:
-    idx = sum(ord(c) for c in name) % len(AV_COLORS)
-    return AV_COLORS[idx]
+# Helpers
 
 
 def _card(parent, **kw) -> ctk.CTkFrame:
@@ -144,12 +140,8 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             self.update_ui(dash, checkins, risks)
 
         def on_error(exc):
-            ctk.CTkMessagebox(
-                self,
-                title="Erro de conexão",
-                message=f"Não foi possível carregar os dados de bem-estar.\n{exc}",
-                icon="error",
-            )
+            import tkinter.messagebox as mb
+            mb.showerror("Erro de conexão", f"Não foi possível carregar os dados de bem-estar.\n{exc}")
             self._set_status_erro()
 
         AsyncRunner.run(
@@ -211,7 +203,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         summary = data.get("summary", {})
         humor   = summary.get("avg_mood")
         if humor and hasattr(self, "_kpi_humor"):
-            emoji = _MOOD_EMOJI.get(round(humor), "😐")
+            emoji = mood_emoji_from_score(round(humor))
             self._kpi_humor.set_value(f"{emoji}  {humor:.1f}")
         part = summary.get("participation_rate")
         if part and hasattr(self, "_kpi_part"):
@@ -263,7 +255,10 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         for i, (title, initial, icon, accent, soft, attr, sub) in enumerate(kpis):
             row.grid_columnconfigure(i, weight=1)
-            card = _KPICard(row, title, initial, icon, accent, soft, sub)
+            card = KPICard(
+                row, title=title, value=initial, icon=icon,
+                accent=accent, unit="", size=BE_TOKENS.get("kpi_size", "md"),
+            )
             card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
             setattr(self, attr, card)
 
@@ -280,7 +275,13 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             height=200, highlightthickness=0,
         )
         self.canvas_30d.pack(fill="both", expand=True, padx=4, pady=(4, 12))
-        outer.body.bind("<Configure>", lambda e: self._draw_chart())
+        self._chart_after_id = None
+        outer.body.bind("<Configure>", self._schedule_draw_chart)
+
+    def _schedule_draw_chart(self, event=None):
+        if self._chart_after_id:
+            self.after_cancel(self._chart_after_id)
+        self._chart_after_id = self.after(80, lambda: self._draw_chart())
 
         # Barras de distribuição de humor
         dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
@@ -529,7 +530,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar colorido
-        av = _avatar(inner, nome[:2], _av_color(nome), 34)
+        av = _avatar(inner, nome[:2], get_avatar_color(nome), 34)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 8), sticky="ns")
 
         ctk.CTkLabel(
@@ -601,7 +602,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         curso = c.get("course", "")
 
         color = _MOOD_COLOR.get(mood, THEME["text_muted"])
-        emoji = _MOOD_EMOJI.get(mood, "😐")
+        emoji = mood_emoji_from_score(mood)
 
         row = ctk.CTkFrame(
             self._checkins_body,
@@ -615,7 +616,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar
-        av = _avatar(inner, nome[:2], _av_color(nome), 38)
+        av = _avatar(inner, nome[:2], get_avatar_color(nome), 38)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="ns")
 
         # Nome + curso
@@ -676,55 +677,6 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
     def criar_lista_checkins(self):
         pass
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  KPI Card
-# ══════════════════════════════════════════════════════════════════════════════
-class _KPICard(ctk.CTkFrame):
-    def __init__(self, parent, title: str, initial: str, icon: str,
-                 accent: str, soft: str, sub: str = ""):
-        super().__init__(
-            parent,
-            fg_color=THEME["surface"],
-            corner_radius=RADIUS["card"],
-            border_width=1,
-            border_color=THEME["border"],
-        )
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["card_pad"])
-
-        top = ctk.CTkFrame(inner, fg_color="transparent")
-        top.pack(fill="x")
-
-        icon_bg = ctk.CTkFrame(top, width=44, height=44,
-                               corner_radius=RADIUS["lg"], fg_color=soft)
-        icon_bg.pack(side="left")
-        icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text=icon,
-                     font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
-
-        self._val = ctk.CTkLabel(
-            top, text=initial,
-            font=themed_font("h2", "bold"),
-            text_color=THEME["text"],
-        )
-        self._val.pack(side="right", anchor="e")
-
-        ctk.CTkLabel(inner, text=title,
-                     font=themed_font("body", "bold"),
-                     text_color=THEME["text"], anchor="w").pack(fill="x", pady=(10, 2))
-
-        if sub:
-            ctk.CTkLabel(inner, text=sub,
-                         font=themed_font("caption"),
-                         text_color=THEME["text_secondary"], anchor="w").pack(fill="x")
-
-        ctk.CTkFrame(self, height=3, corner_radius=0,
-                     fg_color=accent).pack(side="bottom", fill="x")
-
-    def set_value(self, v: str):
-        self._val.configure(text=v)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

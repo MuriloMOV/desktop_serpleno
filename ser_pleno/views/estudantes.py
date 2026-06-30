@@ -8,9 +8,15 @@ from ui_theme import (
     THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, FONT_FAMILY,
     font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
 )
+from ui_theme_extensions import extend_theme
+
+EST_TOKENS = extend_theme(THEME, {
+    "sidebar_width": 300,
+    "avatar_hero_size": 60,
+})
 from components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
-    Divider, Badge, Pill, Tabs
+    Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable
 )
 
 
@@ -52,7 +58,7 @@ def _avatar(parent, initials: str, color: str, size: int = 42) -> ctk.CTkFrame:
     av.pack_propagate(False)
     ctk.CTkLabel(
         av, text=initials[:2].upper(),
-        font=ctk.CTkFont("Segoe UI", size // 3, "bold"),
+        font=font(size=max(10, size // 3), weight="bold", family=FONT_FAMILY),
         text_color="#FFFFFF",
     ).place(relx=0.5, rely=0.5, anchor="center")
     return av
@@ -68,7 +74,7 @@ class _Field(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self, text=label,
-            font=ctk.CTkFont("Segoe UI", 12),
+            font=font(size=12),
             text_color=THEME["text_secondary"], anchor="w",
         ).pack(fill="x", pady=(0, 4))
 
@@ -81,7 +87,7 @@ class _Field(ctk.CTkFrame):
 
         if icon:
             ctk.CTkLabel(box, text=icon,
-                         font=ctk.CTkFont("Segoe UI", 14),
+                         font=font(size=14),
                          text_color=THEME["text_secondary"],
                          width=34).pack(side="left", padx=(8, 0))
 
@@ -89,10 +95,10 @@ class _Field(ctk.CTkFrame):
             box,
             placeholder_text=placeholder,
             placeholder_text_color=THEME["text_muted"],
-            fg_color="transparent",
+            fg_color=THEME["input_bg"],
             border_width=0,
             text_color=THEME["text"],
-            font=ctk.CTkFont("Segoe UI", 13),
+            font=font(size=13),
             height=40,
             show="●" if password else "",
         )
@@ -102,7 +108,7 @@ class _Field(ctk.CTkFrame):
 
         self._err = ctk.CTkLabel(
             self, text=helper if helper else "",
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=font(size=11),
             text_color=THEME["text_secondary"], anchor="w",
         )
         self._err.pack(fill="x", pady=(3, 0))
@@ -178,7 +184,7 @@ class EstudantesFrame(ctk.CTkFrame):
     #  SIDEBAR – lista de estudantes
     # ══════════════════════════════════════
     def _criar_sidebar(self, parent):
-        sidebar = _card(parent, width=300)
+        sidebar = _card(parent, width=EST_TOKENS.get("sidebar_width", 300))
         sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING["grid_gap"]))
         sidebar.grid_propagate(False)
         sidebar.grid_rowconfigure(2, weight=1)
@@ -195,7 +201,7 @@ class EstudantesFrame(ctk.CTkFrame):
         self.entry_busca = ctk.CTkEntry(
             search_wrap,
             placeholder_text="Buscar estudante...",
-            fg_color="transparent", border_width=0,
+            fg_color=THEME["bg_alt"], border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
             font=themed_font("body"),
@@ -271,10 +277,10 @@ class EstudantesFrame(ctk.CTkFrame):
         hero.grid(row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["page_y"], 0))
 
         # Avatar grande
-        self._av_slot = ctk.CTkFrame(hero, width=60, height=60, fg_color="transparent")
+        self._av_slot = ctk.CTkFrame(hero, width=EST_TOKENS.get("avatar_hero_size", 60), height=EST_TOKENS.get("avatar_hero_size", 60), fg_color="transparent")
         self._av_slot.pack(side="left", padx=(0, 16))
         self._av_slot.pack_propagate(False)
-        _av = _avatar(self._av_slot, "??", THEME["primary"], 60)
+        _av = _avatar(self._av_slot, "??", THEME["primary"], EST_TOKENS.get("avatar_hero_size", 60))
         _av.pack(expand=True)
         self._hero_av = _av
 
@@ -383,10 +389,6 @@ class EstudantesFrame(ctk.CTkFrame):
         for label, value, icon, r, c, attr in cfg:
             lbl = self._info_box(grid, label, value, icon, r, c)
             setattr(self, attr, lbl)
-        self.card_email = None
-        self.card_idade = None
-        self.card_curso = None
-        self.card_laudo = None
 
     def _info_box(self, parent, label: str, value: str, icon: str,
                   r: int, c: int) -> ctk.CTkLabel:
@@ -470,11 +472,8 @@ class EstudantesFrame(ctk.CTkFrame):
             self.render_list(result)
 
         def on_error(exc):
-            ctk.CTkMessagebox(
-                self, title="Erro",
-                message=f"Falha ao carregar estudantes.\n{exc}",
-                icon="error",
-            )
+            import tkinter.messagebox as mb
+            mb.showerror("Erro", f"Falha ao carregar estudantes.\n{exc}")
             self._set_status_erro()
 
         AsyncRunner.run(
@@ -533,10 +532,11 @@ class EstudantesFrame(ctk.CTkFrame):
             self.scroll_list,
             fg_color=THEME["bg_alt"],
             corner_radius=RADIUS["lg"],
-            cursor="hand2",
         )
         row.pack(fill="x", pady=2, padx=4)
         row.st_data = st
+
+        bind_clickable(row, lambda: self.selecionar_estudante(st, row))
 
         inner = ctk.CTkFrame(row, fg_color="transparent")
         inner.pack(fill="x", padx=10, pady=8)
@@ -577,9 +577,6 @@ class EstudantesFrame(ctk.CTkFrame):
         row.bind("<Leave>", lambda e, r=row, s=st: r.configure(
             fg_color=THEME["primary_soft"] if self._selecionado == s else THEME["bg_alt"]
         ))
-        row.bind("<Button-1>", lambda e, s=st, r=row: self.selecionar_estudante(s, r))
-        for child in inner.winfo_children():
-            child.bind("<Button-1>", lambda e, s=st, r=row: self.selecionar_estudante(s, r))
 
         self._item_widgets[sid] = row
 

@@ -4,6 +4,8 @@ import customtkinter as ctk
 import random
 import math
 import threading
+import tkinter
+from tkinter import PhotoImage
 
 from services.autenticacao import ServicoAutenticacao
 from services.agendamentos import set_auth_service as set_auth_service_agendamentos
@@ -115,7 +117,7 @@ class LoginInputField(ctk.CTkFrame):
             self._box,
             placeholder_text=placeholder,
             placeholder_text_color=THEME["text_muted"],
-            fg_color="transparent",
+            fg_color=THEME["bg_alt"],
             border_width=0,
             text_color=THEME["text"],
             font=themed_font("body"),
@@ -208,7 +210,7 @@ class LoginFrame(ctk.CTkFrame):
         self._animar_bolhas()
 
     # ══════════════════════════════════════
-    #  FUNDO – gradiente diagonal suave
+    #  FUNDO – gradiente diagonal suave (pré-renderizado)
     # ══════════════════════════════════════
     def _desenhar_fundo(self, event=None):
         w = self.winfo_width()
@@ -218,20 +220,20 @@ class LoginFrame(ctk.CTkFrame):
 
         self.canvas.delete("bg")
 
-        # Gradiente vertical com dois trilhos de cor para simular diagonal
         top_l  = _LOGIN_PALETTE["grad_top_left"]
         top_r  = _LOGIN_PALETTE["grad_top_right"]
         bot    = _LOGIN_PALETTE["grad_bottom"]
 
-        steps = max(1, h)
-        for i in range(steps):
-            t     = i / steps
-            # interpola entre topo-esquerda e topo-direita ao longo da largura,
-            # depois mistura com a cor de fundo conforme desce
+        # Pré-renderiza gradiente em buffer para evitar retângulos individuais
+        img = PhotoImage(width=w, height=h)
+        for y in range(h):
+            t = y / h
             c_top = _lerp_color(top_l, top_r, 0.5)
             color = _lerp_color(c_top, bot, t ** 0.8)
-            self.canvas.create_rectangle(0, i, w, i + 1,
-                                         fill=color, outline="", tags="bg")
+            img.put(color, to=(0, y, w, y + 1))
+
+        self.canvas.create_image(0, 0, anchor="nw", image=img)
+        self.canvas.image = img  # mantém referência viva
 
         # Elipse decorativa (brilho suave no canto superior direito)
         glow_r = int(w * 0.55)
@@ -527,14 +529,6 @@ class LoginFrame(ctk.CTkFrame):
             text_color=_LOGIN_PALETTE["text_muted"],
         )
         self.btn_entrar.configure(text="Aguarde...", state="disabled")
-        GhostButton(
-            self.card,
-            text="🔒  Política de Privacidade",
-            command=self._abrir_politica,
-            height=34,
-            corner_radius=RADIUS["button"],
-            text_color=_LOGIN_PALETTE["text_muted"],
-        ).pack(fill="x")
         self.update_idletasks()
 
         def run_login():
