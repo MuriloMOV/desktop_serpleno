@@ -206,10 +206,10 @@ class AppointmentModal(ctk.CTkToplevel):
                 "dropdown_fg_color": THEME["surface"],
             })
             wgt = ctk.CTkComboBox(self, **kw)
-            if initial is not None:
+            if initial is not None and initial in values:
                 wgt.set(initial)
             else:
-                wgt.set(values[0])
+                wgt.set(values[0] if values else "")
         else:
             wgt = ctk.CTkEntry(self, **kw)
             if initial is not None:

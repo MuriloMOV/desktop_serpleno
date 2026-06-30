@@ -1,13 +1,16 @@
+# -*- coding: utf-8 -*-
 """
 Serviço de Estudantes para o Desktop CustomTkinter
 Funciona de forma independente com sincronização opcional com a API do SerPleno Web
 """
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 
 from repositories.estudantes import EstudanteRepository
+from repositories.bem_estar import BemEstarRepository
 from services.api import api
+from utils.service_helpers import with_api_fallback
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +22,7 @@ class ServicoEstudante:
 
     def __init__(self):
         self.repo = EstudanteRepository()
+        self.repo_bem_estar = BemEstarRepository()
         self._operation_config = None
 
     def _get_operation_config(self):
@@ -51,7 +55,7 @@ class ServicoEstudante:
                 busca, possui_laudo, requer_atencao, pagina
             )
 
-        try:
+        def _api_call():
             params: Dict[str, Any] = {"page": pagina}
             if busca:
                 params["search"] = busca
@@ -72,15 +76,16 @@ class ServicoEstudante:
                 return resp
 
             logger.debug("API não retornou dados válidos, usando repositório local")
-            return self._listar_estudantes_local(
-                busca, possui_laudo, requer_atencao, pagina
-            )
+            return None
 
-        except Exception as e:
-            logger.exception(f"Erro ao listar estudantes: {e}")
-            return self._listar_estudantes_local(
-                busca, possui_laudo, requer_atencao, pagina
-            )
+        return with_api_fallback(
+            _api_call,
+            self._listar_estudantes_local,
+            busca,
+            possui_laudo,
+            requer_atencao,
+            pagina,
+        )
 
     def _listar_estudantes_local(
         self,
@@ -132,7 +137,7 @@ class ServicoEstudante:
 
     def obter_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Obtém detalhes de um estudante específico via API ou repositório local"""
-        try:
+        def _api_call():
             resp = api.get(f"students/{id_estudante}/")
             if (
                 resp
@@ -140,10 +145,13 @@ class ServicoEstudante:
                 and resp.get("data") is not None
             ):
                 return resp
-            return self._fallback_obter_estudante(id_estudante)
-        except Exception as e:
-            logger.exception(f"Erro ao obter estudante: {e}")
-            return self._fallback_obter_estudante(id_estudante)
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_obter_estudante,
+            id_estudante,
+        )
 
     def _fallback_obter_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Fallback para obter estudante do repositório local"""
@@ -172,8 +180,8 @@ class ServicoEstudante:
             return {"success": False, "error": str(e), "data": None}
 
     def obter_relatorio_estudante(self, id_estudante: int) -> Dict[str, Any]:
-        """Retorna o detalhe do estudante junto com seus registros de humor via API ou repositório local"""
-        try:
+        """Obtém relatório completo do estudante via API ou repositório local"""
+        def _api_call():
             resp = api.get(f"students/{id_estudante}/report/")
             if (
                 resp
@@ -181,34 +189,38 @@ class ServicoEstudante:
                 and resp.get("data") is not None
             ):
                 return resp
-            return self._fallback_obter_relatorio_estudante(id_estudante)
-        except Exception as e:
-            logger.exception(f"Erro ao obter relatório do estudante: {e}")
-            return self._fallback_obter_relatorio_estudante(id_estudante)
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_obter_relatorio_estudante,
+            id_estudante,
+        )
 
     def _fallback_obter_relatorio_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Fallback para obter relatório do estudante do repositório local"""
         student_resp = self._fallback_obter_estudante(id_estudante)
         student = student_resp.get("data") if isinstance(student_resp, dict) else None
 
-        from services.bem_estar import ServicoBemEstar
-
-        moods_resp = ServicoBemEstar().obter_humor_estudante(id_estudante)
-        moods = moods_resp.get("data") if isinstance(moods_resp, dict) else moods_resp
+        moods_resp = self.repo_bem_estar.obter_humor_estudante(id_estudante)
+        moods = moods_resp if isinstance(moods_resp, list) else []
 
         return {"success": True, "data": {"student": student, "moods": moods}}
 
     def criar_estudante(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Cria um novo estudante via API ou repositório local"""
-        try:
+        def _api_call():
             resp = api.post("students/add/", json=dados)
             if resp and resp.get("success") is not False:
                 logger.info(f"Estudante criado via API: {resp}")
                 return resp
-            return self._fallback_criar_estudante(dados)
-        except Exception as e:
-            logger.exception(f"Erro ao criar estudante: {e}")
-            return self._fallback_criar_estudante(dados)
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_criar_estudante,
+            dados,
+        )
 
     def _fallback_criar_estudante(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Fallback para criar estudante no repositório local"""
@@ -230,15 +242,19 @@ class ServicoEstudante:
         self, id_estudante: int, dados: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Atualiza um estudante existente via API ou repositório local"""
-        try:
+        def _api_call():
             resp = api.put(f"students/{id_estudante}/update/", json=dados)
             if resp and resp.get("success") is not False:
                 logger.info(f"Estudante atualizado via API: {resp}")
                 return resp
-            return self._fallback_atualizar_estudante(id_estudante, dados)
-        except Exception as e:
-            logger.exception(f"Erro ao atualizar estudante: {e}")
-            return self._fallback_atualizar_estudante(id_estudante, dados)
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_atualizar_estudante,
+            id_estudante,
+            dados,
+        )
 
     def _fallback_atualizar_estudante(
         self, id_estudante: int, dados: Dict[str, Any]
@@ -261,14 +277,17 @@ class ServicoEstudante:
 
     def deletar_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Deleta um estudante via API ou repositório local"""
-        try:
+        def _api_call():
             resp = api.delete(f"students/{id_estudante}/delete/")
             if resp and resp.get("success") is not False:
                 return resp
-            return self._fallback_deletar_estudante(id_estudante)
-        except Exception as e:
-            logger.exception(f"Erro ao deletar estudante: {e}")
-            return self._fallback_deletar_estudante(id_estudante)
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_deletar_estudante,
+            id_estudante,
+        )
 
     def _fallback_deletar_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Fallback para deletar estudante no repositório local"""

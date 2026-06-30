@@ -1,38 +1,45 @@
+from dataclasses import dataclass
+from datetime import date
+from typing import Optional
+
+
+@dataclass
 class Autoavaliacao:
-	def __init__(self, id_autoavaliacao, aluno_id, data_avaliacao=None, bem_estar_academico=None,
-				 bem_estar_emocional=None, bem_estar_social=None, reflexoes_pessoais=None, pontos_xp=None):
-		self.id_autoavaliacao = id_autoavaliacao
-		self.aluno_id = aluno_id
-		self.data_avaliacao = data_avaliacao
-		self.bem_estar_academico = bem_estar_academico
-		self.bem_estar_emocional = bem_estar_emocional
-		self.bem_estar_social = bem_estar_social
-		self.reflexoes_pessoais = reflexoes_pessoais
-		self.pontos_xp = pontos_xp
+    id_autoavaliacao: int
+    aluno_id: int
+    data_avaliacao: Optional[date] = None
+    bem_estar_academico: Optional[str] = None
+    bem_estar_emocional: Optional[str] = None
+    bem_estar_social: Optional[str] = None
+    reflexoes_pessoais: Optional[str] = None
+    pontos_xp: Optional[int] = None
 
+
+@dataclass
 class Gamificacao:
-	def __init__(self, id_gamificacao, pontos_atuais, nivel, conquistas, check_in, metas_pessoais, aluno_id, last_check_in_date=None):
-		self.id_gamificacao = id_gamificacao
-		self.pontos_atuais = pontos_atuais
-		self.nivel = nivel
-		self.conquistas = conquistas
-		self.check_in = check_in
-		self.metas_pessoais = metas_pessoais
-		self.aluno_id = aluno_id
-		self.last_check_in_date = last_check_in_date
+    id_gamificacao: int
+    pontos_atuais: int
+    nivel: str
+    conquistas: str
+    check_in: bool
+    metas_pessoais: str
+    aluno_id: int
+    last_check_in_date: Optional[date] = None
 
+
+@dataclass
 class MeuHistorico:
-	def __init__(self, id_historico, aluno_id, humor_media, dias_consecutivos, total_registros):
-		self.id_historico = id_historico
-		self.aluno_id = aluno_id
-		self.humor_media = humor_media
-		self.dias_consecutivos = dias_consecutivos
-		self.total_registros = total_registros
+    id_historico: int
+    aluno_id: int
+    humor_media: float
+    dias_consecutivos: int
+    total_registros: int
 
+
+@dataclass
 class RegistrosDiarios:
-	def __init__(self, id_registro, aluno_id, data, humor, observacoes=None):
-		self.id_registro = id_registro
-		self.aluno_id = aluno_id
-		self.data = data
-		self.humor = humor
-		self.observacoes = observacoes
+    id_registro: int
+    aluno_id: int
+    data: date
+    humor: str
+    observacoes: Optional[str] = None

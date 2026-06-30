@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 """Controller de Configurações — mediação entre View e Services."""
 
+from controllers.base import BaseController
 from services.configuracoes import ServicoConfiguracoes
 
 
-class ConfiguracoesController:
+class ConfiguracoesController(BaseController):
     """Coordena as requisições da View de Configurações."""
 
-    def __init__(self, servico=None):
-        self.servico = servico or ServicoConfiguracoes()
+    def __init__(self):
+        super().__init__(ServicoConfiguracoes)
 
-    def obter_configuracoes(self):
-        return self.servico.obter_configuracoes()
-
-    def atualizar_configuracoes(self, dados):
-        return self.servico.atualizar_configuracoes(dados)
+    def get_service(self):
+        return self._service

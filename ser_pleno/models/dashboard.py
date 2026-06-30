@@ -1,15 +1,21 @@
-class Disponibilidade:
-	def __init__(self, id_disponibilidade, dias, horario, is_active, analista_id):
-		self.id_disponibilidade = id_disponibilidade
-		self.dias = dias
-		self.horario = horario
-		self.is_active = is_active
-		self.analista_id = analista_id
+from dataclasses import dataclass
+from datetime import date
+from typing import Optional
 
+
+@dataclass
+class Disponibilidade:
+    id_disponibilidade: int
+    dias: str
+    horario: str
+    is_active: bool
+    analista_id: int
+
+
+@dataclass
 class Agendamento:
-	def __init__(self, id_agendamento, aluno_id, disponibilidade_id, data, status):
-		self.id_agendamento = id_agendamento
-		self.aluno_id = aluno_id
-		self.disponibilidade_id = disponibilidade_id
-		self.data = data
-		self.status = status
+    id_agendamento: int
+    aluno_id: int
+    disponibilidade_id: int
+    data: str
+    status: str

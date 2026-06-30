@@ -7,6 +7,7 @@ garantido na thread principal via CTk after(), evitando UI freezes e falhas sile
 import logging
 import threading
 import traceback
+from functools import partial
 from typing import Callable, Optional, Any
 
 logger = logging.getLogger(__name__)
@@ -39,11 +40,11 @@ class AsyncRunner:
             try:
                 result = task()
                 if on_success:
-                    _safe_after(widget_ref, lambda: on_success(result))
+                    _safe_after(widget_ref, partial(on_success, result))
             except Exception as exc:
                 logger.exception("Erro em tarefa assíncrona")
                 if on_error:
-                    _safe_after(widget_ref, lambda: on_error(exc))
+                    _safe_after(widget_ref, partial(on_error, exc))
             finally:
                 if on_complete:
                     _safe_after(widget_ref, on_complete)
