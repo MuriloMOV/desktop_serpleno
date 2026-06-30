@@ -1,9 +1,12 @@
 import os
+from contextlib import contextmanager
+from typing import Generator
 
 import mysql.connector
+from mysql.connector import MySQLConnection
 
 
-def _env_int(name, default):
+def _env_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, default))
     except (TypeError, ValueError):
@@ -11,21 +14,40 @@ def _env_int(name, default):
 
 
 DB_CONFIG = {
-    'host': os.getenv('SERPLENO_DB_HOST', '127.0.0.1'),
-    'user': os.getenv('SERPLENO_DB_USER', 'root'),
-    'password': os.getenv('SERPLENO_DB_PASSWORD', ''),
-    'database': os.getenv('SERPLENO_DB_NAME', 'ser_pleno'),
-    'port': _env_int('SERPLENO_DB_PORT', 3306),
+    "host": os.getenv("SERPLENO_DB_HOST", "127.0.0.1"),
+    "user": os.getenv("SERPLENO_DB_USER", "root"),
+    "password": os.getenv("SERPLENO_DB_PASSWORD", ""),
+    "database": os.getenv("SERPLENO_DB_NAME", "ser_pleno"),
+    "port": _env_int("SERPLENO_DB_PORT", 3306),
 }
 
-def get_db_connection():
+
+def get_db_connection() -> MySQLConnection:
     """
-    Retorna uma conexão com o banco de dados MySQL.
+    Retorna uma nova conexão com o banco de dados MySQL.
+
+    Nota: wherever possível, prefira usar `get_connection()` como context manager
+    para garantir fechamento automático da conexão.
     """
-    return mysql.connector.connect(
-        host=DB_CONFIG['host'],
-        user=DB_CONFIG['user'],
-        password=DB_CONFIG['password'],
-        database=DB_CONFIG['database'],
-        port=DB_CONFIG['port']
-    )
+    return mysql.connector.connect(**DB_CONFIG)
+
+
+@contextmanager
+def connection() -> Generator[MySQLConnection, None, None]:
+    """
+    Context manager para conexões MySQL.
+
+    Uso:
+        with connection() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(...)
+    """
+    conn = get_db_connection()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()

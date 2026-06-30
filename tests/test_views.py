@@ -47,7 +47,7 @@ class TestViews:
         # Verify it initialized correctly
         assert view is not None
         assert hasattr(view, 'servico_dashboard')
-        assert hasattr(view, 'kpi_container')
+        assert hasattr(view, 'kpi_frame')
 
     @patch('views.agenda.ServicoAgendamento')
     def test_agenda_view(self, MockService, app, controller):
@@ -76,13 +76,12 @@ class TestViews:
         assert view is not None
         assert hasattr(view, 'servico_estudante')
 
-    @patch('views.orientacoes.ServicoEstudante')
-    def test_orientacoes_view(self, MockService, app, controller):
+    @patch('views.orientacoes.servico_orientacoes')
+    def test_orientacoes_view(self, MockOrientacoes, app, controller):
         view = OrientacoesFrame(app, controller)
         
         # Verify it initialized correctly
         assert view is not None
-        assert hasattr(view, 'servico_estudante')
         assert hasattr(view, 'servico_orientacoes')
 
     def test_analise_triagem_view(self, app, controller):

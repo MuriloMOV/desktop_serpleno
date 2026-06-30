@@ -3,7 +3,7 @@ from PIL import Image
 import os
 import datetime
 import time
-from ui_theme import THEME, SPACING, RADIUS, themed_font
+from ui_theme import THEME, SPACING, RADIUS, themed_font, font
 from services.comunicacao import ServicoComunicacao
 from utils.async_runner import AsyncRunner
 
@@ -45,7 +45,7 @@ def _make_avatar(parent, initials: str, color: str,
     av.pack_propagate(False)
     ctk.CTkLabel(
         av, text=initials[:2],
-        font=ctk.CTkFont("Segoe UI", size // 3, "bold"),
+        font=font(size=size // 3, weight="bold"),
         text_color="#FFFFFF",
     ).place(relx=0.5, rely=0.5, anchor="center")
     return av
@@ -140,7 +140,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             hdr, text="Mensagens",
-            font=ctk.CTkFont("Segoe UI", 17, "bold"),
+            font=font(size=17, weight="bold"),
             text_color=THEME["text"],
         ).pack(side="left")
 
@@ -151,7 +151,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             fg_color=THEME["primary_soft"],
             hover_color=THEME["primary_hover"],
             text_color=THEME["primary"],
-            font=ctk.CTkFont("Segoe UI", 15),
+            font=font(size=15),
             command=lambda: None,
         ).pack(side="right")
 
@@ -164,18 +164,18 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             search_wrap, text="🔍",
-            font=ctk.CTkFont("Segoe UI", 13),
+            font=font(size=13),
             text_color=THEME["text_muted"],
         ).pack(side="left", padx=(10, 0))
 
         self.entry_busca = ctk.CTkEntry(
             search_wrap,
             placeholder_text="Buscar conversas...",
-            fg_color="transparent",
+            fg_color="#F3F4F6",
             border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
-            font=ctk.CTkFont("Segoe UI", 13),
+            font=font(size=13),
             height=36,
         )
         self.entry_busca.pack(side="left", fill="x", expand=True, padx=(4, 8))
@@ -253,7 +253,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         # Nome
         ctk.CTkLabel(
             inner, text=nome,
-            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            font=font(size=13, weight="bold"),
             text_color=THEME["text"], anchor="w",
         ).grid(row=0, column=1, sticky="w")
 
@@ -261,7 +261,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         sub = "Grupo de comunicação" if papel == "group" else papel.capitalize()
         ctk.CTkLabel(
             inner, text=sub,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=font(size=11),
             text_color=THEME["text_secondary"], anchor="w",
         ).grid(row=1, column=1, sticky="w")
 
@@ -276,7 +276,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             badge_frame.grid_propagate(False)
             ctk.CTkLabel(
                 badge_frame, text=str(unread),
-                font=ctk.CTkFont("Segoe UI", 9, "bold"),
+                font=font(size=9, weight="bold"),
                 text_color=THEME["text_on_primary"],
             ).place(relx=0.5, rely=0.5, anchor="center")
         row._badge_frame = badge_frame
@@ -388,7 +388,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         self.lbl_chat_nome = ctk.CTkLabel(
             title_stack, text="Selecione uma conversa",
-            font=ctk.CTkFont("Segoe UI", 14, "bold"),
+            font=font(size=14, weight="bold"),
             text_color=THEME["text"],
         )
         self.lbl_chat_nome.pack(anchor="w")
@@ -404,7 +404,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         self.lbl_chat_status = ctk.CTkLabel(
             status_row, text="Online",
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=font(size=11),
             text_color=THEME["success"],
         )
         self.lbl_chat_status.pack(side="left")
@@ -420,7 +420,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 fg_color="transparent",
                 hover_color=THEME["primary_soft"],
                 text_color=THEME["text_secondary"],
-                font=ctk.CTkFont("Segoe UI", 16),
+                font=font(size=16),
             ).pack(side="left", padx=3)
 
     # ── Área de mensagens ───────────────────────────────────────────────────
@@ -466,7 +466,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=THEME["primary_soft"],
             text_color=THEME["text_secondary"],
-            font=ctk.CTkFont("Segoe UI", 16),
+            font=font(size=16),
             command=self.toggle_modal_arquivos,
         )
         self.btn_clip.pack(side="left", padx=(8, 0))
@@ -475,11 +475,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.entry_mensagem = ctk.CTkEntry(
             box,
             placeholder_text="Digite sua mensagem...",
-            fg_color="transparent",
+            fg_color="#F9FAFB",
             border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
-            font=ctk.CTkFont("Segoe UI", 13),
+            font=font(size=13),
             height=42,
         )
         self.entry_mensagem.pack(side="left", fill="x", expand=True, padx=4)
@@ -494,7 +494,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             fg_color="transparent",
             hover_color=THEME["primary_soft"],
             text_color=THEME["text_secondary"],
-            font=ctk.CTkFont("Segoe UI", 16),
+            font=font(size=16),
         ).pack(side="left", padx=4)
 
         # Enviar
@@ -504,7 +504,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             fg_color=THEME["primary"],
             hover_color=THEME["primary_hover"],
             text_color="#FFFFFF",
-            font=ctk.CTkFont("Segoe UI", 16, "bold"),
+            font=font(size=16, weight="bold"),
             command=self.enviar_mensagem,
         )
         self.btn_enviar.pack(side="right", padx=(4, 8))
@@ -544,7 +544,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ctk.CTkLabel(
             self.modal_arquivos,
             text="Enviar arquivo",
-            font=ctk.CTkFont("Segoe UI", 13, "bold"),
+            font=font(size=13, weight="bold"),
             text_color=THEME["text"],
         ).grid(row=0, column=0, columnspan=3, padx=14, pady=(12, 8), sticky="w")
 
@@ -552,7 +552,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             btn = ctk.CTkButton(
                 self.modal_arquivos,
                 text=f"{icon}\n{nome}",
-                font=ctk.CTkFont("Segoe UI", 11),
+                font=font(size=11),
                 height=58, width=78,
                 corner_radius=10,
                 fg_color=THEME["bg_alt"],
@@ -627,7 +627,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         date_lbl.pack(pady=(12, 8))
         ctk.CTkLabel(
             date_lbl, text="HOJE",
-            font=ctk.CTkFont("Segoe UI", 10, "bold"),
+            font=font(size=10, weight="bold"),
             text_color=THEME["text_secondary"],
         ).pack(padx=14, pady=4)
 
@@ -666,7 +666,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             )
             ctk.CTkLabel(
                 av_row, text=remetente,
-                font=ctk.CTkFont("Segoe UI", 11, "bold"),
+                font=font(size=11, weight="bold"),
                 text_color=THEME["text_secondary"],
             ).pack(side="left")
 
@@ -688,7 +688,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             ctk.CTkLabel(
                 bubble,
                 text=msg["text"],
-                font=ctk.CTkFont("Segoe UI", 13),
+                font=font(size=13),
                 text_color=txt_color,
                 wraplength=380,
                 justify="left",
@@ -706,14 +706,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             meta, text=time_str,
-            font=ctk.CTkFont("Segoe UI", 10),
+            font=font(size=10),
             text_color=THEME["text_muted"],
         ).pack(side="left")
 
         if is_mine:
             ctk.CTkLabel(
                 meta, text=" ✓✓",
-                font=ctk.CTkFont("Segoe UI", 10),
+                font=font(size=10),
                 text_color=THEME["primary"] if msg.get("read") else THEME["text_muted"],
             ).pack(side="left")
 
@@ -736,18 +736,18 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             card, text=icon,
-            font=ctk.CTkFont("Segoe UI", 26),
+            font=font(size=26),
         ).grid(row=0, column=0, rowspan=2, padx=(12, 8), pady=10)
 
         ctk.CTkLabel(
             card, text=nome,
-            font=ctk.CTkFont("Segoe UI", 12, "bold"),
+            font=font(size=12, weight="bold"),
             text_color=THEME["text"], anchor="w", wraplength=220,
         ).grid(row=0, column=1, sticky="w", pady=(10, 2))
 
         ctk.CTkLabel(
             card, text=tam,
-            font=ctk.CTkFont("Segoe UI", 11),
+            font=font(size=11),
             text_color=THEME["text_secondary"], anchor="w",
         ).grid(row=1, column=1, sticky="w", pady=(0, 10))
 
@@ -764,7 +764,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 fg_color=THEME["primary_soft"],
                 hover_color=THEME["primary_hover"],
                 text_color=THEME["primary"],
-                font=ctk.CTkFont("Segoe UI", 14),
+                font=font(size=14),
                 command=cmd,
             ).pack(pady=3)
 

@@ -48,6 +48,10 @@ def test_navigation_flow():
     app = App.__new__(App)
     app.atualizar_menu = MagicMock()
     app.trocar_frame = MagicMock()
+    app.header_title = MagicMock()
+    app.header_subtitle = MagicMock()
+    app.header_title.winfo_exists.return_value = True
+    app.header_subtitle.winfo_exists.return_value = True
 
     app.mostrar_agenda()
 

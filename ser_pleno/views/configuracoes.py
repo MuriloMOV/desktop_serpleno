@@ -71,7 +71,7 @@ class ConfigInputField(ctk.CTkFrame):
         self.entry = ctk.CTkEntry(
             box,
             placeholder_text=placeholder,
-            fg_color="transparent",
+            fg_color=THEME["bg_alt"],
             border_width=0,
             font=themed_font("body"),
             height=36,
