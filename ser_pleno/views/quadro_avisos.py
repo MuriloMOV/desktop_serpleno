@@ -21,11 +21,15 @@ logger = logging.getLogger("apps.desktop")
 # ══════════════════════════════════════════════════════════════════════════════
 Q = extend_theme(THEME, {
     "input_border":     "#E5E7EB",
+    "text_light":       "#9CA3AF",
     "danger_hover":     "#B91C1C",
     "block_bg":         "#F5F3FF",
     "block_border":     "#C7D2FE",
     "card_radius":      RADIUS["card"],
+    "card_bg":          THEME["surface"],
     "card_border":      THEME["border"],
+    "modal_bg":         THEME["surface"],
+    "preview_bg":       THEME["bg_alt"],
     "cat": {
         "informativo": ("#4F46E5", "#EEF2FF"),
         "aviso":       ("#D97706", "#FEF3C7"),

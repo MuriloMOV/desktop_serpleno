@@ -111,6 +111,7 @@ class AppointmentModal(ctk.CTkToplevel):
                  horarios_base: list[str], mapa_estudantes: dict[str, int],
                  on_save, on_delete=None):
         super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
         self.hora = hora
         self.info = info
         self.horarios_base = horarios_base
@@ -125,7 +126,7 @@ class AppointmentModal(ctk.CTkToplevel):
         self.geometry("520x760")
         self.configure(fg_color=THEME["surface"])
         self.grab_set()
-        self.transient(self.winfo_toplevel())
+        self.transient(self._parent_window)
         w, h = 520, 760
         self.geometry(f"{w}x{h}+{(self.winfo_screenwidth()//2)-(w//2)}+{(self.winfo_screenheight()//2)-(h//2)}")
 
@@ -146,14 +147,14 @@ class AppointmentModal(ctk.CTkToplevel):
 
         Divider(container).pack(fill="x", pady=(0, 22))
 
-        self.combo_hora = self._campo_combo("Horário", "", self.horarios_base, initial=self.hora)
+        self.combo_hora = self._campo_combo(container, "Horário", "", self.horarios_base, initial=self.hora)
         estudantes = list(self.mapa_estudantes.keys())
         self.combo_estudante = self._campo_combo(
-            "Estudante", "", estudantes,
+            container, "Estudante", "", estudantes,
             initial=self.info["nome"] if self.info else None
         )
         self.combo_status = self._campo_combo(
-            "Status", "", ["Agendado", "Realizado", "Cancelado", "Faltou"],
+            container, "Status", "", ["Agendado", "Realizado", "Cancelado", "Faltou"],
             initial=self.info.get("status", "Agendado") if self.info else "Agendado"
         )
 
@@ -186,9 +187,9 @@ class AppointmentModal(ctk.CTkToplevel):
             command=self._save, width=120, icon="✔"
         ).pack(side="right")
 
-    def _campo_combo(self, label, placeholder, values=None, initial=None):
+    def _campo_combo(self, parent, label, placeholder, values=None, initial=None):
         ctk.CTkLabel(
-            self, text=label,
+            parent, text=label,
             font=themed_font("caption", "bold"), text_color=THEME["text_secondary"]
         ).pack(anchor="w", pady=(0, 5))
 
@@ -205,13 +206,13 @@ class AppointmentModal(ctk.CTkToplevel):
                 "button_hover_color": THEME["border_strong"],
                 "dropdown_fg_color": THEME["surface"],
             })
-            wgt = ctk.CTkComboBox(self, **kw)
+            wgt = ctk.CTkComboBox(parent, **kw)
             if initial is not None and initial in values:
                 wgt.set(initial)
             else:
                 wgt.set(values[0] if values else "")
         else:
-            wgt = ctk.CTkEntry(self, **kw)
+            wgt = ctk.CTkEntry(parent, **kw)
             if initial is not None:
                 wgt.delete(0, "end")
                 wgt.insert(0, initial)
@@ -278,6 +279,7 @@ class GradeManagementModal(ctk.CTkToplevel):
     def __init__(self, parent, horarios_base: list[str], servico: ServicoAgendamento,
                  on_refresh):
         super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
         self.horarios_base = horarios_base
         self.servico = servico
         self.on_refresh = on_refresh
@@ -289,7 +291,7 @@ class GradeManagementModal(ctk.CTkToplevel):
         self.geometry("420x580")
         self.configure(fg_color=THEME["surface"])
         self.grab_set()
-        self.transient(self.winfo_toplevel())
+        self.transient(self._parent_window)
         _centralizar_janela(self, w=420, h=580)
 
     def _build(self):

@@ -253,6 +253,9 @@ class FormModal(ctk.CTkToplevel):
 
         self._center(parent, width, height)
         self._build()
+        self.transient(parent.winfo_toplevel())
+        self.grab_set()
+        self.deiconify()
 
     def _center(self, parent, w, h):
         self.update_idletasks()

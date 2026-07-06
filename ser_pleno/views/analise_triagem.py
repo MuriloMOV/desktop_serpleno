@@ -6,11 +6,8 @@ from ui_theme import (
 )
 from ui_theme_extensions import extend_theme
 from components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, EmptyState,
-    Avatar, Badge, Pill, KPICard, SectionHeader, InputField, ClickableFrame, bind_clickable
+    Card, PrimaryButton, GhostButton, Divider, KPICard
 )
-from services.estudantes import ServicoEstudante
-from utils.async_runner import AsyncRunner
 from utils.avatar_utils import get_avatar_color
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -112,7 +109,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
              "priority": "Baixa",   "status": "Cancelada"},
         ]
 
-        self._criar_cabecalho()
+        self._criar_toolbar_acoes()
         self._criar_kpis()
         self._criar_filtros()
         self._criar_tabela()
@@ -120,18 +117,9 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     # ══════════════════════════════════════════
     #  CABEÇALHO
     # ══════════════════════════════════════════
-    def _criar_cabecalho(self):
+    def _criar_toolbar_acoes(self):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Análise de Triagem",
-                     font=themed_font("h2", "bold"),
-                     text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Acompanhamento de triagens e encaminhamentos",
-                     font=themed_font("body"),
-                     text_color=THEME["text_secondary"]).pack(anchor="w", pady=(SPACING["label_gap"], 0))
 
         PrimaryButton(
             bar, text="＋  Nova Triagem",
@@ -139,10 +127,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             height=40, corner_radius=RADIUS["button"], width=160,
         ).pack(side="right")
 
-        ctk.CTkFrame(self, height=1,
-                     fg_color=THEME["border"]).pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0))
-
-    # ══════════════════════════════════════════
+    # ══════════════════════════════════
     #  KPIs
     # ══════════════════════════════════════════
     def _criar_kpis(self):

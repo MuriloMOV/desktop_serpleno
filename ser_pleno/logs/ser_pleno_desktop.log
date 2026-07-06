@@ -1,0 +1,428 @@
+2026-07-03 14:22:33 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 14:22:39 | INFO     | services.connectivity | Disponibilidade da API atualizada: False
+2026-07-03 14:22:55 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-03 14:23:01 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 14:23:15 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-03 14:23:15 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-03 14:23:24 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 14:23:26 | INFO     | services.orientacoes | Encontradas 20 orientações no banco de dados local
+2026-07-03 14:23:26 | INFO     | services.orientacoes | Orientações obtidas do banco local
+2026-07-03 14:25:40 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 14:25:42 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-03 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 14:25:43 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 14:25:45 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-10 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:02:32 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 15:04:40 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-03 15:04:43 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:05:01 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-03 15:05:01 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-03 15:05:11 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:28:55 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 15:28:57 | INFO     | services.connectivity | Disponibilidade da API atualizada: False
+2026-07-03 15:29:05 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-03 15:29:07 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:29:24 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:34:36 | INFO     | services.orientacoes | Encontradas 20 orientações no banco de dados local
+2026-07-03 15:34:36 | INFO     | services.orientacoes | Orientações obtidas do banco local
+2026-07-03 15:34:38 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:38:55 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 15:39:07 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-03 15:39:10 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:40:26 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-03 15:40:26 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-03 15:40:28 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 15:40:30 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-03 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:40:30 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 15:40:32 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-10 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:41:03 | INFO     | services.orientacoes | Encontradas 20 orientações no banco de dados local
+2026-07-03 15:41:03 | INFO     | services.orientacoes | Orientações obtidas do banco local
+2026-07-03 15:41:09 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:43:40 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 15:43:42 | INFO     | services.connectivity | Disponibilidade da API atualizada: False
+2026-07-03 15:44:48 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-03 15:44:58 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-03 15:45:00 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:45:27 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-03 15:45:27 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-03 15:45:29 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 15:45:31 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-03 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:45:31 | INFO     | root | Banco local vazio, tentando API como fallback
+2026-07-03 15:45:33 | WARNING  | root | Erro ao buscar agendamentos via API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/desktop/schedule/appointments/?date=2026-07-10 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:46:02 | INFO     | services.orientacoes | Encontradas 20 orientações no banco de dados local
+2026-07-03 15:46:02 | INFO     | services.orientacoes | Orientações obtidas do banco local
+2026-07-03 15:46:04 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-03 15:46:12 | ERROR    | services.mural | Erro ao obter mensagem: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1362, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1122, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1066, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\services\mural.py", line 137, in obter_mensagem
+    response = session.get(url, timeout=10)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:46:13 | ERROR    | services.mural | Erro ao obter mensagem: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1362, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1122, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1066, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\services\mural.py", line 137, in obter_mensagem
+    response = session.get(url, timeout=10)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:46:13 | ERROR    | services.mural | Erro ao obter mensagem: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1362, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1122, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1066, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\services\mural.py", line 137, in obter_mensagem
+    response = session.get(url, timeout=10)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-03 15:46:58 | INFO     | apps.desktop | Notificação 'Mensagens Diretas' ativada
+2026-07-03 15:46:59 | INFO     | apps.desktop | Notificação 'Pedidos de Ajuda' ativada
+2026-07-03 15:47:00 | INFO     | apps.desktop | Notificação 'Feedback de Alunos' ativada
+2026-07-03 15:47:01 | INFO     | apps.desktop | Notificação 'Efeitos Sonoros' ativada
+2026-07-03 15:47:06 | INFO     | apps.desktop | Escala de texto alterada: Padrão (16px)
+2026-07-03 15:47:09 | INFO     | apps.desktop | Escala de texto alterada: Grande (18px)
+2026-07-03 15:47:14 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-06 14:37:30 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 14:38:49 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 14:42:29 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-06 14:42:38 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-06 15:13:16 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 15:13:39 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-06 15:13:41 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-06 15:14:19 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-06 15:14:21 | INFO     | services.orientacoes | Encontradas 20 orientações no banco de dados local
+2026-07-06 15:14:21 | INFO     | services.orientacoes | Orientações obtidas do banco local
+2026-07-06 15:14:32 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-06 15:14:32 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-06 15:14:38 | INFO     | services.estudantes | Tentando conectar ao repositório de estudantes...
+2026-07-06 15:14:38 | INFO     | services.estudantes | Encontrados 26 estudantes no repositório local
+2026-07-06 15:21:23 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-06 15:23:04 | WARNING  | services.mural | Erro de conexão com API: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/?page=1 (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente")), usando banco local
+2026-07-06 15:23:16 | ERROR    | services.mural | Erro ao obter mensagem: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 85, in create_connection
+    raise err
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\connection.py", line 73, in create_connection
+    sock.connect(sa)
+    ~~~~~~~~~~~~^^^^
+ConnectionRefusedError: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 493, in _make_request
+    conn.request(
+    ~~~~~~~~~~~~^
+        method,
+        ^^^^^^^
+    ...<6 lines>...
+        enforce_content_length=enforce_content_length,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 500, in request
+    self.endheaders()
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1362, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1122, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "C:\Users\58023826\AppData\Local\Programs\Python\Python313\Lib\http\client.py", line 1066, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 331, in connect
+    self.sock = self._new_conn()
+                ~~~~~~~~~~~~~~^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connection.py", line 219, in _new_conn
+    raise NewConnectionError(
+        self, f"Failed to establish a new connection: {e}"
+    ) from e
+urllib3.exceptions.NewConnectionError: HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\urllib3\util\retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\services\mural.py", line 137, in obter_mensagem
+    response = session.get(url, timeout=10)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\58023826\Desktop\react\tkinter\desktop_serpleno\ser_pleno\.venv\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/mural/3/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))

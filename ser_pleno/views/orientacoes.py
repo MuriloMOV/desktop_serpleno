@@ -17,14 +17,26 @@ logger = logging.getLogger("apps.desktop")
 # ══════════════════════════════════════════════════════════════════════════════
 O = extend_theme(THEME, {
     "card_radius":  RADIUS["card"],
+    "card_bg":      THEME["surface"],
+    "card_border":  THEME["border"],
     "danger_hover": "#B91C1C",
     "text_light":   "#9CA3AF",
     "input_border": "#E5E7EB",
     "sidebar_bg":   "#FFFFFF",
     "sidebar_border": "#E5E7EB",
     "student_bg":   "#FAFAFA",
-    "card_border":  THEME["border"],
-    "card_bg":      THEME["surface"],
+    "av_colors": [
+        "#4F46E5", "#7C3AED", "#059669",
+        "#D97706", "#DC2626", "#0891B2",
+    ],
+    "temas": {
+        "Geral":       ("#4F46E5", "#EEF2FF"),
+        "Acadêmico":   ("#2563EB", "#DBEAFE"),
+        "Emocional":   ("#DB2777", "#FCE7F3"),
+        "Social":      ("#0891B2", "#CCFBF1"),
+        "Familiar":    ("#EA580C", "#FFEDD5"),
+        "Vocacional":  ("#7C3AED", "#EDE9FE"),
+    },
 })
 
 _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")

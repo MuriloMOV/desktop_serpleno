@@ -1,9 +1,6 @@
 from components.ui_components import (
-    Card, EmptyState, PrimaryButton, GhostButton, Badge, Pill,
-    Divider, Avatar, Toast, Tabs, KPICard, ClickableFrame, bind_clickable
+    Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable
 )
-from utils.avatar_utils import get_avatar_color
-from utils.chart import draw_mood_line_chart
 from utils.async_runner import AsyncRunner
 
 import customtkinter as ctk
@@ -14,22 +11,6 @@ from services.dashboard import ServicoDashboard
 DASH_TOKENS = extend_theme(THEME, {
     "kpi_size": "wide",
 })
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Componentes auxiliares
-# ══════════════════════════════════════════════════════════════════════════════
-
-class _SectionCard(Card):
-    """Card padrão de seção com título e corpo."""
-    def __init__(self, parent, title: str, action_text: str = "",
-                 action_cmd=None, badge_text: str = ""):
-        super().__init__(parent, title=title)
-        self._build_extras(action_text, action_cmd, badge_text)
-
-    def _build_extras(self, action_text, action_cmd, badge_text):
-        # badge no header (sobrescreve comportamento padrão de Card para adicionar badge)
-        pass
 
 
 class _AgendaRow(ctk.CTkFrame):
@@ -169,6 +150,7 @@ class NotificationPanel(ctk.CTkToplevel):
     def __init__(self, parent, titulo: str, notificacoes: list, tipo: str,
                  on_mark_read=None, on_mark_all_read=None):
         super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
         self.titulo = titulo
         self.notificacoes = notificacoes
         self.tipo = tipo
@@ -183,7 +165,7 @@ class NotificationPanel(ctk.CTkToplevel):
         self.resizable(False, False)
         self.configure(fg_color=THEME["surface"])
         self.attributes("-topmost", True)
-        self.transient(self.winfo_toplevel())
+        self.transient(self._parent_window)
         self.update_idletasks()
         x = self.winfo_screenwidth() // 2 - 260
         y = self.winfo_screenheight() // 2 - 240
@@ -288,6 +270,7 @@ class ProfileModal(ctk.CTkToplevel):
     """Modal de perfil do usuário."""
     def __init__(self, parent, user_data: dict, on_edit=None):
         super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
         self.user_data = user_data or {}
         self.on_edit = on_edit
         self._setup()
@@ -299,7 +282,7 @@ class ProfileModal(ctk.CTkToplevel):
         self.resizable(False, False)
         self.configure(fg_color=THEME["surface"])
         self.attributes("-topmost", True)
-        self.transient(self.winfo_toplevel())
+        self.transient(self._parent_window)
         self.update_idletasks()
         x = self.winfo_screenwidth() // 2 - 220
         y = self.winfo_screenheight() // 2 - 190
@@ -404,7 +387,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self.controller = controller
         self.servico_dashboard = ServicoDashboard()
 
-        self._criar_cabecalho()
+        self._criar_toolbar_acoes()
         self._criar_kpi_container()
         self._criar_grid_principal()
         self._carregar_dados()
@@ -442,30 +425,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._atualizar_secao_humor(data)
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Cabeçalho
+    #  Toolbar de ações
     # ──────────────────────────────────────────────────────────────────────
-    def _criar_cabecalho(self):
+    def _criar_toolbar_acoes(self):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
 
-        # Saudação
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-
-        ctk.CTkLabel(
-            left, text="Dashboard Central",
-            font=themed_font("h2", "bold"),
-            text_color=THEME["text"],
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            left,
-            text="Visão geral do acompanhamento discente",
-            font=themed_font("body"),
-            text_color=THEME["text_secondary"],
-        ).pack(anchor="w", pady=(2, 0))
-
-        # Botões do lado direito
         right = ctk.CTkFrame(bar, fg_color="transparent")
         right.pack(side="right")
 
@@ -507,11 +472,6 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             font=themed_font("body", "bold"),
             text_color="white",
         ).place(relx=0.5, rely=0.5, anchor="center")
-
-        # Divider
-        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).pack(
-            fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0)
-        )
 
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(
@@ -835,4 +795,4 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     # Alias legado
     @staticmethod
     def get_humor_emoji(media):
-        return DashboardFrame._humor_emoji.__func__(None, media)
+        return DashboardFrame._humor_emoji(media)

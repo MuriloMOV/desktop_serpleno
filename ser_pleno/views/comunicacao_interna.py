@@ -2,10 +2,12 @@ import customtkinter as ctk
 from PIL import Image
 import os
 import datetime
-import time
+import logging
 from ui_theme import THEME, SPACING, RADIUS, themed_font, font
 from services.comunicacao import ServicoComunicacao
 from utils.async_runner import AsyncRunner
+
+logger = logging.getLogger(__name__)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
