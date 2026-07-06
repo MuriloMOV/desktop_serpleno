@@ -1,0 +1,10 @@
+2026-07-06 16:43:01 | INFO     | ser_pleno.config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 16:43:01 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 16:43:19 | WARNING  | root | API indisponÃ­vel, usando banco local para login
+2026-07-06 16:43:21 | WARNING  | root | Erro ao tentar estabelecer sessÃ£o Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))
+2026-07-06 17:18:55 | INFO     | ser_pleno.config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 17:18:56 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 17:20:18 | INFO     | ser_pleno.config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 17:20:18 | INFO     | config.operation_mode | Configuração carregada: modo db_primary
+2026-07-06 17:20:29 | WARNING  | root | API indisponível, usando banco local para login
+2026-07-06 17:20:31 | WARNING  | root | Erro ao tentar estabelecer sessão Django: HTTPConnectionPool(host='127.0.0.1', port=8000): Max retries exceeded with url: /api/v1/serpleno/auth/login/ (Caused by NewConnectionError("HTTPConnection(host='127.0.0.1', port=8000): Failed to establish a new connection: [WinError 10061] Nenhuma conexão pôde ser feita porque a máquina de destino as recusou ativamente"))

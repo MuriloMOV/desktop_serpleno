@@ -1,111 +1,96 @@
-# Planejamento de Reestruturação Arquitetural — SerPleno Desktop
+﻿# Documentação Arquitetural — SerPleno Desktop
 
-**Data:** 2026-06-17  
-**Contexto:** Projeto `ser_pleno` — Desktop Application (CustomTkinter) com backend Django/MySQL  
-**Status:** Em execução
-
----
-
-## 1. Diagnóstico
-
-O projeto segue um padrão **híbrido MVC/MVVM informal**, com separação de pastas parcialmente implementada:
-- Views: Implementadas (CustomTkinter Frames)
-- Controllers: **Stubados/vazios** — apenas `triagem_controller.py` tem implementação
-- Services: Implementados com lógica de negócio e acesso a dados
-- Models: Dataclasses simples, não utilizados como entidades de domínio
-
-### Problemas principais:
-1. Controllers vazios — Views falam diretamente com Services
-2. SQL espalhado em Services — sem camada Repository
-3. Duplicação removida: apenas `services/estudantes.py` segue como serviço de estudantes consolidado (`services/students.py` foi removido)
-4. Models desatualizados em relação ao schema real do banco
-5. `operation_config.json` na raiz do projeto (deveria estar em `config/`)
+**Data:** 2026-07-06
+**Contexto:** Projeto `ser_pleno` — Desktop Application (CustomTkinter) com backend Django/MySQL
+**Status:** Estrutura reorganizada e validação verde
 
 ---
 
-## 2. Objetivos
+## 1. Estrutura de Pastas Atual
 
-- **Curto prazo:** Implementar controllers stubados; consolidar duplicações; reorganizar configurações
-- **Médio prazo:** Introduzir camada Repository; refinar Models como entidades; extrair componentes reutilizáveis
-- **Longo prazo:** Adotar DI simples; Event Bus; considerar SQLAlchemy para type-safety
+```
+desktop_serpleno/
+├── pyproject.toml
+├── .env.example
+├── .gitignore
+├── README.md
+├── REORGANIZACAO_PLANO.md
+├── BUILD_DESKTOP.md
+├── src/ser_pleno/
+│   ├── __init__.py
+│   ├── __main__.py
+│   ├── app.py
+│   ├── config/
+│   ├── ui/
+│   ├── domain/
+│   ├── infrastructure/
+│   │   └── api/
+│   ├── application/
+│   │   ├── services/
+│   │   └── controllers/
+│   ├── presentation/
+│   │   ├── views/
+│   │   └── components/
+│   ├── repositories/
+│   ├── utils/
+│   └── scripts/
+├── tests/
+│   ├── unit/
+│   ├── ui/
+│   ├── integration/
+│   └── fixtures/
+├── user_data/
+├── build/
+├── dist/
+└── docs/
+    └── arquitetura-planejamento.md
+```
 
----
+## 2. Arquitetura
 
-## 3. Backlog Hierárquico
+O projeto segue Clean Architecture simplificada:
+- `presentation/` → views e components
+- `application/controllers` → orquestração
+- `application/services` → casos de uso e regras de negócio
+- `repositories/` → acesso a dados
+- `infrastructure/` → HTTP, MySQL, SO
+- `domain/` → entidades puras
+- `config/` → configurações gerais
+- `ui/` → Design System
+- `utils/` → utilidades transversais
 
-### 3.1 Curto Prazo (ganhos rápidos)
+## 3. Checklist de Implementação
 
-#### T1: Implementar controllers stubados
-- [x] `controllers/dashboard.py`
-- [x] `controllers/estudantes.py`
-- [x] `controllers/bem_estar.py`
-- [x] `controllers/configuracoes.py`
-- [x] `controllers/analise_triagem.py`
+### Concluído
+- [x] Estrutura `src/` layout com pacote `ser_pleno/`
+- [x] Ponto de entrada `__main__.py`
+- [x] `pyproject.toml` com dependências e pytest
+- [x] Reorganização em camadas
+- [x] Controllers implementados
+- [x] Repository layer implementada
+- [x] Services refatorados para usar repositories
+- [x] Componentes reutilizáveis de UI
+- [x] Design System centralizado
+- [x] Testes organizados: 20 passed
+- [x] Encoding UTF-8 sem BOM
+- [x] Pasta `tkclaude/` removida
 
-#### T2: Consolidar services duplicados
-- [x] Remover `services/students.py` (StudentService wrapper legado)
-
-#### T3: Reorganizar configurações
-- [x] Mover `operation_config.json` para `config/operation_config.json`
-- [x] Atualizar imports em `config/operation_mode.py`
-
-### 3.2 Médio Prazo
-
-#### T4: Atualizar models para refletir schema real
-- [x] `models/estudantes.py` — manter `Estudante` (já está ok)
-- [x] `models/dashboard.py` — atualizar campos para refletir tabela `agendamento`
-- [x] `models/bem_estar.py` — validar campos contra `desktop_wellnesscheckin`
-- [x] `models/configuracoes.py` — revisar
-
-#### T5: Introduzir pasta `repositories/`
-- [ ] `repositories/base.py` — conexão compartilhada
-- [ ] `repositories/estudantes.py` — EstudanteRepository
-- [ ] `repositories/dashboard.py` — DashboardRepository
-- [ ] `repositories/agendamentos.py` — AgendamentoRepository
-
-#### T6: Refatorar `services/` para usar repositories
-- [ ] `services/estudantes.py` → depende de `EstudanteRepository`
-- [ ] `services/dashboard.py` → depende de `DashboardRepository`
-- [ ] `services/agendamentos.py` → depende de `AgendamentoRepository`
-
-#### T7: Extrair lógica de UI das Views para componentes
-- [ ] Mover modal de `views/estudantes.py` para `components/modals/EstudanteFormModal.py`
-
-#### T8: Atualizar App para usar controllers
-- [ ] `app.py` injeta controllers nas views
-
-### 3.3 Longo Prazo
-
-#### T9: Adotar tipagem stricter (mypy)
-- [ ] Adicionar `mypy.ini`
-- [ ] Implementar gradualmente tipos em serviços críticos
-
-#### T10: Considerar SQLAlchemy 2.0
-- [ ] Avaliar viabilidade de migração
-
----
+### Futuro
+- [ ] Adotar tipagem stricter (mypy)
+- [ ] Considerar SQLAlchemy 2.0
+- [ ] DI simples / Event Bus
+- [ ] Testes de integração para repositories
 
 ## 4. Critérios de Sucesso
 
-| Item | Métrica |
-|---|---|
-| Controllers implementados | 100% dos controllers stubados possuem implementação funcional |
-| Services consolidados | 0 imports de `services.students` legados |
-| Configuração organizada | `operation_config.json` reside em `config/` |
-| Repository layer | Toda query SQL em services moveu-se para repositories |
-| Models atualizados | Todos os models refletem colunas reais das tabelas |
-| Views desacopladas | Nenhuma view instancia diretamente `ServicoX` |
+| Item | Métrica | Status |
+|---|---|---|
+| Estrutura `src/` | Código em `src/ser_pleno/` | ✅ |
+| Ponto de entrada | `python -m ser_pleno` | ✅ |
+| Repository layer | SQL isolado em repositories | ✅ |
+| Testes | `pytest tests` passa | ✅ 20 passed |
+| Encoding | UTF-8 sem BOM | ✅ |
 
 ---
 
-## 5. Riscos
-
-| Risco | Mitigação |
-|---|---|
-| Quebra de funcionalidade existente | Testes manuais após cada etapa; manter fallback API→DB |
-| Complexidade crescente | Documentar interfaces entre camadas |
-| Custo de migração gradual | Implementar changesets pequenos e versionados |
-
----
-
-*Documento de planejamento gerado pela análise arquitetural.*
+*Documento atualizado em 2026-07-06*
