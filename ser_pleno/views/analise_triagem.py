@@ -6,10 +6,8 @@ from ui_theme import (
 )
 from ui_theme_extensions import extend_theme
 from components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, EmptyState, BaseModal
+    Card, PrimaryButton, GhostButton, Divider, KPICard
 )
-from services.estudantes import ServicoEstudante
-from utils.async_runner import AsyncRunner
 from utils.avatar_utils import get_avatar_color
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -111,6 +109,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
              "priority": "Baixa",   "status": "Cancelada"},
         ]
 
+        self._criar_toolbar_acoes()
         self._criar_kpis()
         self._criar_filtros()
         self._criar_tabela()
@@ -118,10 +117,17 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     # ══════════════════════════════════════════
     #  CABEÇALHO
     # ══════════════════════════════════════════
-    def _criar_cabecalho(self):
-        raise NotImplementedError
+    def _criar_toolbar_acoes(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
 
-    # ══════════════════════════════════════════
+        PrimaryButton(
+            bar, text="＋  Nova Triagem",
+            command=self.abrir_nova_triagem,
+            height=40, corner_radius=RADIUS["button"], width=160,
+        ).pack(side="right")
+
+    # ══════════════════════════════════
     #  KPIs
     # ══════════════════════════════════════════
     def _criar_kpis(self):

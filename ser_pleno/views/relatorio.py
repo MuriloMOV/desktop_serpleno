@@ -1,6 +1,6 @@
 import logging
 import customtkinter as ctk
-from components.ui_components import Divider, PrimaryButton, GhostButton
+from components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton
 from services.relatorios import ServicoRelatorio
 from utils.async_runner import AsyncRunner
 from ui_theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
@@ -41,9 +41,6 @@ def _card(parent, **kwargs) -> ctk.CTkFrame:
         border_color=THEME["border"],
         **kwargs,
     )
-
-def _divider(parent):
-    ctk.CTkFrame(parent, height=1, fg_color=THEME["divider"]).pack(fill="x")
 
 def _section_title(parent, text: str, pady=(16, 12)):
     ctk.CTkLabel(

@@ -1,36 +1,40 @@
 import os
-import ctypes
 import logging
-import customtkinter as ctk
+import math
+import platform
 import random
 import threading
 
 import customtkinter as ctk
 from tkinter import PhotoImage
 from PIL import Image, ImageTk, ImageDraw, ImageFilter
-from PIL import Image, ImageTk, ImageDraw, ImageFilter
 
 from services.autenticacao import ServicoAutenticacao
 from services.agendamentos import set_auth_service as set_auth_service_agendamentos
 from services.api import set_auth_service as set_auth_service_api
-from ui_theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
-from components.ui_components import (
-    PrimaryButton, GhostButton, InputField, Badge, Divider
-)
+from ui_theme import THEME, RADIUS, themed_font
+from components.ui_components import PrimaryButton, GhostButton, Divider
 
 logger = logging.getLogger("apps.desktop")
 
+_IS_WINDOWS = platform.system() == "Windows"
 
-# ─────────────────────────────────────────────
-#  Paleta dedicada à tela de login
-# (gradiente e bolhas mantêm identidade própria)
-# ─────────────────────────────────────────────
-_LOGIN_PALETTE = {
-    # Gradiente
-    "grad_top_left":   "#1E1B4B",
-    "grad_top_right":  "#312E81",
-    "grad_bottom_left":"#4338CA",
-    "grad_bottom":     "#6D5CE8",
+
+def _build_login_palette() -> dict:
+    """Monta a paleta da tela de login lendo o THEME *no momento da chamada*.
+
+    Antes este dicionário era construído uma única vez no nível do módulo
+    (na importação), então se o usuário alternasse para o modo escuro e
+    voltasse à tela de login, ela continuaria usando cores antigas para
+    sempre — o mesmo problema de "valor padrão congelado" corrigido em
+    ui_components.py, só que em formato de dicionário de módulo.
+    """
+    return {
+        # Gradiente — identidade própria da tela de login, não segue o tema
+        "grad_top_left":    "#1E1B4B",
+        "grad_top_right":   "#312E81",
+        "grad_bottom_left": "#4338CA",
+        "grad_bottom":      "#6D5CE8",
 
         # Card
         "card_bg":     THEME["surface"],
@@ -143,8 +147,6 @@ class LoginInputField(ctk.CTkFrame):
             self._eye_btn.grid(row=0, column=2, padx=(0, 6), pady=4)
             self._eye_btn.bind("<Return>", lambda _: self._toggle_show())
             self._eye_btn.bind("<space>", lambda _: self._toggle_show())
-            self._eye_btn.bind("<Return>", lambda _: self._toggle_show())
-            self._eye_btn.bind("<space>", lambda _: self._toggle_show())
 
         self._msg = ctk.CTkLabel(
             self, text="", anchor="w",
@@ -223,25 +225,26 @@ class LoginFrame(ctk.CTkFrame):
 
         self.bind("<Destroy>", self._on_destroy)
 
-        # Canvas de fundo (gradiente + bolhas + sombra e card arredondado via PIL)
         self.canvas = ctk.CTkCanvas(self, highlightthickness=0, bd=0)
         self.canvas.place(relwidth=1, relheight=1)
 
         self._criar_bolhas()
         self._criar_music_toggle()
-        # Card arredondado desenhado no canvas via PIL
-        card_img = self._criar_imagem_card()
-        self._card_img = card_img
-        self._card_img_id = self.canvas.create_image(0, 0, anchor="nw", image=card_img, tags="card_img")
-        self.canvas.image_card = card_img
+
+        # Imagem do card (com sombra suave) é fixa em tamanho — criada uma
+        # única vez, nunca recriada em resize (antes era regenerada via PIL
+        # a cada evento <Configure>, sempre com o mesmo tamanho constante,
+        # ou seja, refazendo um trabalho idêntico repetidamente à toa).
+        self._card_img = self._criar_imagem_card()
+        self._card_img_id = self.canvas.create_image(0, 0, anchor="nw", image=self._card_img, tags="card_img")
+
         self._criar_card_login()
 
-        self.bind("<Configure>", self._desenhar_fundo)
-        # Handler especial para redimensionamento do frame do botão de música
+        self.bind("<Configure>", self._on_resize)
         if hasattr(self, "_music_btn_frame"):
             self._music_btn_frame.bind("<Configure>", self._ajustar_botao_musica)
-        # Garante posicionamento inicial do card após a janela ser exibida
-        self.after_idle(self._posicionar_card)
+
+        self.after_idle(self._desenhar_fundo)
         self._animar_bolhas()
 
     def _on_destroy(self, event):
@@ -260,33 +263,25 @@ class LoginFrame(ctk.CTkFrame):
     # ══════════════════════════════════════
     #  FUNDO — gradiente diagonal (com debounce de redimensionamento)
     # ══════════════════════════════════════
+    def _on_resize(self, event=None):
+        # O evento <Configure> dispara continuamente durante um arraste de
+        # redimensionamento da janela. Recalcular o gradiente pixel-a-pixel
+        # a cada disparo travava visivelmente a UI; agora só redesenhamos
+        # ~80ms depois que o usuário parar de redimensionar.
+        if self._resize_job:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(80, self._desenhar_fundo)
+
     def _posicionar_card(self):
-        if hasattr(self, "_card_img_id") and hasattr(self, "_card_img"):
-            w = self.winfo_width()
-            h = self.winfo_height()
-            if w > 1 and h > 1:
-                card_w, card_h = 444, 582
-                card_x = (w - card_w) / 2
-                card_y = (h - card_h) / 2
-                self.canvas.coords(self._card_img_id, card_x, card_y)
+        w, h = self.winfo_width(), self.winfo_height()
+        if w > 1 and h > 1:
+            self.canvas.coords(self._card_img_id, (w - CARD_W) / 2, (h - CARD_H) / 2)
 
-    def _criar_imagem_card_redimensionada(self, width: int, height: int) -> ImageTk.PhotoImage:
-        """Cria imagem do card redimensionada para as dimensões especificadas."""
-        tamanho_original = (444, 582)
-        tamanho_destino = (width, height)
-
-        # Cria nova imagem com fundo branco
-        img_original = Image.new("RGBA", tamanho_destino, (255, 255, 255, 255))
-
-        # Aplica bordas arredondadas
-        draw = ImageDraw.Draw(img_original)
-        draw.rounded_rectangle([0, 0, width - 1, height - 1], radius=20, fill=(255, 255, 255, 255))
-
-        return ImageTk.PhotoImage(img_original)
-
-    def _desenhar_fundo(self, event=None):
-        w = self.winfo_width()
-        h = self.winfo_height()
+    def _desenhar_fundo(self):
+        self._resize_job = None
+        if not self._alive or not self.winfo_exists():
+            return
+        w, h = self.winfo_width(), self.winfo_height()
         if w <= 1 or h <= 1:
             return
         if (w, h) == self._last_bg_size:
@@ -311,7 +306,6 @@ class LoginFrame(ctk.CTkFrame):
             img.put(color, to=(0, y, w, min(y + step, h)))
 
         self.canvas.create_image(0, 0, anchor="nw", image=img, tags="bg")
-        self.canvas.create_image(0, 0, anchor="nw", image=img, tags="bg")
         self.canvas.image = img  # mantém referência viva
 
         glow_r = int(w * 0.55)
@@ -324,52 +318,23 @@ class LoginFrame(ctk.CTkFrame):
             fill=self.palette["grad_bottom_left"], outline="", tags="bg",
         )
 
-        # Atualiza card redimensionado se necessário
-        if hasattr(self, "_card_img_id") and hasattr(self, "_card"):
-            card_x = (w - 444) / 2
-            card_y = (h - 582) / 2
-            self.canvas.coords(self._card_img_id, card_x, card_y)
-
-        # Garante que os elementos de UI fiquem por cima
         self.canvas.tag_lower("bg")
-        # Eleva card_img acima do fundo, mas abaixo dos widgets
-        if hasattr(self, "_card_img_id"):
-            self.canvas.tag_raise("card_img")
-            self.canvas.tag_raise("bubble")
+        self.canvas.tag_raise("card_img")
+        self.canvas.tag_raise("bubble")
+        self._posicionar_card()
         self._elevar_elementos()
-
-        # Atualiza a imagem do card com as dimensões atuais da janela
-        try:
-            if hasattr(self, "_card_img_id"):
-                # Remove imagem antiga
-                self.canvas.delete(self._card_img_id)
-
-                # Cria nova imagem redimensionada
-                new_card_img = self._criar_imagem_card_redimensionada(444, 582)
-                self.canvas.create_image(
-                    (w - 444) / 2,
-                    (h - 582) / 2,
-                    anchor="nw",
-                    image=new_card_img,
-                    tags="card_img"
-                )
-                self.canvas.image_card = new_card_img
-                self._card_img_id = "card_img"
-        except Exception as e:
-            logger.exception("Erro ao atualizar card: %s", e)
 
     def _elevar_elementos(self):
         for b in self.bolhas:
             if b.get("id"):
                 self.canvas.tag_raise(b["id"])
-        # Eleva o frame do botão de música para garantir que fique acima das bolhas
         if hasattr(self, "_music_btn_frame"):
             self._music_btn_frame.lift()
         if hasattr(self, "card"):
             self.card.lift()
 
     # ══════════════════════════════════
-    #  BOLHAS flutuantes – mais delicadas
+    #  BOLHAS flutuantes
     # ══════════════════════════════════
     def _criar_bolhas(self):
         for _ in range(28):
@@ -427,31 +392,39 @@ class LoginFrame(ctk.CTkFrame):
     # ══════════════════════════════════════
     #  CARD DE LOGIN
     # ══════════════════════════════════════
-    # ══════════════════════════════════════
-    #  CARD DE LOGIN – arredondamento no canvas via PIL
-    # ══════════════════════════════════════
-    def _criar_imagem_card(self):
-        """Cria imagem do card com bordas arredondadas usando PIL."""
-        tamanho = (444, 582)
-        img = Image.new("RGBA", tamanho, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        draw.rounded_rectangle([0, 0, 443, 581], radius=20, fill=(255, 255, 255, 255))
-        return ImageTk.PhotoImage(img)
+    def _criar_imagem_card(self) -> ImageTk.PhotoImage:
+        """Card branco com bordas arredondadas e sombra suave (desenhada uma
+        única vez com PIL). Antes a sombra era só mencionada em comentário —
+        `ImageFilter` estava importado mas nunca usado."""
+        padding = 24  # espaço extra para a sombra não ser cortada
+        total_w, total_h = CARD_W + padding * 2, CARD_H + padding * 2
+
+        shadow = Image.new("RGBA", (total_w, total_h), (0, 0, 0, 0))
+        sdraw = ImageDraw.Draw(shadow)
+        sdraw.rounded_rectangle(
+            [padding, padding + 8, padding + CARD_W, padding + CARD_H + 8],
+            radius=20, fill=(15, 15, 35, 70),
+        )
+        shadow = shadow.filter(ImageFilter.GaussianBlur(14))
+
+        card = Image.new("RGBA", (CARD_W, CARD_H), (0, 0, 0, 0))
+        cdraw = ImageDraw.Draw(card)
+        cdraw.rounded_rectangle([0, 0, CARD_W - 1, CARD_H - 1], radius=20, fill=(255, 255, 255, 255))
+        shadow.alpha_composite(card, (padding, padding))
+
+        self._card_offset = padding
+        return ImageTk.PhotoImage(shadow)
 
     def _criar_card_login(self):
-        # Mantém fundo branco no CTk; o arredondamento visual vem da imagem PIL no canvas
         self.card = ctk.CTkFrame(
-            self, width=444, height=582,
+            self, width=CARD_W, height=CARD_H,
             corner_radius=0,
-            fg_color=_LOGIN_PALETTE["card_bg"],
-            bg_color=_LOGIN_PALETTE["card_bg"],
+            fg_color=self.palette["card_bg"],
+            bg_color=self.palette["card_bg"],
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
         self.card.lift()
-
-        # Atualiza referência do card para uso no _desenhar_fundo
-        self._card = self.card
 
         inner = ctk.CTkFrame(self.card, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=40, pady=36)
@@ -536,36 +509,22 @@ class LoginFrame(ctk.CTkFrame):
     #  TOGGLE DE MÚSICA (canto inferior direito)
     # ══════════════════════════════════════
     def _criar_music_toggle(self):
-        self.music_var = ctk.StringVar(value="off")
-        self._music_btn_frame = ctk.CTkFrame(
-            self,
-            fg_color="transparent",
-            width=64,
-            height=64
-        )
-        self._music_btn_frame.pack(
-            side="right",
-            padx=(16, 16),
-            pady=(0, 16),
-            anchor="se"
-        )
+        self._music_btn_frame = ctk.CTkFrame(self, fg_color="transparent", width=64, height=64)
+        self._music_btn_frame.pack(side="right", padx=(16, 16), pady=(0, 16), anchor="se")
         self._music_btn_frame.pack_propagate(False)
 
-        # NOTA: corner_radius=8 e border_width=0 previnem bordas pretas no Windows
-        # Bug conhecido do customtkinter: border_width > 0 + corner_radius > 0 causa
-        # renderização problemática no Windows (subpixel anti-aliasing issues)
+        # corner_radius baixo e border_width=0 evitam um bug conhecido do
+        # CustomTkinter no Windows (artefatos pretos nas bordas quando
+        # corner_radius e border_width são combinados).
         self._music_btn = ctk.CTkButton(
             self._music_btn_frame,
-            self._music_btn_frame,
             text="♪",
-            width=48,
-            height=48,
-            corner_radius=8,  # Reduzido de RADIUS["pill"] (999) para evitar renderização bugada
+            width=48, height=48, corner_radius=8,
             font=themed_font("h3"),
             fg_color="white",
-            hover_color=_LOGIN_PALETTE["accent_soft"],
-            text_color=_LOGIN_PALETTE["text_muted"],
-            border_width=0,  # Removido para evitar bordas pretas no Windows
+            hover_color=self.palette["accent_soft"],
+            text_color=THEME["text_secondary"],
+            border_width=0,
             command=self._toggle_music,
             cursor="hand2",
         )
@@ -678,18 +637,6 @@ class LoginFrame(ctk.CTkFrame):
             self.card.place(relx=0.5, rely=0.5, anchor="center", x=offset, y=0)
             self.after(38, lambda: shake(step + 1))
         shake()
-
-    def _ajustar_botao_musica(self, event=None):
-        """Garante posicionamento correto do botão de música após redimensionamento."""
-        if hasattr(self, "_music_btn_frame"):
-            w = self._music_btn_frame.winfo_width()
-            h = self._music_btn_frame.winfo_height()
-            if w > 1 and h > 1:
-                try:
-                    self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
-                except Exception:
-                    pass
-        return "break"  # Impede propagação do evento
 
     def _on_login_success(self, user):
         self._is_loading = False

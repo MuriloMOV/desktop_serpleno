@@ -48,10 +48,6 @@ def _card(parent, **kw) -> ctk.CTkFrame:
     )
 
 
-def _divider(parent):
-    ctk.CTkFrame(parent, height=1, fg_color=THEME["divider"]).pack(fill="x")
-
-
 def _avatar(parent, initials: str, color: str, size: int = 42) -> ctk.CTkFrame:
     av = ctk.CTkFrame(parent, width=size, height=size,
                       corner_radius=size // 2, fg_color=color)
@@ -138,18 +134,30 @@ class EstudantesFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
+        self._criar_toolbar_acoes()
         self._criar_conteudo()
+
         self.load_data()
 
-    # ══════════════════════════════════════
-    #  CABEÇALHO
-    # ══════════════════════════════════════
-    def _criar_cabecalho(self):
-        raise NotImplementedError
+    # ══════════════════════════════════
+    #  Toolbar de ações
+    # ══════════════════════════════════
+    def _criar_toolbar_acoes(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
 
-    # ══════════════════════════════════════
+        right = ctk.CTkFrame(bar, fg_color="transparent")
+        right.pack(side="right")
+
+        PrimaryButton(
+            right, text="➕  Novo Estudante",
+            command=self.novo_estudante_click,
+            height=40, width=168,
+        ).pack()
+
+    # ══════════════════════════════════
     #  LAYOUT PRINCIPAL
-    # ══════════════════════════════════════
+    # ══════════════════════════════════
     def _criar_conteudo(self):
         wrap = ctk.CTkFrame(self, fg_color="transparent")
         wrap.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=SPACING["section_gap"])

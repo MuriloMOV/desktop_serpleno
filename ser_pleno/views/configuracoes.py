@@ -257,7 +257,15 @@ class FormModal(BaseModal):
         self.withdraw()
         self._icon = icon
         self._build()
+        self.transient(parent.winfo_toplevel())
+        self.grab_set()
         self.deiconify()
+
+    def _center(self, parent, w, h):
+        self.update_idletasks()
+        x = parent.winfo_rootx() + (parent.winfo_width()  // 2) - (w // 2)
+        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (h // 2)
+        self.geometry(f"+{x}+{y}")
 
     def _build(self):
         # Banner

@@ -3,13 +3,12 @@ import customtkinter as ctk
 from utils.async_runner import AsyncRunner
 
 from ui_theme import (
-    THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, FONT_FAMILY,
-    font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
+    THEME, SPACING, RADIUS, FONT_FAMILY,
+    themed_font, blend_color,
 )
 from ui_theme_extensions import extend_theme
 from components.ui_components import (
-    Card, PrimaryButton, DangerButton, GhostButton, Avatar,
-    Badge, Pill, EmptyState, Toast, Tabs, Divider, KPICard, ClickableFrame, bind_clickable
+    GhostButton, EmptyState, Divider, KPICard
 )
 from services.bem_estar import ServicoBemEstar
 from utils.avatar_utils import get_avatar_color
@@ -222,7 +221,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     def _criar_cabecalho(self):
         raise NotImplementedError
 
-    # ══════════════════════════════════════
+    # ══════════════════════════════════
     #  KPI CARDS
     # ══════════════════════════════════════
     def _criar_kpis(self):
@@ -264,7 +263,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._chart_after_id = None
         outer.body.bind("<Configure>", self._schedule_draw_chart)
 
-        # Barras de distribuição de humor (criadas uma única vez)
+        # Barras de distribuição de humor
         dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
         dist_row.pack(fill="x", pady=(4, 4))
 
@@ -661,15 +660,3 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         pass
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-#  Utilitário: pastel de cor
-# ──────────────────────────────────────────────────────────────────────────────
-def _soft_from_color(color: str) -> str:
-    mapping = {
-        THEME["danger"]:  THEME["danger_soft"],
-        THEME["alto"]:    THEME["alto_soft"],
-        THEME["medio"]:   THEME["medio_soft"],
-        THEME["success"]: THEME["normal_soft"],
-        THEME["primary"]: THEME["primary_soft"],
-    }
-    return mapping.get(color, THEME["primary_soft"])

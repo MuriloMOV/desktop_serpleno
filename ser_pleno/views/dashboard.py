@@ -1,9 +1,6 @@
 from components.ui_components import (
-    Card, EmptyState, PrimaryButton, GhostButton, Badge, Pill,
-    Divider, Avatar, Toast, Tabs, KPICard, ClickableFrame, bind_clickable, BaseModal
+    Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable
 )
-from utils.avatar_utils import get_avatar_color
-from utils.chart import draw_mood_line_chart
 from utils.async_runner import AsyncRunner
 
 import customtkinter as ctk
@@ -14,22 +11,6 @@ from services.dashboard import ServicoDashboard
 DASH_TOKENS = extend_theme(THEME, {
     "kpi_size": "wide",
 })
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  Componentes auxiliares
-# ══════════════════════════════════════════════════════════════════════════════
-
-class _SectionCard(Card):
-    """Card padrão de seção com título e corpo."""
-    def __init__(self, parent, title: str, action_text: str = "",
-                 action_cmd=None, badge_text: str = ""):
-        super().__init__(parent, title=title)
-        self._build_extras(action_text, action_cmd, badge_text)
-
-    def _build_extras(self, action_text, action_cmd, badge_text):
-        # badge no header (sobrescreve comportamento padrão de Card para adicionar badge)
-        pass
 
 
 class _AgendaRow(ctk.CTkFrame):
@@ -168,12 +149,26 @@ class NotificationPanel(BaseModal):
     """Modal de notificações."""
     def __init__(self, parent, titulo: str, notificacoes: list, tipo: str,
                  on_mark_read=None, on_mark_all_read=None):
-        super().__init__(parent, title=titulo, width=520, height=480)
+        super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
+        self.titulo = titulo
         self.notificacoes = notificacoes
         self.tipo = tipo
         self.on_mark_read = on_mark_read
         self.on_mark_all_read = on_mark_all_read
         self._build()
+
+    def _setup(self):
+        self.title(self.titulo)
+        self.geometry("520x480")
+        self.resizable(False, False)
+        self.configure(fg_color=THEME["surface"])
+        self.attributes("-topmost", True)
+        self.transient(self._parent_window)
+        self.update_idletasks()
+        x = self.winfo_screenwidth() // 2 - 260
+        y = self.winfo_screenheight() // 2 - 240
+        self.geometry(f"520x480+{x}+{y}")
 
     def _build(self):
         is_ajuda = self.tipo == "ajuda"
@@ -273,15 +268,25 @@ class NotificationPanel(BaseModal):
 class ProfileModal(BaseModal):
     """Modal de perfil do usuário."""
     def __init__(self, parent, user_data: dict, on_edit=None):
-        super().__init__(parent, title="Meu Perfil", width=440, height=380)
+        super().__init__(parent)
+        self._parent_window = parent.winfo_toplevel()
         self.user_data = user_data or {}
         self.on_edit = on_edit
         self._build()
 
+    def _setup(self):
+        self.title("Meu Perfil")
+        self.configure(fg_color=THEME["surface"])
+        self.attributes("-topmost", True)
+        self.transient(self._parent_window)
+        self.update_idletasks()
+        x = self.winfo_screenwidth() // 2 - 220
+        y = self.winfo_screenheight() // 2 - 190
+        self.geometry(f"440x380+{x}+{y}")
+
     def _build(self):
         # Banner de topo
         banner = ctk.CTkFrame(self, fg_color=THEME["primary_soft"], corner_radius=0, height=80)
-        banner.pack(fill="x")
 
         initials = (
             (self.user_data.get("first_name", "") or "")[0:1] +
@@ -377,6 +382,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self.controller = controller
         self.servico_dashboard = ServicoDashboard()
 
+        self._criar_toolbar_acoes()
         self._criar_kpi_container()
         self._criar_grid_principal()
         self._carregar_dados()
@@ -414,10 +420,53 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._atualizar_secao_humor(data)
 
     # ──────────────────────────────────────────────────────────────────────
-    #  Cabeçalho
+    #  Toolbar de ações
     # ──────────────────────────────────────────────────────────────────────
-    def _criar_cabecalho(self):
-        raise NotImplementedError
+    def _criar_toolbar_acoes(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
+
+        right = ctk.CTkFrame(bar, fg_color="transparent")
+        right.pack(side="right")
+
+        # Ícone ajuda
+        help_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
+                               fg_color=THEME["primary_soft"])
+        help_f.pack(side="left", padx=4)
+        help_f.pack_propagate(False)
+        bind_clickable(help_f, self._abrir_notificacoes_ajuda)
+        ctk.CTkLabel(
+            help_f, text="🤝",
+            font=themed_font("body"),
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        self.help_badge = self._criar_badge(help_f)
+
+        # Ícone alertas
+        alert_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
+                                fg_color=THEME["danger_soft"])
+        alert_f.pack(side="left", padx=4)
+        alert_f.pack_propagate(False)
+        bind_clickable(alert_f, self._abrir_notificacoes_alertas)
+        ctk.CTkLabel(
+            alert_f, text="🔔",
+            font=themed_font("body"),
+        ).place(relx=0.5, rely=0.5, anchor="center")
+        self.alert_badge = self._criar_badge(alert_f)
+
+        # Avatar
+        name = ""
+        if self.controller.usuario_logado:
+            name = self.controller.usuario_logado.get("username", "?")[:2].upper()
+        av_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
+                             fg_color=THEME["primary"])
+        av_f.pack(side="left", padx=(8, 0))
+        av_f.pack_propagate(False)
+        bind_clickable(av_f, self._abrir_perfil)
+        ctk.CTkLabel(
+            av_f, text=name,
+            font=themed_font("body", "bold"),
+            text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
 
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(
@@ -743,4 +792,4 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     # Alias legado
     @staticmethod
     def get_humor_emoji(media):
-        return DashboardFrame._humor_emoji.__func__(None, media)
+        return DashboardFrame._humor_emoji(media)
