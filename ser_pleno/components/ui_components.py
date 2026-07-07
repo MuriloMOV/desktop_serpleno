@@ -156,6 +156,7 @@ class KPICard(ctk.CTkFrame):
         "sm": {"icon": 40, "value": "h3", "title": "caption", "sub": "overline", "pad": 14},
         "md": {"icon": 52, "value": "h1", "title": "body", "sub": "caption", "pad": SPACING["card_pad"]},
         "lg": {"icon": 64, "value": "display", "title": "h3", "sub": "body", "pad": 28},
+        "wide": {"icon": 52, "value": "h1", "title": "body", "sub": "caption", "pad": SPACING["card_pad"]},
     }
 
     def __init__(self, parent, title: str, value: str, icon: str,
@@ -1049,15 +1050,19 @@ class BaseModal(ctk.CTkToplevel):
     """Modal base centralizado, transient e com grab_set."""
 
     def __init__(self, parent, title: str, width: int, height: int,
-                 fg_color: str = THEME["surface"]):
+                 fg_color: str = THEME["surface"], resizable: bool = False):
         super().__init__(parent)
         self.title(title)
         self.configure(fg_color=fg_color)
-        self.resizable(False, False)
+        self.resizable(resizable, resizable)
 
-        sx = self.winfo_screenwidth() // 2 - width // 2
-        sy = self.winfo_screenheight() // 2 - height // 2
-        self.geometry(f"{width}x{height}+{sx}+{sy}")
+        # Centraliza após a janela ter sido mapeada, evitando flicker.
+        self.update_idletasks()
+        sw = self.winfo_screenwidth()
+        sh = self.winfo_screenheight()
+        x = max(0, sw // 2 - width // 2)
+        y = max(0, sh // 2 - height // 2)
+        self.geometry(f"{width}x{height}+{x}+{y}")
 
         self.transient(self.winfo_toplevel())
         self.grab_set()

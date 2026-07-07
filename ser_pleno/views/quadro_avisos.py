@@ -12,6 +12,7 @@ from typing import Any
 from services.mural import servico_mural
 from ui_theme import THEME, SPACING, RADIUS, font, themed_font
 from ui_theme_extensions import extend_theme
+from components.ui_components import BaseModal
 
 logger = logging.getLogger("apps.desktop")
 
@@ -26,6 +27,14 @@ Q = extend_theme(THEME, {
     "block_border":     "#C7D2FE",
     "card_radius":      RADIUS["card"],
     "card_border":      THEME["border"],
+    "card_bg":          THEME["surface"],
+    "modal_bg":         THEME["surface"],
+    "preview_bg":       THEME["bg_alt"],
+    "input_bg":         THEME["input_bg"],
+    "input_error":      THEME["danger"],
+    "input_error_soft": THEME["danger_soft"],
+    "input_focus":      THEME["primary"],
+    "text_light":       THEME["text_muted"],
     "cat": {
         "informativo": ("#4F46E5", "#EEF2FF"),
         "aviso":       ("#D97706", "#FEF3C7"),
@@ -186,32 +195,14 @@ class FormField(ctk.CTkFrame):
 # ══════════════════════════════════════════════════════════════════════════════
 #  PublicacaoModal
 # ══════════════════════════════════════════════════════════════════════════════
-class PublicacaoModal(ctk.CTkToplevel):
-    def __init__(self, parent, on_publish, on_cancel):
-        super().__init__(parent)
+class PublicacaoModal(BaseModal):
+    def __init__(self, parent, on_publish, on_cancel, W=980, H=700):
         self.on_publish = on_publish
         self.on_cancel  = on_cancel
         self._block_editors: list[dict[str, Any]] = []
-
-        self.title("Publicação do Mural")
-        self.resizable(False, False)
+        super().__init__(parent, title="Publicação do Mural", width=W, height=H)
         self.configure(fg_color=Q["modal_bg"])
-        self.withdraw()
-
-        W, H = 980, 700
-        self.geometry(f"{W}x{H}")
-        try:
-            self.transient(parent.master)
-        except Exception:
-            pass
-        self._center(parent, W, H)
         self._build(W, H)
-
-    def _center(self, parent, w, h):
-        self.update_idletasks()
-        x = parent.winfo_rootx() + parent.winfo_width()  // 2 - w // 2
-        y = parent.winfo_rooty() + parent.winfo_height() // 2 - h // 2
-        self.geometry(f"+{x}+{y}")
 
     def _build(self, W, H):
         # ── Banner de topo ──────────────────────────────────────────────────
@@ -238,7 +229,7 @@ class PublicacaoModal(ctk.CTkToplevel):
 
         # Botão fechar
         ctk.CTkButton(bi, text="✕", width=32, height=32, corner_radius=8,
-                      fg_color=Q["card_bg"], hover_color="#E5E7EB",
+                      fg_color=Q["card_bg"], hover_color=THEME["border_strong"],
                       text_color=Q["text_muted"],
                       font=font(size=13),
                       command=self._fechar).pack(side="right")
@@ -757,8 +748,6 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         self.editing_post: dict[str, Any] | None = None
         self._modal: PublicacaoModal | None = None
 
-        self._build_header()
-
         self.lista = ctk.CTkScrollableFrame(
             self, fg_color="transparent",
             scrollbar_button_color="#C7D2FE",
@@ -770,30 +759,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
     # ── Cabeçalho ─────────────────────────────────────────────────────────────
     def _build_header(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=28, pady=(20, 4))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Quadro de Avisos",
-                     font=font(size=22, weight="bold"),
-                     text_color=Q["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Gerencie publicações e comunicados do sistema",
-                     font=font(size=13),
-                     text_color=Q["text_muted"]).pack(anchor="w", pady=(2, 0))
-
-        ctk.CTkButton(
-            bar, text="＋  Novo Aviso",
-            command=self._abrir_modal_novo,
-            height=40, corner_radius=12, width=150,
-            font=font(size=13, weight="bold"),
-            fg_color=Q["accent"], hover_color=Q["accent_hover"],
-            text_color="white",
-        ).pack(side="right")
-
-        ctk.CTkFrame(self, height=1, fg_color=Q["card_border"] if "card_border" in Q else Q["card_border"]).pack(
-            fill="x", padx=28, pady=(12, 0)
-        )
+        raise NotImplementedError
 
     # ── Thread helper ──────────────────────────────────────────────────────────
     def _run_in_thread(self, fn, callback=None, err_callback=None):

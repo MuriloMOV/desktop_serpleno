@@ -6,5 +6,5 @@
   "auto_sync": true,
   "offline_cache_size": 1000,
   "last_sync": null,
-  "api_available": true
+  "api_available": false
 }

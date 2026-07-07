@@ -6,8 +6,7 @@ from ui_theme import (
 )
 from ui_theme_extensions import extend_theme
 from components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, EmptyState,
-    Avatar, Badge, Pill, KPICard, SectionHeader, InputField, ClickableFrame, bind_clickable
+    Card, PrimaryButton, GhostButton, Divider, EmptyState, BaseModal
 )
 from services.estudantes import ServicoEstudante
 from utils.async_runner import AsyncRunner
@@ -112,7 +111,6 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
              "priority": "Baixa",   "status": "Cancelada"},
         ]
 
-        self._criar_cabecalho()
         self._criar_kpis()
         self._criar_filtros()
         self._criar_tabela()
@@ -121,26 +119,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     #  CABEÇALHO
     # ══════════════════════════════════════════
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Análise de Triagem",
-                     font=themed_font("h2", "bold"),
-                     text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Acompanhamento de triagens e encaminhamentos",
-                     font=themed_font("body"),
-                     text_color=THEME["text_secondary"]).pack(anchor="w", pady=(SPACING["label_gap"], 0))
-
-        PrimaryButton(
-            bar, text="＋  Nova Triagem",
-            command=self.abrir_nova_triagem,
-            height=40, corner_radius=RADIUS["button"], width=160,
-        ).pack(side="right")
-
-        ctk.CTkFrame(self, height=1,
-                     fg_color=THEME["border"]).pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0))
+        raise NotImplementedError
 
     # ══════════════════════════════════════════
     #  KPIs
@@ -292,13 +271,10 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             self._lbl_count.configure(text=f"{len(data_list)} registro{'s' if len(data_list) != 1 else ''}")
 
         if not data_list:
-            empty = ctk.CTkFrame(self.lista_triagens,
-                                 fg_color=THEME["primary_soft"],
-                                 corner_radius=RADIUS["lg"])
-            empty.pack(fill="x", pady=SPACING["item_gap"])
-            ctk.CTkLabel(empty, text="📭  Nenhuma triagem encontrada",
-                         font=themed_font("body"),
-                         text_color=THEME["text_secondary"]).pack(pady=SPACING["section_gap"])
+            EmptyState(
+                self.lista_triagens, icon="📭", title="Nenhuma triagem encontrada",
+                subtitle=""
+            ).pack(pady=SPACING["section_gap"])
             return
 
         for item in data_list:
@@ -391,17 +367,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     #  MODAL: Nova Triagem
     # ══════════════════════════════════════════
     def abrir_nova_triagem(self):
-        modal = ctk.CTkToplevel(self)
-        modal.title("Nova Triagem")
+        modal = BaseModal(self, title="Nova Triagem", width=520, height=580)
         modal.configure(fg_color=THEME["surface_elevated"])
-        modal.resizable(False, False)
-
-        w, h = 520, 580
-        sx = modal.winfo_screenwidth()  // 2 - w // 2
-        sy = modal.winfo_screenheight() // 2 - h // 2
-        modal.geometry(f"{w}x{h}+{sx}+{sy}")
-        modal.transient(self.winfo_toplevel())
-        modal.grab_set()
 
         # Banner
         banner = ctk.CTkFrame(modal, fg_color=THEME["primary_soft"],
@@ -526,16 +493,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     #  MODAL: Detalhe
     # ══════════════════════════════════════════
     def _modal_detalhe(self, item: dict):
-        modal = ctk.CTkToplevel(self)
-        modal.title("Detalhe da Triagem")
+        modal = BaseModal(self, title="Detalhe da Triagem", width=420, height=340)
         modal.configure(fg_color=THEME["surface_elevated"])
-        modal.resizable(False, False)
-
-        w, h = 420, 340
-        sx = modal.winfo_screenwidth()  // 2 - w // 2
-        sy = modal.winfo_screenheight() // 2 - h // 2
-        modal.geometry(f"{w}x{h}+{sx}+{sy}")
-        modal.transient(self.winfo_toplevel()); modal.grab_set()
 
         nome     = item["student"]
         av_color = get_avatar_color(nome)

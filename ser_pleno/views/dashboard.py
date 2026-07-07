@@ -1,6 +1,6 @@
 from components.ui_components import (
     Card, EmptyState, PrimaryButton, GhostButton, Badge, Pill,
-    Divider, Avatar, Toast, Tabs, KPICard, ClickableFrame, bind_clickable
+    Divider, Avatar, Toast, Tabs, KPICard, ClickableFrame, bind_clickable, BaseModal
 )
 from utils.avatar_utils import get_avatar_color
 from utils.chart import draw_mood_line_chart
@@ -164,30 +164,16 @@ class _BemEstarBar(ctk.CTkFrame):
         fill_frame.pack(side="left", fill="y")
 
 
-class NotificationPanel(ctk.CTkToplevel):
+class NotificationPanel(BaseModal):
     """Modal de notificações."""
     def __init__(self, parent, titulo: str, notificacoes: list, tipo: str,
                  on_mark_read=None, on_mark_all_read=None):
-        super().__init__(parent)
-        self.titulo = titulo
+        super().__init__(parent, title=titulo, width=520, height=480)
         self.notificacoes = notificacoes
         self.tipo = tipo
         self.on_mark_read = on_mark_read
         self.on_mark_all_read = on_mark_all_read
-        self._setup()
         self._build()
-
-    def _setup(self):
-        self.title(self.titulo)
-        self.geometry("520x480")
-        self.resizable(False, False)
-        self.configure(fg_color=THEME["surface"])
-        self.attributes("-topmost", True)
-        self.transient(self.winfo_toplevel())
-        self.update_idletasks()
-        x = self.winfo_screenwidth() // 2 - 260
-        y = self.winfo_screenheight() // 2 - 240
-        self.geometry(f"520x480+{x}+{y}")
 
     def _build(self):
         is_ajuda = self.tipo == "ajuda"
@@ -203,7 +189,7 @@ class NotificationPanel(ctk.CTkToplevel):
         hinner.pack(fill="x", padx=SPACING["page_x"], pady=14)
 
         ctk.CTkLabel(
-            hinner, text=f"{icon_txt}  {self.titulo}",
+            hinner, text=f"{icon_txt}  {self.title()}",
             font=themed_font("h4", "bold"),
             text_color=accent,
         ).pack(side="left")
@@ -284,26 +270,13 @@ class NotificationPanel(ctk.CTkToplevel):
         self.destroy()
 
 
-class ProfileModal(ctk.CTkToplevel):
+class ProfileModal(BaseModal):
     """Modal de perfil do usuário."""
     def __init__(self, parent, user_data: dict, on_edit=None):
-        super().__init__(parent)
+        super().__init__(parent, title="Meu Perfil", width=440, height=380)
         self.user_data = user_data or {}
         self.on_edit = on_edit
-        self._setup()
         self._build()
-
-    def _setup(self):
-        self.title("Meu Perfil")
-        self.geometry("440x380")
-        self.resizable(False, False)
-        self.configure(fg_color=THEME["surface"])
-        self.attributes("-topmost", True)
-        self.transient(self.winfo_toplevel())
-        self.update_idletasks()
-        x = self.winfo_screenwidth() // 2 - 220
-        y = self.winfo_screenheight() // 2 - 190
-        self.geometry(f"440x380+{x}+{y}")
 
     def _build(self):
         # Banner de topo
@@ -404,7 +377,6 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self.controller = controller
         self.servico_dashboard = ServicoDashboard()
 
-        self._criar_cabecalho()
         self._criar_kpi_container()
         self._criar_grid_principal()
         self._carregar_dados()
@@ -445,73 +417,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     #  Cabeçalho
     # ──────────────────────────────────────────────────────────────────────
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
-
-        # Saudação
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-
-        ctk.CTkLabel(
-            left, text="Dashboard Central",
-            font=themed_font("h2", "bold"),
-            text_color=THEME["text"],
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            left,
-            text="Visão geral do acompanhamento discente",
-            font=themed_font("body"),
-            text_color=THEME["text_secondary"],
-        ).pack(anchor="w", pady=(2, 0))
-
-        # Botões do lado direito
-        right = ctk.CTkFrame(bar, fg_color="transparent")
-        right.pack(side="right")
-
-        # Ícone ajuda
-        help_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                               fg_color=THEME["primary_soft"])
-        help_f.pack(side="left", padx=4)
-        help_f.pack_propagate(False)
-        bind_clickable(help_f, self._abrir_notificacoes_ajuda)
-        ctk.CTkLabel(
-            help_f, text="🤝",
-            font=themed_font("body"),
-        ).place(relx=0.5, rely=0.5, anchor="center")
-        self.help_badge = self._criar_badge(help_f)
-
-        # Ícone alertas
-        alert_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                                fg_color=THEME["danger_soft"])
-        alert_f.pack(side="left", padx=4)
-        alert_f.pack_propagate(False)
-        bind_clickable(alert_f, self._abrir_notificacoes_alertas)
-        ctk.CTkLabel(
-            alert_f, text="🔔",
-            font=themed_font("body"),
-        ).place(relx=0.5, rely=0.5, anchor="center")
-        self.alert_badge = self._criar_badge(alert_f)
-
-        # Avatar
-        name = ""
-        if self.controller.usuario_logado:
-            name = self.controller.usuario_logado.get("username", "?")[:2].upper()
-        av_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
-                             fg_color=THEME["primary"])
-        av_f.pack(side="left", padx=(8, 0))
-        av_f.pack_propagate(False)
-        bind_clickable(av_f, self._abrir_perfil)
-        ctk.CTkLabel(
-            av_f, text=name,
-            font=themed_font("body", "bold"),
-            text_color="white",
-        ).place(relx=0.5, rely=0.5, anchor="center")
-
-        # Divider
-        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).pack(
-            fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0)
-        )
+        raise NotImplementedError
 
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(
@@ -787,6 +693,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         print("Editar perfil")
 
     def _atualizar_badge_notificacoes(self):
+        if not hasattr(self, "help_badge") or not hasattr(self, "alert_badge"):
+            return
         ajuda   = self.servico_dashboard.obter_notificacoes_ajuda()
         alertas = self.servico_dashboard.obter_notificacoes_alertas()
         n_ajuda   = sum(1 for n in ajuda   if not n.get("lida", True))

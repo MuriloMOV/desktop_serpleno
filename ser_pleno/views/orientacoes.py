@@ -8,6 +8,7 @@ from utils.async_runner import AsyncRunner
 from services.orientacoes import servico_orientacoes
 from ui_theme import THEME, SPACING, RADIUS, font, themed_font
 from ui_theme_extensions import extend_theme
+from utils.avatar_utils import get_avatar_color
 
 logger = logging.getLogger("apps.desktop")
 
@@ -23,8 +24,20 @@ O = extend_theme(THEME, {
     "sidebar_bg":   "#FFFFFF",
     "sidebar_border": "#E5E7EB",
     "student_bg":   "#FAFAFA",
+    "student_hover":    "#EEF2FF",
+    "student_active":   "#E0E7FF",
     "card_border":  THEME["border"],
     "card_bg":      THEME["surface"],
+    "input_error":      THEME["danger"],
+    "input_error_soft": THEME["danger_soft"],
+    "input_focus":      THEME["primary"],
+    "temas": {
+        "Geral":     ("#4F46E5", "#EEF2FF"),
+        "Psicológico": ("#7C3AED", "#EDE9FE"),
+        "Pedagógico":  ("#059669", "#D1FAE5"),
+        "Social":      ("#D97706", "#FEF3C7"),
+        "Urgente":     ("#DC2626", "#FEE2E2"),
+    },
 })
 
 _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")
@@ -34,7 +47,7 @@ _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")
 #  Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 def _av_color(name: str) -> str:
-    return O["av_colors"][sum(ord(c) for c in name) % len(O["av_colors"])]
+    return get_avatar_color(name)
 
 
 def _card(parent, **kw) -> ctk.CTkFrame:
@@ -330,7 +343,6 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
         self._selected_student: dict | None = None
         self._selected_card: StudentCard | None = None
 
-        self._criar_cabecalho()
         self._criar_conteudo()
         self._carregar_dados()
 
@@ -338,30 +350,7 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
     #  CABEÇALHO
     # ══════════════════════════════════════════
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=28, pady=(20, 4))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Orientações",
-                     font=font(size=22, weight="bold"),
-                     text_color=O["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Fluxo de apoio e encaminhamentos",
-                     font=font(size=13),
-                     text_color=O["text_muted"]).pack(anchor="w", pady=(2, 0))
-
-        ctk.CTkButton(
-            bar, text="＋  Nova Orientação",
-            command=self._nova_orientacao,
-            height=40, corner_radius=12, width=170,
-            font=font(size=13, weight="bold"),
-            fg_color=O["accent"], hover_color=O["accent_hover"],
-            text_color="white",
-        ).pack(side="right")
-
-        ctk.CTkFrame(self, height=1,
-                     fg_color=O["card_border"] if "card_border" in O else O["card_border"]).pack(
-            fill="x", padx=28, pady=(12, 0))
+        raise NotImplementedError
 
     # ══════════════════════════════════════════
     #  LAYOUT: sidebar + painel
@@ -630,10 +619,10 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
 
         # Mostra todas se não há seleção
         if not orientacoes:
-            ctk.CTkLabel(self._area_historico,
-                         text="📋  Nenhuma orientação registrada",
-                         font=font(size=13),
-                         text_color=O["text_muted"]).pack(pady=30)
+            EmptyState(
+                self._area_historico, icon="📋", title="Nenhuma orientação registrada",
+                subtitle=""
+            ).pack(pady=30)
         else:
             self._mostrar_orientacoes(orientacoes)
 
@@ -642,10 +631,10 @@ class OrientacoesFrame(ctk.CTkScrollableFrame):
             w.destroy()
 
         if not estudantes:
-            ctk.CTkLabel(self._scroll_students,
-                         text="Nenhum estudante",
-                         font=font(size=12),
-                         text_color=O["text_muted"]).pack(pady=20)
+            EmptyState(
+                self._scroll_students, icon="😕", title="Nenhum estudante",
+                subtitle=""
+            ).pack(pady=20)
             return
 
         # Item "Todos"

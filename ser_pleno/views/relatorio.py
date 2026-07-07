@@ -53,7 +53,7 @@ def _section_title(parent, text: str, pady=(16, 12)):
     ).pack(fill="x", padx=20, pady=pady)
 
 def _chip(parent, text: str, tipo: str = "") -> ctk.CTkFrame:
-    bg, fg = _CHIP.get(tipo, (THEME["chip_default_bg"], THEME["chip_default_text"]))
+    bg, fg = _CHIP.get(tipo, ("#E5E7EB", "#374151"))
     f = ctk.CTkFrame(parent, fg_color=bg, corner_radius=RADIUS["md"])
     ctk.CTkLabel(
         f, text=text,
@@ -131,7 +131,6 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         self._summary_vals: dict[str, ctk.CTkLabel] = {}
         self._chart_data   = []
 
-        self._criar_cabecalho()
         self._criar_kpis()
         self._criar_grid_central()
         self._criar_secao_exportacao()
@@ -217,34 +216,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     #  CABEÇALHO
     # ══════════════════════════════════════════
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-
-        ctk.CTkLabel(
-            left, text="Relatórios",
-            font=themed_font("h2", "bold"),
-            text_color=THEME["text"],
-        ).pack(anchor="w")
-
-        ctk.CTkLabel(
-            left, text="Visão gerencial e indicadores do sistema",
-            font=themed_font("body"),
-            text_color=THEME["text_muted"],
-        ).pack(anchor="w", pady=(SPACING["label_gap"], 0))
-
-        PrimaryButton(
-            bar,
-            text="＋  Gerar Relatório",
-            command=lambda: None,
-            height=40, corner_radius=RADIUS["button"], width=180,
-        ).pack(side="right")
-
-        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).pack(
-            fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0)
-        )
+        raise NotImplementedError
 
     # ══════════════════════════════════════════
     #  KPIs

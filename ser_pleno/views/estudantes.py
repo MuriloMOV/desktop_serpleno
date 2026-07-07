@@ -138,7 +138,6 @@ class EstudantesFrame(ctk.CTkFrame):
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
 
-        self._criar_cabecalho()
         self._criar_conteudo()
         self.load_data()
 
@@ -146,27 +145,7 @@ class EstudantesFrame(ctk.CTkFrame):
     #  CABEÇALHO
     # ══════════════════════════════════════
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Estudantes",
-                     font=themed_font("h2", "bold"),
-                     text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Acompanhamento e monitoramento discente",
-                     font=themed_font("body"),
-                     text_color=THEME["text_secondary"]).pack(anchor="w", pady=(2, 0))
-
-        PrimaryButton(
-            bar, text="➕  Novo Estudante",
-            command=self.novo_estudante_click,
-            height=40, width=168,
-        ).pack(side="right")
-
-        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).grid(
-            row=0, column=0, sticky="sew", padx=SPACING["page_x"], pady=(56, 0)
-        )
+        raise NotImplementedError
 
     # ══════════════════════════════════════
     #  LAYOUT PRINCIPAL
@@ -506,11 +485,9 @@ class EstudantesFrame(ctk.CTkFrame):
             w.destroy()
 
         if not lista:
-            ctk.CTkLabel(
-                self.scroll_list,
-                text="😕  Nenhum estudante encontrado",
-                font=themed_font("body"),
-                text_color=THEME["text_secondary"],
+            EmptyState(
+                self.scroll_list, icon="😕", title="Nenhum estudante encontrado",
+                subtitle="Tente ajustar os filtros de busca"
             ).pack(pady=24)
             self.lbl_count.configure(text="0 estudantes")
             return

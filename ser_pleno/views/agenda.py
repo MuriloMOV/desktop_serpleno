@@ -6,7 +6,7 @@ from config.db_config import get_db_connection
 from ui_theme import THEME, SPACING, RADIUS, font, themed_font, blend_color, darken, lighten
 from components.ui_components import (
     PageHeader, Card, PrimaryButton, GhostButton, Divider, EmptyState,
-    InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader
+    InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
 )
 
 
@@ -66,6 +66,8 @@ class ScheduleCell(ctk.CTkFrame):
 
     def _build(self):
         self.bind("<Button-1>", lambda e: self._open())
+        self.bind("<Return>", lambda e: self._open())
+        self.bind("<space>", lambda e: self._open())
         if hasattr(self, "configure"):
             self.configure(cursor="hand2")
 
@@ -105,29 +107,19 @@ class ScheduleCell(ctk.CTkFrame):
             self.on_open(self.hora, self.info)
 
 
-class AppointmentModal(ctk.CTkToplevel):
+class AppointmentModal(BaseModal):
     """Modal de criação/edição de agendamento."""
     def __init__(self, parent, hora: str, info: dict | None,
                  horarios_base: list[str], mapa_estudantes: dict[str, int],
                  on_save, on_delete=None):
-        super().__init__(parent)
         self.hora = hora
         self.info = info
         self.horarios_base = horarios_base
         self.mapa_estudantes = mapa_estudantes
         self.on_save = on_save
         self.on_delete = on_delete
-        self._setup_window()
+        super().__init__(parent, title="Editar Agendamento" if info else "Novo Agendamento", width=520, height=760)
         self._build()
-
-    def _setup_window(self):
-        self.title("Editar Agendamento" if self.info else "Novo Agendamento")
-        self.geometry("520x760")
-        self.configure(fg_color=THEME["surface"])
-        self.grab_set()
-        self.transient(self.winfo_toplevel())
-        w, h = 520, 760
-        self.geometry(f"{w}x{h}+{(self.winfo_screenwidth()//2)-(w//2)}+{(self.winfo_screenheight()//2)-(h//2)}")
 
     def _build(self):
         container = ctk.CTkScrollableFrame(self, fg_color="transparent")
@@ -273,24 +265,15 @@ class AppointmentModal(ctk.CTkToplevel):
         return datetime.now().strftime("%Y-%m-%d")
 
 
-class GradeManagementModal(ctk.CTkToplevel):
+class GradeManagementModal(BaseModal):
     """Modal de gestão de grade de horários."""
     def __init__(self, parent, horarios_base: list[str], servico: ServicoAgendamento,
                  on_refresh):
-        super().__init__(parent)
         self.horarios_base = horarios_base
         self.servico = servico
         self.on_refresh = on_refresh
-        self._setup_window()
+        super().__init__(parent, title="Gestão de Grade", width=420, height=580)
         self._build()
-
-    def _setup_window(self):
-        self.title("Gestão de Grade")
-        self.geometry("420x580")
-        self.configure(fg_color=THEME["surface"])
-        self.grab_set()
-        self.transient(self.winfo_toplevel())
-        _centralizar_janela(self, w=420, h=580)
 
     def _build(self):
         container = ctk.CTkFrame(self, fg_color="transparent")

@@ -14,9 +14,17 @@ from components.ui_components import (
     PrimaryButton,
     GhostButton,
     Badge,
+    BaseModal,
 )
 
 logger = logging.getLogger("apps.desktop")
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Helpers
+# ══════════════════════════════════════════════════════════════════════════════
+def _divider(parent):
+    ctk.CTkFrame(parent, height=1, fg_color=THEME["divider"]).pack(fill="x")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Paleta dedicada + helpers de cor
@@ -240,41 +248,43 @@ class SectionCard(ctk.CTkFrame):
     def body(self) -> ctk.CTkFrame:
         return self._body
 
-class FormModal(ctk.CTkToplevel):
+class FormModal(BaseModal):
     """Modal reutilizável para formulários."""
 
-    def __init__(self, parent, title: str, width: int = 420, height: int = 340):
-        super().__init__(parent)
-        self.title(title)
-        self.geometry(f"{width}x{height}")
-        self.resizable(False, False)
-        self.configure(fg_color=THEME["surface"])
+    def __init__(self, parent, title: str, width: int = 420, height: int = 340,
+                 icon: str = "🔒"):
+        super().__init__(parent, title, width, height, fg_color=THEME["surface"])
         self.withdraw()
-
-        self._center(parent, width, height)
+        self._icon = icon
         self._build()
-
-    def _center(self, parent, w, h):
-        self.update_idletasks()
-        x = parent.winfo_rootx() + (parent.winfo_width()  // 2) - (w // 2)
-        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (h // 2)
-        self.geometry(f"+{x}+{y}")
+        self.deiconify()
 
     def _build(self):
-        inner = ctk.CTkFrame(self, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=28, pady=28)
+        # Banner
+        banner = ctk.CTkFrame(self, fg_color=THEME["primary_soft"],
+                              corner_radius=0, height=64)
+        banner.pack(fill="x")
+        banner.pack_propagate(False)
+        bi = ctk.CTkFrame(banner, fg_color="transparent")
+        bi.pack(fill="both", expand=True, padx=24)
+        ib = ctk.CTkFrame(bi, width=38, height=38,
+                          corner_radius=RADIUS["button"], fg_color=THEME["primary"])
+        ib.pack(side="left", padx=(0, 12))
+        ib.pack_propagate(False)
+        ctk.CTkLabel(ib, text=self._icon,
+                     font=themed_font("h3", "bold")).place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(bi, text=self._title,
+                     font=themed_font("h3", "bold"),
+                     text_color=THEME["primary"]).pack(side="left")
 
-        ctk.CTkLabel(
-            inner, text=self.title(),
-            font=themed_font("h3", "bold"),
-            text_color=THEME["text"],
-        ).pack(pady=(0, 18))
+        inner = ctk.CTkFrame(self, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["item_gap"])
 
         self._fields_frame = ctk.CTkFrame(inner, fg_color="transparent")
         self._fields_frame.pack(fill="both", expand=True)
 
         footer = ctk.CTkFrame(inner, fg_color="transparent", height=52)
-        footer.pack(fill="x", side="bottom", pady=(12, 0))
+        footer.pack(fill="x", side="bottom", pady=(SPACING["item_gap"], 0))
         footer.pack_propagate(False)
 
         GhostButton(
@@ -290,9 +300,10 @@ class FormModal(ctk.CTkToplevel):
     def _on_confirm(self):
         raise NotImplementedError
 
+
 class AlterarSenhaModal(FormModal):
     def __init__(self, parent, on_save):
-        super().__init__(parent, "Alterar Senha", width=420, height=380)
+        super().__init__(parent, "Alterar Senha", width=420, height=380, icon="🔑")
         self._on_save = on_save
 
         self.f_senha_atual    = ConfigInputField(self._fields_frame, "Senha Atual",    placeholder="••••••", password=True, icon="🔒")
@@ -307,13 +318,19 @@ class AlterarSenhaModal(FormModal):
         nova    = self.f_nova_senha.get().strip()
         confirm = self.f_confirmar_senha.get().strip()
 
+        # Limpa estados anteriores
+        for f in (self.f_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
+            f.clear_state()
+
         if not atual or not nova or not confirm:
             messagebox.showwarning("Atenção", "Preencha todos os campos.")
             return
         if nova != confirm:
+            self.f_confirmar_senha.set_error("As senhas não coincidem.")
             messagebox.showerror("Erro", "As senhas não coincidem.")
             return
         if len(nova) < 6:
+            self.f_nova_senha.set_error("Mínimo de 6 caracteres.")
             messagebox.showwarning("Atenção", "A nova senha deve ter pelo menos 6 caracteres.")
             return
 
@@ -393,16 +410,42 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         profile = self._profile_data()
         avatar_name = profile.get("avatar", "avatar-1.jpg")
 
-        self.avatar_display = ctk.CTkLabel(
-            card.body, text="", image=self._load_image(avatar_name, (160, 160))
-        )
-        self.avatar_display.pack(pady=10)
+        # Avatar com ring
+        av_outer = ctk.CTkFrame(card.body, fg_color="transparent")
+        av_outer.pack(pady=(4, 10))
 
-        GhostButton(
+        av_ring = ctk.CTkFrame(av_outer, width=130, height=130,
+                               corner_radius=RADIUS["avatar"], fg_color=THEME["primary_soft"])
+        av_ring.pack()
+        av_ring.pack_propagate(False)
+
+        img = self._load_image(avatar_name, (118, 118))
+        self.avatar_display = ctk.CTkLabel(
+            av_ring, text="" if img else "👤", image=img,
+            font=themed_font("h2", "bold"))
+        self.avatar_display.place(relx=0.5, rely=0.5, anchor="center")
+
+        # Nome e email
+        user    = self.controller.usuario_logado or {}
+        nome    = f"{user.get('first_name','')} {user.get('last_name','')}".strip() \
+                  or user.get("username", "Usuário")
+        email   = user.get("email", "email@exemplo.com")
+
+        ctk.CTkLabel(card.body, text=nome,
+                     font=themed_font("h4", "bold"),
+                     text_color=THEME["text"]).pack()
+        ctk.CTkLabel(card.body, text=email,
+                     font=themed_font("body_sm"),
+                     text_color=THEME["text_muted"]).pack(pady=(2, 12))
+
+        # Botão galeria
+        self._btn_gallery = GhostButton(
             card.body, text="Alterar imagem de perfil",
             command=self._toggle_gallery, width=240,
-        ).pack(pady=(0, 8))
+        )
+        self._btn_gallery.pack(pady=(0, 8))
 
+        # Galeria de avatares (oculta por padrão)
         self.gallery_frame = ctk.CTkFrame(
             card.body,
             fg_color=THEME["bg_alt"],
@@ -411,14 +454,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             border_color=THEME["border"],
         )
         self.grid_galeria = ctk.CTkFrame(self.gallery_frame, fg_color="transparent")
-        self.grid_galeria.pack(padx=10, pady=10)
+        self.grid_galeria.pack(padx=SPACING["item_gap"], pady=SPACING["item_gap"])
         self._fill_gallery()
 
-        nome = (
-            f"{self.controller.usuario_logado.get('first_name', '')} "
-            f"{self.controller.usuario_logado.get('last_name', '')}"
-        ).strip() or self.controller.usuario_logado.get("username", "Usuário")
-        email = self.controller.usuario_logado.get("email", "email@exemplo.com")
+        _divider(card.body)
 
         ConfigInputField(card.body, "Nome de exibição", value=nome, icon="👤")\
             .pack(fill="x", pady=(0, 8))
@@ -440,10 +479,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 image=self._load_image(filename, (52, 52)),
                 width=52, height=52,
                 fg_color="white",
-                hover_color=THEME["primary_light"],
+                hover_color=THEME["primary_soft"],
                 corner_radius=RADIUS["md"],
                 command=lambda fn=filename: self._select_avatar(fn),
-            ).grid(row=i // 3, column=i % 3, padx=3, pady=3)
+            ).grid(row=i // 4, column=i % 4, padx=4, pady=4)
 
     def _toggle_gallery(self):
         if self.gallery_frame.winfo_ismapped():

@@ -1,14 +1,46 @@
+# Python
 __pycache__/
 *.py[cod]
-
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
 .pytest_cache/
 .coverage
 htmlcov/
+.mypy_cache/
+.ruff_cache/
 
+# Virtualenvs
 .env
+.env.*
 .venv/
 venv/
+ENV/
+env/
 
-build/
-dist/
-*.spec.bak
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+Thumbs.db
+
+# Build artifacts
+*.spec
+*.log
+debug.log
+
+# Secrets (não versionar)
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Node / Kilocode (quando aplicável)
+.kilocode/node_modules/
+
+# Docker (se aplicável)
+docker-compose.override.yml

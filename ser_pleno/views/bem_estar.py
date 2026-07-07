@@ -115,7 +115,6 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self.colunas_risco: dict = {}
         self._chart_data: list  = []
 
-        self._criar_cabecalho()
         self._criar_kpis()
         self._criar_secao_grafico()
         self._criar_visao_risco()
@@ -221,21 +220,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  CABEÇALHO
     # ══════════════════════════════════════
     def _criar_cabecalho(self):
-        bar = ctk.CTkFrame(self, fg_color="transparent")
-        bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
-
-        left = ctk.CTkFrame(bar, fg_color="transparent")
-        left.pack(side="left")
-        ctk.CTkLabel(left, text="Bem-Estar e Humor",
-                     font=themed_font("h2", "bold"),
-                     text_color=THEME["text"]).pack(anchor="w")
-        ctk.CTkLabel(left, text="Monitoramento emocional e social dos estudantes",
-                     font=themed_font("body"),
-                     text_color=THEME["text_secondary"]).pack(anchor="w", pady=(2, 0))
-
-        ctk.CTkFrame(self, height=1, fg_color=THEME["border"]).pack(
-            fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0)
-        )
+        raise NotImplementedError
 
     # ══════════════════════════════════════
     #  KPI CARDS
@@ -268,6 +253,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     def _criar_secao_grafico(self):
         outer = _section_card(self, "📈  Tendência de Bem-Estar — últimos 30 dias")
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        self._secao_grafico_outer = outer
 
         # Canvas
         self.canvas_30d = ctk.CTkCanvas(
@@ -278,12 +264,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._chart_after_id = None
         outer.body.bind("<Configure>", self._schedule_draw_chart)
 
-    def _schedule_draw_chart(self, event=None):
-        if self._chart_after_id:
-            self.after_cancel(self._chart_after_id)
-        self._chart_after_id = self.after(80, lambda: self._draw_chart())
-
-        # Barras de distribuição de humor
+        # Barras de distribuição de humor (criadas uma única vez)
         dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
         dist_row.pack(fill="x", pady=(4, 4))
 
@@ -316,6 +297,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                                    text_color=THEME["text"])
             pct_lbl.pack(anchor="w")
             self._dist_pcts[pct_key] = pct_lbl
+
+    def _schedule_draw_chart(self, event=None):
+        if self._chart_after_id:
+            self.after_cancel(self._chart_after_id)
+        self._chart_after_id = self.after(80, lambda: self._draw_chart())
 
     def _draw_chart(self, data=None):
         if data:
@@ -481,11 +467,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         if not risks:
             for key in self.colunas_risco:
-                ctk.CTkLabel(
-                    self.colunas_risco[key]["content"],
-                    text="Nenhum estudante",
-                    font=themed_font("body"),
-                    text_color=THEME["text_muted"],
+                EmptyState(
+                    self.colunas_risco[key]["content"], icon="😕",
+                    title="Nenhum estudante", subtitle=""
                 ).pack(pady=12)
             return
 
@@ -503,11 +487,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         for key, count in counts.items():
             self.colunas_risco[key]["count_lbl"].configure(text=str(count))
             if count == 0:
-                ctk.CTkLabel(
-                    self.colunas_risco[key]["content"],
-                    text="Nenhum estudante",
-                    font=themed_font("body"),
-                    text_color=THEME["text_muted"],
+                EmptyState(
+                    self.colunas_risco[key]["content"], icon="😕",
+                    title="Nenhum estudante", subtitle=""
                 ).pack(pady=12)
 
     def _criar_card_risco(self, parent, student: dict,
