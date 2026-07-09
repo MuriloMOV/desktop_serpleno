@@ -1,6 +1,7 @@
 from ser_pleno.presentation.components.ui_components import (
     Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal
 )
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.async_runner import AsyncRunner
 
 import customtkinter as ctk
@@ -52,7 +53,7 @@ class _AgendaRow(ctk.CTkFrame):
         time_frame.pack(side="right", padx=spacing("md"), pady=spacing("md"))
         ctk.CTkLabel(
             time_frame,
-            text=f"📊  {appt.get('time', '')}",
+            text=f"{ICONS['chart']}  {appt.get('time', '')}",
             font=themed_font("body", "bold"),
             text_color=THEME["primary"],
         ).pack(padx=spacing("md"), pady=spacing("sm"))
@@ -62,7 +63,7 @@ class _AlertaRow(ctk.CTkFrame):
     """Linha de estudante em alerta."""
     _PRIORITY_COLOR = {0: THEME["warning"], 1: "#F97316", 2: THEME["danger"], 3: THEME["danger"]}
     _PRIORITY_LABEL = {0: "Moderado", 1: "Alto", 2: "Crítico", 3: "Crítico"}
-    _PRIORITY_ICON  = {0: "⚡", 1: "⚡", 2: "🔴", 3: "🔴"}
+    _PRIORITY_ICON  = {0: ICONS["bolt"], 1: ICONS["bolt"], 2: ICONS["priority_high"], 3: ICONS["priority_high"]}
 
     def __init__(self, parent, student: dict):
         super().__init__(
@@ -162,7 +163,7 @@ class NotificationPanel(BaseModal):
         is_ajuda = self.tipo == "ajuda"
         accent   = THEME["primary"] if is_ajuda else THEME["danger"]
         soft     = THEME["primary_soft"] if is_ajuda else THEME["danger_soft"]
-        icon_txt = "👤" if is_ajuda else "🔔"
+        icon_txt = ICONS["user"] if is_ajuda else ICONS["notification"]
 
         # Cabeçalho
         header = ctk.CTkFrame(self, fg_color=soft, corner_radius=0)
@@ -190,7 +191,7 @@ class NotificationPanel(BaseModal):
 
         if not self.notificacoes:
             EmptyState(
-                lst, icon="📋", title="Sem notificações",
+                lst, icon=ICONS["empty"], title="Sem notificações",
                 subtitle=f"Nenhuma notificação de {self.tipo} no momento",
             ).pack(pady=spacing("xl"))
         else:
@@ -413,9 +414,9 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         help_f.pack(side="left", padx=spacing("xs"))
         help_f.pack_propagate(False)
         bind_clickable(help_f, self._abrir_notificacoes_ajuda)
-        ctk.CTkLabel(
-            help_f, text="👤",
-            font=themed_font("body"),
+        IconLabel(
+            help_f, icon=ICONS["help"], size=20,
+            fg_color="transparent", text_color=THEME["primary"],
         ).place(relx=0.5, rely=0.5, anchor="center")
         self.help_badge = self._criar_badge(help_f)
 
@@ -425,9 +426,9 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         alert_f.pack(side="left", padx=spacing("xs"))
         alert_f.pack_propagate(False)
         bind_clickable(alert_f, self._abrir_notificacoes_alertas)
-        ctk.CTkLabel(
-            alert_f, text="🔔",
-            font=themed_font("body"),
+        IconLabel(
+            alert_f, icon=ICONS["notification"], size=20,
+            fg_color="transparent", text_color=THEME["danger"],
         ).place(relx=0.5, rely=0.5, anchor="center")
         self.alert_badge = self._criar_badge(alert_f)
 
@@ -480,13 +481,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         kpis = [
             ("Atendimentos Hoje", str(data.get("appointments_today", 0)),
-             "👥", THEME["kpi_blue"],   THEME["kpi_blue_soft"],  "Atendimentos marcados"),
+             ICONS["users"], THEME["kpi_blue"],   THEME["kpi_blue_soft"],  "Atendimentos marcados"),
             ("Vagas Disponíveis", str(data.get("available_slots", 0)),
-             "📅", THEME["kpi_green"],  THEME["kpi_green_soft"], "Horários livres"),
+             ICONS["calendar"], THEME["kpi_green"],  THEME["kpi_green_soft"], "Horários livres"),
             ("Alertas Ativos",    str(data.get("alerts", 0)),
-             "🔔", THEME["kpi_red"],    THEME["kpi_red_soft"],   "Requerem atenção"),
+             ICONS["bell"], THEME["kpi_red"],    THEME["kpi_red_soft"],   "Requerem atenção"),
             ("Total de Estudantes", str(data.get("total_students", 0)),
-             "👥", THEME["kpi_violet"], THEME["kpi_violet_soft"],"Alunos cadastrados"),
+             ICONS["group"], THEME["kpi_violet"], THEME["kpi_violet_soft"],"Alunos cadastrados"),
             ("Humor Médio",
              f"{media_humor:.1f}/5" if media_humor else "—",
              humor_emoji, THEME["kpi_amber"], THEME["kpi_amber_soft"], "Média dos últimos 30 dias"),
@@ -518,7 +519,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._criar_card_chart()
 
     def _criar_card_chart(self):
-        self.chart_card = Card(self.left_col, title="📋  Humor dos Estudantes —” últimos 30 dias")
+        self.chart_card = Card(self.left_col, title=f"{ICONS['chart']}  Humor dos Estudantes — últimos 30 dias")
         self.chart_card.pack(fill="x", pady=(0, spacing("md")))
 
         self.canvas = ctk.CTkCanvas(
@@ -545,7 +546,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._criar_card_chart()
 
         card = Card(
-            self.left_col, title="📅  Próximos Atendimentos",
+            self.left_col, title=f"{ICONS['calendar']}  Próximos Atendimentos",
         )
         card.pack(fill="x", pady=(0, 14))
 
@@ -555,7 +556,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 _AgendaRow(card.body, appt).pack(fill="x", pady=3)
         else:
             EmptyState(
-                card.body, icon="📅",
+                card.body, icon=ICONS["calendar"],
                 title="Nenhum atendimento próximo",
                 subtitle="Não há agendamentos futuros",
             ).pack(pady=10)
@@ -563,7 +564,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     def _atualizar_secao_alertas(self, data):
         n_alerts = len(data.get("attention_students", []))
         card = Card(
-            self.right_col, title=f"🔴  Estudantes em Alerta",
+            self.right_col, title=f"{ICONS['danger']}  Estudantes em Alerta",
         )
         card.pack(fill="x", pady=(0, 14))
 
@@ -573,20 +574,20 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 _AlertaRow(card.body, s).pack(fill="x", pady=3)
         else:
             EmptyState(
-                card.body, icon="✖”",
+                card.body, icon=ICONS["cross"],
                 title="Tudo sob controle",
                 subtitle="Nenhum estudante em alerta",
             ).pack(pady=10)
 
     def _atualizar_secao_bem_estar(self, data):
-        card = Card(self.left_col, title="💙  Bem-Estar por Dimensão")
+        card = Card(self.left_col, title=f"{ICONS['heart']}  Bem-Estar por Dimensão")
         card.pack(fill="x", pady=(0, 14))
 
         be = data.get("bem_estar_dimensions", {})
         dims = [
-            ("📊Acadêmico", be.get("academico", 0) / 5, THEME["primary"], THEME["primary_soft"]),
-            ("💬  Emocional",  be.get("emocional", 0) / 5, "#EC4899", "#FCE7F3"),
-            ("👥  Social",    be.get("social",    0) / 5, THEME["success"], THEME["success_soft"]),
+            (f"{ICONS['chart']} Acadêmico", be.get("academico", 0) / 5, THEME["primary"], THEME["primary_soft"]),
+            (f"{ICONS['chat']}  Emocional",  be.get("emocional", 0) / 5, "#EC4899", "#FCE7F3"),
+            (f"{ICONS['group']}  Social",    be.get("social",    0) / 5, THEME["success"], THEME["success_soft"]),
         ]
         for nome, val, color, soft in dims:
             _BemEstarBar(card.body, nome, val, color, soft).pack(
@@ -616,8 +617,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             pts   = [item["media_humor"] for item in humor_history]
             dates = [item.get("data", "") for item in humor_history]
             if len(pts) < 2:
-                pts   = [pts[0], pts[0]]
-                dates = [dates[0], dates[0]]
+                if not pts:
+                    pts   = [0.0, 0.0]
+                    dates = ["—", "—"]
+                else:
+                    pts   = [pts[0], pts[0]]
+                    dates = [dates[0], dates[0]]
 
         mx, my = 44, 24
         cw2 = cw - 2 * mx
@@ -761,11 +766,11 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
     @staticmethod
     def _humor_emoji(media) -> str:
-        if media is None: return "😟"
-        if media < 2.0:   return "😟"
-        if media < 3.0:   return "😟"
-        if media < 4.0:   return "😀"
-        return "😟„"
+        if media is None: return ICONS["mood_bad"]
+        if media < 2.0:   return ICONS["mood_bad"]
+        if media < 3.0:   return ICONS["mood_bad"]
+        if media < 4.0:   return ICONS["mood_good"]
+        return ICONS["mood_good"]
 
     # Alias legado
     @staticmethod

@@ -10,6 +10,7 @@ from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.presentation.components.ui_components import (
     GhostButton, EmptyState, Divider, KPICard
 )
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.application.services.bem_estar import ServicoBemEstar
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.utils.mood import mood_emoji_from_score
@@ -163,9 +164,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
     def _set_status_erro(self):
         try:
-            self._kpi_humor.set_value("—”")
-            self._kpi_part.set_value("—”")
-            self._kpi_crit.set_value("—”")
+            self._kpi_humor.set_value("—")
+            self._kpi_part.set_value("—")
+            self._kpi_crit.set_value("—")
         except Exception:
             pass
 
@@ -229,11 +230,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
         kpis = [
-            ("Humor Médio",       "😀  —”",  "💙", THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "_kpi_humor",
+            ("Humor Médio",       f"{ICONS['mood_good']}  —",  ICONS["heart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "_kpi_humor",
              "Média dos últimos 7 dias"),
-            ("Participação",      "—”%",    "📋", THEME["kpi_pink"],  THEME["kpi_pink_soft"],  "_kpi_part",
+            ("Participação",      "—%",    ICONS["chart"], THEME["kpi_pink"],  THEME["kpi_pink_soft"],  "_kpi_part",
              "Taxa de check-ins"),
-            ("Alertas Críticos",  "—”",     "😀", THEME["kpi_red"],   THEME["kpi_red_soft"],   "_kpi_crit",
+            ("Alertas Críticos",  "—",     ICONS["alert"], THEME["kpi_red"],   THEME["kpi_red_soft"],   "_kpi_crit",
              "Estudantes em situação crítica"),
         ]
 
@@ -250,7 +251,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  GRÁFICO DE TENDÊNCIA
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_secao_grafico(self):
-        outer = _section_card(self, "📋  Tendência de Bem-Estar —” últimos 30 dias")
+        outer = _section_card(self, f"{ICONS['chart']}  Tendência de Bem-Estar — últimos 30 dias")
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
         self._secao_grafico_outer = outer
 
@@ -271,9 +272,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._dist_pcts: dict[str, ctk.CTkLabel] = {}
 
         for label, color, pct_key, default in [
-            ("😀  Bom",     THEME["success"], "bom",  65),
-            ("😟  Neutro",  THEME["warning"], "med",  25),
-            ("😟  Baixo",   THEME["danger"],  "mau",  10),
+            (f"{ICONS['mood_good']}  Bom",     THEME["success"], "bom",  65),
+            (f"{ICONS['mood_bad']}  Neutro",  THEME["warning"], "med",  25),
+            (f"{ICONS['mood_bad']}  Baixo",   THEME["danger"],  "mau",  10),
         ]:
             col = ctk.CTkFrame(dist_row, fg_color="transparent")
             col.pack(side="left", expand=True, padx=SPACING["grid_gap"])
@@ -389,7 +390,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         title_row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 10))
 
         ctk.CTkLabel(
-            title_row, text="😀  Visão de Risco dos Estudantes",
+            title_row, text=f"{ICONS['mood_good']}  Visão de Risco dos Estudantes",
             font=themed_font("h4", "bold"),
             text_color=THEME["text"],
         ).pack(side="left")
@@ -467,7 +468,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         if not risks:
             for key in self.colunas_risco:
                 EmptyState(
-                    self.colunas_risco[key]["content"], icon="😟",
+                    self.colunas_risco[key]["content"], icon=ICONS["mood_bad"],
                     title="Nenhum estudante", subtitle=""
                 ).pack(pady=12)
             return
@@ -487,7 +488,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             self.colunas_risco[key]["count_lbl"].configure(text=str(count))
             if count == 0:
                 EmptyState(
-                    self.colunas_risco[key]["content"], icon="😟",
+                    self.colunas_risco[key]["content"], icon=ICONS["mood_bad"],
                     title="Nenhum estudante", subtitle=""
                 ).pack(pady=12)
 
@@ -548,7 +549,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  LISTA DE CHECK-INS
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_lista_checkins(self):
-        outer = _section_card(self, "📊Check-ins Recentes")
+        outer = _section_card(self, f"{ICONS['chart']} Check-ins Recentes")
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
         self._checkins_body = outer.body
 
@@ -563,7 +564,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         if not checkins:
             EmptyState(
-                self._checkins_body, icon="📊",
+                self._checkins_body, icon=ICONS["chart"],
                 title="Nenhum check-in registrado",
                 subtitle="Os check-ins aparecerão aqui quando forem realizados",
             ).pack(pady=20)

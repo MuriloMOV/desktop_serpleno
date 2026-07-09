@@ -9,6 +9,7 @@ from ser_pleno.presentation.components.ui_components import (
     PageHeader, Card, PrimaryButton, GhostButton, Divider, EmptyState,
     InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
 )
+from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -86,7 +87,7 @@ class ScheduleCell(ctk.CTkFrame):
             ctk.CTkLabel(self, text=nome, font=themed_font("body", "bold"),
                          text_color=THEME["text"]).pack(pady=(spacing("sm"), 0), padx=spacing("md"), anchor="w")
             curso = self.info.get("curso", "")
-            ctk.CTkLabel(self, text=f"👥 {curso}", font=themed_font("overline"),
+            ctk.CTkLabel(self, text=f"{ICONS['users']} {curso}", font=themed_font("overline"),
                          text_color=THEME["text_muted"]).pack(padx=spacing("md"), anchor="w")
         else:
             ctk.CTkLabel(self, text="Livre para atendimento",
@@ -94,11 +95,10 @@ class ScheduleCell(ctk.CTkFrame):
                 pady=(spacing("md"), 0), padx=spacing("md"), anchor="w"
             )
 
-        arrow_btn = ctk.CTkButton(
-            self, text="→", width=28, height=28,
+        arrow_btn = IconButton(
+            self, icon=ICONS["arrow_forward"], size=28,
             fg_color="transparent", hover_color=AGENDA_COLORS["cell_hover"],
             text_color=self._cor, corner_radius=RADIUS["pill"],
-            font=themed_font("body", "bold"),
             command=lambda: self._open()
         )
         arrow_btn.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-10)
@@ -177,7 +177,7 @@ class AppointmentModal(BaseModal):
         GhostButton(footer, text="Cancelar", command=self.destroy, width=120).pack(side="right", padx=8)
         PrimaryButton(
             footer, text="Salvar",
-            command=self._save, width=120, icon="✖”"
+            command=self._save, width=120, icon=ICONS["save"]
         ).pack(side="right")
 
     def _campo_combo(self, parent, label, placeholder, values=None, initial=None):
@@ -307,8 +307,8 @@ class GradeManagementModal(BaseModal):
         self.entry_novo.bind("<KeyRelease>", lambda e: _formatar_horario_entry(self.entry_novo))
 
         PrimaryButton(
-            container, text="Adicionar A  Grade",
-            command=self._adicionar, icon="➕", width=160
+            container, text="Adicionar à Grade",
+            command=self._adicionar, icon=ICONS["add"], width=160
         ).pack(anchor="w")
 
     def _render_lista(self):
@@ -464,13 +464,13 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         nav = ctk.CTkFrame(toolbar, fg_color=AGENDA_COLORS["nav_bg"], corner_radius=RADIUS["button"])
         nav.pack(side="left")
 
-        self._botao_navegacao(nav, "◀", -1)
+        self._botao_navegacao(nav, ICONS["arrow_left"], -1)
         self._label_data_nav(nav)
-        self._botao_navegacao(nav, "▶", 1)
+        self._botao_navegacao(nav, ICONS["arrow_right"], 1)
 
         right = ctk.CTkFrame(toolbar, fg_color="transparent")
         right.pack(side="right")
-        PrimaryButton(right, text="Gerenciar Horários", command=self._abrir_modal_gestao, width=170, icon="⚙️").pack()
+        PrimaryButton(right, text="Gerenciar Horários", command=self._abrir_modal_gestao, width=170, icon=ICONS["settings"]).pack()
 
     def _botao_navegacao(self, parent, texto, delta):
         btn = ctk.CTkButton(
@@ -519,7 +519,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     # ——————————————————————————————————————————————————————————————————————
 
     def _criar_container_agenda_dia(self):
-        card = Card(self, title="📅 Agenda do Dia", status="Em andamento")
+        card = Card(self, title=f"{ICONS['calendar']} Agenda do Dia", status="Em andamento")
         card.pack(fill="x", padx=SPACING["page_x"], pady=10)
         self.container_grid = ctk.CTkFrame(card.body, fg_color="transparent")
         self.container_grid.pack(fill="x", pady=(0, 12))

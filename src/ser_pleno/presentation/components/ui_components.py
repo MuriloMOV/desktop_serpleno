@@ -32,6 +32,7 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, STATUS_COLORS, FONT_FAMILY,
     font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
 )
+from ser_pleno.presentation.components.icons import ICONS
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -612,7 +613,7 @@ class InputField(ctk.CTkFrame):
             self._show_helper()
 
     def _show_error(self, msg: str):
-        self._status_icon.configure(text="⚡ ", text_color=THEME["danger"])
+        self._status_icon.configure(text=f"{ICONS['alert']} ", text_color=THEME["danger"])
         self._status_icon.pack(side="right", padx=(8, 0))
         self._inner.configure(border_color=THEME["danger"])
         err = ctk.CTkLabel(self, text=msg, font=themed_font("overline"),
@@ -636,7 +637,7 @@ class InputField(ctk.CTkFrame):
         self._destroy_aux()
         self._error = False
         self._inner.configure(border_color=THEME["success"])
-        self._status_icon.configure(text="✖”", text_color=THEME["success"])
+        self._status_icon.configure(text=ICONS["check"], text_color=THEME["success"])
         self._status_icon.pack(side="right", padx=(8, 0))
 
     def _destroy_aux(self):
@@ -676,7 +677,7 @@ class SearchField(ctk.CTkFrame):
     def _build(self, placeholder):
         self.pack_propagate(False)
 
-        ctk.CTkLabel(self, text="😀”", font=themed_font("body"),
+        ctk.CTkLabel(self, text=ICONS["search"], font=themed_font("body"),
                      text_color=THEME["text_muted"]).pack(side="left", padx=(14, 8))
 
         self.entry = ctk.CTkEntry(
@@ -688,7 +689,7 @@ class SearchField(ctk.CTkFrame):
         )
         self.entry.pack(side="left", fill="both", expand=True, padx=(0, 40))
 
-        self._clear = ctk.CTkButton(self, text="✖•", width=22, height=22,
+        self._clear = ctk.CTkButton(self, text=ICONS["clear"], width=22, height=22,
                                      fg_color=THEME["border"], hover_color=THEME["border_strong"],
                                      text_color=THEME["text"], font=themed_font("caption"),
                                      corner_radius=4, command=self.clear, cursor="hand2")
@@ -780,7 +781,7 @@ class Toast(ctk.CTkFrame):
         super().__init__(parent, fg_color=THEME["surface"], corner_radius=RADIUS["lg"],
                           border_width=1, border_color=THEME["border"])
         self._on_action = on_action
-        icons = {"info": "â„¹", "success": "✖”", "warning": "⚡ ", "danger": "✖•"}
+        icons = {"info": ICONS["info"], "success": ICONS["check"], "warning": ICONS["alert"], "danger": ICONS["cross"]}
         colors = {
             "info": THEME["info"], "success": THEME["success"],
             "warning": THEME["warning"], "danger": THEME["danger"],
@@ -813,7 +814,7 @@ class Toast(ctk.CTkFrame):
             self.destroy()
 
     def _close(self, parent) -> ctk.CTkButton:
-        return ctk.CTkButton(parent, text="✖•", width=24, height=24,
+        return ctk.CTkButton(parent, text=ICONS["cross"], width=24, height=24,
                               fg_color="transparent", hover_color=THEME["bg_alt"],
                               text_color=THEME["text_muted"], font=themed_font("caption"),
                               corner_radius=RADIUS["xs"], command=self._safe_destroy, cursor="hand2")

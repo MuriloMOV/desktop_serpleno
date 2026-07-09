@@ -12,6 +12,7 @@ from typing import Any
 from ser_pleno.infrastructure.api.mural import servico_mural
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.presentation.components.ui_components import BaseModal
 
 logger = logging.getLogger("apps.desktop")
@@ -211,7 +212,7 @@ class PublicacaoModal(BaseModal):
 
         ib = ctk.CTkFrame(bi, width=38, height=38, corner_radius=10, fg_color=Q["accent"])
         ib.pack(side="left", padx=(0, 12)); ib.pack_propagate(False)
-        ctk.CTkLabel(ib, text="📊",
+        ctk.CTkLabel(ib, text=ICONS["chart"],
                      font=font(size=17)).place(relx=0.5, rely=0.5, anchor="center")
 
         ts = ctk.CTkFrame(bi, fg_color="transparent")
@@ -224,7 +225,7 @@ class PublicacaoModal(BaseModal):
                      text_color=Q["text_muted"]).pack(anchor="w")
 
         # Botão fechar
-        ctk.CTkButton(bi, text="✖•", width=32, height=32, corner_radius=8,
+        ctk.CTkButton(bi, text=ICONS["close"], width=32, height=32, corner_radius=8,
                       fg_color=Q["card_bg"], hover_color=THEME["border_strong"],
                       text_color=Q["text_muted"],
                       font=font(size=13),
@@ -259,10 +260,10 @@ class PublicacaoModal(BaseModal):
                                         scrollbar_button_color="#D1D5DB")
         scroll.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
 
-        self.f_titulo   = FormField(scroll, "📊Título", placeholder="Título da publicação")
+        self.f_titulo   = FormField(scroll, f"{ICONS['chart']}Título", placeholder="Título da publicação")
         self.f_titulo.pack(fill="x", pady=(0, 10))
 
-        self.f_conteudo = FormField(scroll, "📄  Conteúdo",
+        self.f_conteudo = FormField(scroll, f"{ICONS['file']}  Conteúdo",
                                     placeholder="Conteúdo da publicação",
                                     multiline=True, height=110)
         self.f_conteudo.pack(fill="x", pady=(0, 10))
@@ -271,36 +272,36 @@ class PublicacaoModal(BaseModal):
         row1.pack(fill="x", pady=(0, 10))
         row1.grid_columnconfigure((0, 1), weight=1)
 
-        self.f_categoria = FormField(row1, "📌  Categoria",
+        self.f_categoria = FormField(row1, f"{ICONS['pin']}  Categoria",
                                      values=["informativo","aviso","aula","urgente","evento"],
                                      initial="informativo")
         self.f_categoria.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self.f_autor = FormField(row1, "👁¤  Autor", placeholder="Nome do autor")
+        self.f_autor = FormField(row1, f"{ICONS['view']}  Autor", placeholder="Nome do autor")
         self.f_autor.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         row2 = ctk.CTkFrame(scroll, fg_color="transparent")
         row2.pack(fill="x", pady=(0, 10))
         row2.grid_columnconfigure((0, 1), weight=1)
 
-        self.f_local = FormField(row2, "📍 Local", placeholder="Ex: Auditório")
+        self.f_local = FormField(row2, f"{ICONS['location']} Local", placeholder="Ex: Auditório")
         self.f_local.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self.f_link  = FormField(row2, "🔍  Link externo", placeholder="https://...")
+        self.f_link  = FormField(row2, f"{ICONS['search']}  Link externo", placeholder="https://...")
         self.f_link.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         row3 = ctk.CTkFrame(scroll, fg_color="transparent")
         row3.pack(fill="x", pady=(0, 10))
         row3.grid_columnconfigure((0, 1), weight=1)
 
-        self.f_data_ag = FormField(row3, "📅  Agendamento", placeholder="YYYY-MM-DD")
+        self.f_data_ag = FormField(row3, f"{ICONS['calendar']}  Agendamento", placeholder="YYYY-MM-DD")
         self.f_data_ag.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self.f_horario_evento = FormField(row3, "📊  Horário evento",
+        self.f_horario_evento = FormField(row3, f"{ICONS['chart']}  Horário evento",
                                           placeholder="YYYY-MM-DD HH:MM")
         self.f_horario_evento.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
-        self.f_layout = FormField(scroll, "âŠž  Layout",
+        self.f_layout = FormField(scroll, f"{ICONS['layout']}  Layout",
                                   values=["single","grid-2","grid-3","grid-4"],
                                   initial="single")
         self.f_layout.pack(fill="x", pady=(0, 10))
@@ -355,7 +356,7 @@ class PublicacaoModal(BaseModal):
         ).pack(side="left", pady=11)
 
         self._btn_publicar = ctk.CTkButton(
-            footer, text="✖”  Publicar",
+            footer, text=f"{ICONS['check']}  Publicar",
             command=self._on_save,
             height=38, width=140, corner_radius=10,
             fg_color=Q["accent"], hover_color=Q["accent_hover"],
@@ -776,7 +777,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def carregar_avisos_async(self):
         self._limpar_lista()
         ctk.CTkLabel(self.lista,
-                     text="⏳  Carregando publicações...",
+                      text=f"{ICONS['hourglass']}  Carregando publicações...",
                      font=font(size=13),
                      text_color=Q["text_muted"]).pack(pady=20)
 
@@ -801,7 +802,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
         if not posts:
             ctk.CTkLabel(self.lista,
-                         text="📋  Nenhuma publicação encontrada",
+                          text=f"{ICONS['empty']}  Nenhuma publicação encontrada",
                          font=font(size=13),
                          text_color=Q["text_muted"]).pack(pady=30)
             return
@@ -821,7 +822,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def _on_load_error(self, e):
         self._limpar_lista()
         ctk.CTkLabel(self.lista,
-                     text=f"⚡   Erro ao carregar avisos: {e}",
+                      text=f"{ICONS['bolt']}   Erro ao carregar avisos: {e}",
                      font=font(size=12),
                      text_color=Q["danger"]).pack(pady=20)
 
@@ -867,7 +868,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         acts.pack(side="right")
 
         ctk.CTkButton(
-            acts, text="✖  Editar",
+            acts, text=f"{ICONS['edit']}  Editar",
             command=lambda i=aviso_id: self._on_edit(i),
             height=30, width=90, corner_radius=8,
             fg_color=Q["accent_soft"], hover_color=Q["accent"],
@@ -876,7 +877,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         ).pack(side="left", padx=(0, 6))
 
         ctk.CTkButton(
-            acts, text="😀  Excluir",
+            acts, text=f"{ICONS['delete']}  Excluir",
             command=lambda i=aviso_id: self._on_delete(i),
             height=30, width=90, corner_radius=8,
             fg_color=Q["danger_soft"], hover_color=Q["danger_hover"],
@@ -899,7 +900,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         footer_row = ctk.CTkFrame(body, fg_color="transparent")
         footer_row.pack(fill="x")
 
-        for icon, val in [("👁¤", autor), ("📊", data)]:
+        for icon, val in [(ICONS["view"], autor), (ICONS["chart"], data)]:
             if val:
                 lbl_row = ctk.CTkFrame(footer_row, fg_color="transparent")
                 lbl_row.pack(side="left", padx=(0, 16))

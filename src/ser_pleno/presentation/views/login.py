@@ -18,6 +18,7 @@ from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
     PrimaryButton, GhostButton, InputField, Badge, Divider
 )
+from ser_pleno.presentation.components.icons import ICONS
 
 logger = logging.getLogger("apps.desktop")
 
@@ -135,7 +136,7 @@ class LoginInputField(ctk.CTkFrame):
 
         if password:
             self._eye_btn = ctk.CTkButton(
-                self._box, text="👁", width=36, height=36,
+                self._box, text=ICONS["view"], width=36, height=36,
                 fg_color="transparent", hover_color=self._bg_normal,
                 text_color=THEME["text_secondary"],
                 font=themed_font("body"),
@@ -167,7 +168,7 @@ class LoginInputField(ctk.CTkFrame):
         self._state = "error"
         self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
         self._label.configure(text_color=THEME["danger"])
-        self._msg.configure(text=f"⚡   {msg}" if msg else "", text_color=THEME["danger"])
+        self._msg.configure(text=f"{ICONS['alert']}   {msg}" if msg else "", text_color=THEME["danger"])
 
     def set_success(self):
         self._state = "success"
@@ -204,7 +205,7 @@ class LoginInputField(ctk.CTkFrame):
     def _toggle_show(self):
         self._show_pass = not self._show_pass
         self.entry.configure(show="" if self._show_pass else "●")
-        self._eye_btn.configure(text="🙈" if self._show_pass else "👁")
+        self._eye_btn.configure(text=ICONS["hide"] if self._show_pass else ICONS["view"])
 
 
 # —————————————————————————————————————————————
@@ -516,7 +517,7 @@ class LoginFrame(ctk.CTkFrame):
         )
         icon_bg.pack(pady=(0, 10))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="👥 ", font=themed_font("h2")).place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(icon_bg, text=f"{ICONS['group']} ", font=themed_font("h2")).place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
             header, text="SerPleno", font=themed_font("h2", "bold"),
@@ -532,7 +533,7 @@ class LoginFrame(ctk.CTkFrame):
 
         info_row = ctk.CTkFrame(inner, fg_color="transparent")
         info_row.pack(fill="x", pady=(0, 16))
-        for text in ["🔒 LGPD", "⚡ Acesso rápido", "👤 Apoio contínuo"]:
+        for text in [f"{ICONS['lock']} LGPD", f"{ICONS['alert']} Acesso rápido", f"{ICONS['user']} Apoio contínuo"]:
             chip = ctk.CTkFrame(info_row, height=30, corner_radius=RADIUS["pill"], fg_color=THEME["bg_alt"])
             chip.pack(side="left", padx=(0, 8))
             chip.pack_propagate(False)
@@ -541,10 +542,10 @@ class LoginFrame(ctk.CTkFrame):
 
         Divider(inner).pack(fill="x", pady=(0, 20))
 
-        self.input_user = LoginInputField(inner, "Usuário", placeholder="Seu nome de usuário", icon="👤")
+        self.input_user = LoginInputField(inner, "Usuário", placeholder="Seu nome de usuário", icon=ICONS["user"])
         self.input_user.pack(fill="x", pady=(0, 12))
 
-        self.input_pass = LoginInputField(inner, "Senha", placeholder="Sua senha", icon="🔒", password=True)
+        self.input_pass = LoginInputField(inner, "Senha", placeholder="Sua senha", icon=ICONS["lock"], password=True)
         self.input_pass.pack(fill="x", pady=(0, 4))
 
         self.lbl_erro = ctk.CTkLabel(
@@ -560,7 +561,7 @@ class LoginFrame(ctk.CTkFrame):
         self.btn_entrar.pack(fill="x", pady=(14, 8))
 
         GhostButton(
-            inner, text="🔒  Política de Privacidade", command=self._abrir_politica,
+            inner, text=f"{ICONS['lock']}  Política de Privacidade", command=self._abrir_politica,
             height=34, corner_radius=RADIUS["button"], text_color=self.palette["text_muted"],
         ).pack(fill="x")
 
@@ -594,7 +595,7 @@ class LoginFrame(ctk.CTkFrame):
         # renderização problemática no Windows (subpixel anti-aliasing issues)
         self._music_btn = ctk.CTkButton(
             self._music_btn_frame,
-            text="♪ª",
+            text=ICONS["music"],
             width=48,
             height=48,
             corner_radius=8,  # Reduzido de RADIUS["pill"] (999) para evitar renderização bugada
@@ -638,7 +639,7 @@ class LoginFrame(ctk.CTkFrame):
                 self._mci_send(f'open "{path}" type mpegvideo alias serpleno_bgm')
                 self._mci_send("play serpleno_bgm repeat")
                 self._music_playing = True
-                self._music_btn.configure(text="♪¬", text_color=THEME["primary"])
+                self._music_btn.configure(text=ICONS["music"], text_color=THEME["primary"])
             except Exception as e:
                 logger.warning("Erro ao tocar música: %s", e)
         else:
@@ -646,7 +647,7 @@ class LoginFrame(ctk.CTkFrame):
                 self._mci_send("stop serpleno_bgm")
                 self._mci_send("close serpleno_bgm")
                 self._music_playing = False
-                self._music_btn.configure(text="♪ª", text_color=THEME["text_secondary"])
+                self._music_btn.configure(text=ICONS["music"], text_color=THEME["text_secondary"])
             except Exception:
                 pass
 
@@ -739,7 +740,7 @@ class LoginFrame(ctk.CTkFrame):
     def _on_login_failure(self, msg):
         self._is_loading = False
         self._set_idle_state()
-        self.lbl_erro.configure(text=f"✖•  {msg}", text_color=self.palette["danger"])
+        self.lbl_erro.configure(text=f"{ICONS['cross']}•  {msg}", text_color=self.palette["danger"])
         self.input_pass.set_error("Credenciais inválidas")
         self.input_pass.entry.delete(0, "end")
         self._shake_card()
@@ -769,7 +770,7 @@ class LoginFrame(ctk.CTkFrame):
                                fg_color=self.palette["accent_soft"])
         icon_bg.pack(pady=(0, 14))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="🔒", font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(icon_bg, text=ICONS["lock"], font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
             inner, text="Política de Privacidade", font=themed_font("h4", "bold"),

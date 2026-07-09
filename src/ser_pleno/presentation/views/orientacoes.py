@@ -8,6 +8,7 @@ from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.application.services.orientacoes import servico_orientacoes
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 logger = logging.getLogger("apps.desktop")
@@ -306,13 +307,13 @@ class OrientationHistoryCard(ctk.CTkFrame):
         acts.pack(side="right", anchor="n")
 
         for label, cmd, accent, s in [
-            ("👁  Ver",      lambda: self._on_view(self._o),
+            (f"{ICONS['view']}  Ver",      lambda: self._on_view(self._o),
              O["accent_soft"], O["accent"]),
-            ("✖  Editar",   lambda: self._on_edit(self._o),
+            (f"{ICONS['cross']}  Editar",   lambda: self._on_edit(self._o),
              O["accent"],     "#FFFFFF"),
-            ("🗂  Duplicar", lambda: self._on_duplicate(self._o.get("id")),
+            (f"{ICONS['duplicate']}  Duplicar", lambda: self._on_duplicate(self._o.get("id")),
              O["divider"],    O["text_muted"]),
-            ("😀  Excluir",  lambda: self._on_delete(self._o.get("id")),
+            (f"{ICONS['delete']}  Excluir",  lambda: self._on_delete(self._o.get("id")),
              O["danger_soft"], O["danger"]),
         ]:
             ctk.CTkButton(acts, text=label, command=cmd,
@@ -390,7 +391,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         search_wrap = ctk.CTkFrame(sidebar, fg_color="#F3F4F6", corner_radius=10)
         search_wrap.grid(row=1, column=0, sticky="ew", padx=spacing("sm"), pady=(0, spacing("item_gap")))
 
-        ctk.CTkLabel(search_wrap, text="🔍",
+        ctk.CTkLabel(search_wrap, text=ICONS["search"],
                      font=font(size=13),
                      text_color=O["text_light"]).pack(side="left", padx=(10, 0))
 
@@ -439,7 +440,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._tab_ativo = "historico"
         self._tab_btns: dict[str, ctk.CTkButton] = {}
 
-        for key, label in [("historico", "📊  Histórico"),
+        for key, label in [(ICONS["chart"], f"{ICONS['chart']}  Histórico"),
                            ("nova",      " +  Nova Orientação")]:
             btn = ctk.CTkButton(
                 self._tab_bar, text=label,
@@ -506,7 +507,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         ib = ctk.CTkFrame(bi, width=34, height=34, corner_radius=9, fg_color=O["accent"])
         ib.pack(side="left", padx=(0, spacing("md"))); ib.pack_propagate(False)
-        ctk.CTkLabel(ib, text="📊",
+        ctk.CTkLabel(ib, text=ICONS["chart"],
                      font=font(size=15)).place(relx=0.5, rely=0.5, anchor="center")
         ts = ctk.CTkFrame(bi, fg_color="transparent")
         ts.pack(side="left")
@@ -521,10 +522,10 @@ class OrientacoesFrame(ctk.CTkFrame):
                                        scrollbar_button_color="#D1D5DB")
         body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
 
-        self.f_titulo = FormField(body, "📊Título", placeholder="Título da orientação")
+        self.f_titulo = FormField(body, f"{ICONS['chart']}Título", placeholder="Título da orientação")
         self.f_titulo.pack(fill="x", pady=(0, 10))
 
-        self.f_conteudo = FormField(body, "📄  Conteúdo",
+        self.f_conteudo = FormField(body, f"{ICONS['file']}  Conteúdo",
                                      placeholder="Descreva a orientação...",
                                      multiline=True, height=100)
         self.f_conteudo.pack(fill="x", pady=(0, 10))
@@ -533,21 +534,21 @@ class OrientacoesFrame(ctk.CTkFrame):
         row.pack(fill="x", pady=(0, 10))
         row.grid_columnconfigure((0, 1), weight=1)
 
-        self.f_tema = FormField(row, "📌  Tema",
+        self.f_tema = FormField(row, f"{ICONS['pin']}  Tema",
                                  values=["Acadêmico","Emocional","Social",
                                          "Familiar","Vocacional","Geral"],
                                  initial="Geral")
         self.f_tema.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self.f_data = FormField(row, "📅  Data da Sessão",
-                                 placeholder="YYYY-MM-DD", icon="📅")
+        self.f_data = FormField(row, f"{ICONS['calendar']}  Data da Sessão",
+                                 placeholder="YYYY-MM-DD", icon=ICONS["calendar"])
         self.f_data.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
-        self.f_encaminhamento = FormField(body, "🔍—  Encaminhamento",
+        self.f_encaminhamento = FormField(body, f"{ICONS['search']}—  Encaminhamento",
                                            placeholder="Serviço ou profissional indicado")
         self.f_encaminhamento.pack(fill="x", pady=(0, 10))
 
-        self.f_obs = FormField(body, "💬  Observações",
+        self.f_obs = FormField(body, f"{ICONS['chat']}  Observações",
                                 multiline=True, height=70)
         self.f_obs.pack(fill="x", pady=(0, 10))
 
@@ -564,7 +565,7 @@ class OrientacoesFrame(ctk.CTkFrame):
                       border_width=1, border_color=O["card_border"],
                       font=font(size=12)).pack(side="left", pady=spacing("md"))
 
-        ctk.CTkButton(footer, text="✖”  Salvar Orientação",
+        ctk.CTkButton(footer, text=f"{ICONS['check']}  Salvar Orientação",
                       command=self._salvar_orientacao,
                       height=36, width=180, corner_radius=10,
                       fg_color=O["accent"], hover_color=O["accent_hover"],
@@ -624,7 +625,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         # Mostra todas se não há seleção
         if not orientacoes:
             EmptyState(
-                self._area_historico, icon="📊", title="Nenhuma orientação registrada",
+                self._area_historico, icon=ICONS["chart"], title="Nenhuma orientação registrada",
                 subtitle=""
             ).pack(pady=30)
         else:
@@ -636,7 +637,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         if not estudantes:
             EmptyState(
-                self._scroll_students, icon="😟", title="Nenhum estudante",
+                self._scroll_students, icon=ICONS["mood_bad"], title="Nenhum estudante",
                 subtitle=""
             ).pack(pady=20)
             return
@@ -646,7 +647,7 @@ class OrientacoesFrame(ctk.CTkFrame):
                                   fg_color=O["accent_soft"], corner_radius=10,
                                   cursor="hand2")
         todos_row.pack(fill="x", pady=(0, spacing("xs")), padx=spacing("xs"))
-        ctk.CTkLabel(todos_row, text="📊  Todos os estudantes",
+        ctk.CTkLabel(todos_row, text=f"{ICONS['group']}  Todos os estudantes",
                      font=font(size=12, weight="bold"),
                       text_color=O["accent"]).pack(padx=spacing("md"), pady=spacing("sm"))
         todos_row.bind("<Button-1>",
@@ -683,7 +684,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         if not orientacoes:
             ctk.CTkLabel(self._area_historico,
-                         text="📊  Nenhuma orientação para este estudante",
+                          text=f"{ICONS['chart']}  Nenhuma orientação para este estudante",
                          font=font(size=13),
                          text_color=O["text_muted"]).pack(pady=30)
             return
@@ -795,7 +796,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         ib = ctk.CTkFrame(bi, width=42, height=42, corner_radius=12, fg_color=color)
         ib.pack(side="left", padx=(0, 12)); ib.pack_propagate(False)
-        ctk.CTkLabel(ib, text="📊",
+        ctk.CTkLabel(ib, text=ICONS["chart"],
                      font=font(size=18)).place(relx=0.5, rely=0.5, anchor="center")
 
         ts = ctk.CTkFrame(bi, fg_color="transparent")
@@ -815,9 +816,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
 
         for label, value in [
-            ("📅  Data",          (o.get("session_date") or "—”")[:10]),
-            ("📌  Tema",          tema),
-            ("🔍—  Encaminhamento", o.get("referral") or "—”"),
+            (f"{ICONS['calendar']}  Data",          (o.get("session_date") or "—")[:10]),
+            (f"{ICONS['pin']}  Tema",          tema),
+            (f"{ICONS['search']}—  Encaminhamento", o.get("referral") or "—"),
         ]:
             row = ctk.CTkFrame(body, fg_color="#FAFAFA", corner_radius=8)
             row.pack(fill="x", pady=3)

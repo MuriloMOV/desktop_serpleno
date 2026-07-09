@@ -8,6 +8,7 @@ from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal
 )
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -66,9 +67,10 @@ class _DateField(ctk.CTkFrame):
         super().__init__(parent, fg_color=THEME["input_bg"],
                          corner_radius=RADIUS["input"], border_width=1,
                          border_color=THEME["input_border"])
-        ctk.CTkLabel(self, text="📅",
-                     font=themed_font("body"),
-                     text_color=THEME["text_secondary"]).pack(side="left", padx=(SPACING["icon_gap"], 0))
+        IconLabel(
+            self, icon=ICONS["calendar"], size=20,
+            fg_color="transparent", text_color=THEME["text_secondary"],
+        ).pack(side="left", padx=(SPACING["icon_gap"], 0))
         self.entry = ctk.CTkEntry(
             self, placeholder_text=placeholder,
             fg_color=THEME["input_bg"], border_width=0,
@@ -122,7 +124,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
 
         PrimaryButton(
-            bar, text="➕  Nova Triagem",
+            bar, text=f"{ICONS['add']}  Nova Triagem",
             command=self.abrir_nova_triagem,
             height=40, corner_radius=RADIUS["button"], width=160,
         ).pack(side="right")
@@ -141,10 +143,13 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
         kpis = [
-            ("Total de Triagens", str(total),     "📊", THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "Registros"),
-            ("Pendentes",         str(pendentes),  "⏳", THEME["kpi_amber"], THEME["kpi_amber_soft"], "Aguardando"),
-            ("Concluídas",        str(concluidas), "✅", THEME["kpi_green"], THEME["kpi_green_soft"], "Finalizadas"),
-            ("Alta Prioridade",   str(alta_p),     "⚡ ", THEME["kpi_red"],   THEME["kpi_red_soft"],   "Urgente ou Alta"),
+            ("Total de Triagens", str(total),     ICONS["chart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "Registros"),
+
+            ("Pendentes",         str(pendentes),  ICONS["hourglass"], THEME["kpi_amber"], THEME["kpi_amber_soft"], "Aguardando"),
+
+            ("Concluídas",        str(concluidas), ICONS["check"], THEME["kpi_green"], THEME["kpi_green_soft"], "Finalizadas"),
+
+            ("Alta Prioridade",   str(alta_p),     f"{ICONS['bolt']} ", THEME["kpi_red"],   THEME["kpi_red_soft"],   "Urgente ou Alta"),
         ]
         for i, (title, val, icon, accent, soft, sub) in enumerate(kpis):
             row.grid_columnconfigure(i, weight=1)
@@ -162,7 +167,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
 
         hdr = ctk.CTkFrame(card, fg_color="transparent")
         hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
-        ctk.CTkLabel(hdr, text="🔍½  Filtrar Triagens",
+        ctk.CTkLabel(hdr, text=f"{ICONS['search']}  Filtrar Triagens",
                      font=themed_font("body", "bold"),
                      text_color=THEME["text"]).pack(side="left")
 
@@ -278,7 +283,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
 
         if not data_list:
             EmptyState(
-                self.lista_triagens, icon="📋", title="Nenhuma triagem encontrada",
+                self.lista_triagens, icon=ICONS["empty"], title="Nenhuma triagem encontrada",
                 subtitle=""
             ).pack(pady=SPACING["section_gap"])
             return
@@ -330,8 +335,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         # Col 4 —“ Ações
         acts = ctk.CTkFrame(row, fg_color="transparent")
         acts.grid(row=0, column=4, sticky="e", padx=(0, SPACING["icon_gap"]), pady=SPACING["icon_gap"])
-        for icon, cmd, tip in [("👁", lambda s=item: self._ver_detalhe(s), "Ver detalhe"),
-                                ("✖", lambda s=item: self._editar(s), "Editar")]:
+        for icon, cmd, tip in [(ICONS["view"], lambda s=item: self._ver_detalhe(s), "Ver detalhe"),
+                                (ICONS["cross"], lambda s=item: self._editar(s), "Editar")]:
             GhostButton(
                 acts, icon=icon, tooltip=tip, width=30, height=30,
                 corner_radius=RADIUS["xs"],
@@ -386,8 +391,10 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         ib = ctk.CTkFrame(bi, width=40, height=40,
                           corner_radius=RADIUS["button"], fg_color=THEME["primary"])
         ib.pack(side="left", padx=(0, SPACING["icon_gap"])); ib.pack_propagate(False)
-        ctk.CTkLabel(ib, text="📊",
-                     font=themed_font("h4")).place(relx=0.5, rely=0.5, anchor="center")
+        IconLabel(
+            ib, icon=ICONS["chart"], size=22,
+            fg_color="transparent", text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
 
         ts = ctk.CTkFrame(bi, fg_color="transparent")
         ts.pack(side="left")
@@ -427,8 +434,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             en.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
             return en
 
-        en_nome  = field(body, "Nome do Estudante", "Ex: Ana Silva", "👁")
-        en_data  = field(body, "Data da Triagem",   "dd/mm/aaaa",   "📅")
+        en_nome  = field(body, "Nome do Estudante", "Ex: Ana Silva", ICONS["view"])
+        en_data  = field(body, "Data da Triagem",   "dd/mm/aaaa",   ICONS["calendar"])
 
         opt_style = dict(
             fg_color=THEME["primary_soft"], button_color=THEME["primary"],
@@ -491,7 +498,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             self.renderizar_tabela(self.data_master)
 
         PrimaryButton(
-            footer, text="✖”  Salvar", command=salvar,
+            footer, text=f"{ICONS['save']}  Salvar", command=salvar,
             height=38, width=140, corner_radius=RADIUS["button"],
         ).pack(side="right", pady=SPACING["item_gap"])
 

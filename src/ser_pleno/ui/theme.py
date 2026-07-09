@@ -573,6 +573,9 @@ def readable_text_color(bg_hex: str) -> str:
 # ——————————————————————————————————————————————————————————————————————————
 #  Constantes semânticas usadas pelas views
 # ——————————————————————————————————————————————————————————————————————————
+# ——————————————————————————————————————————————————————————————————————————
+#  Constantes semânticas usadas pelas views
+# ——————————————————————————————————————————————————————————————————————————
 SEMANTIC_COLORS = {
     "positive": "#10B981",
     "negative": "#EF4444",
@@ -596,13 +599,6 @@ PRIORITY_COLORS = {
     "Baixa":   ("normal",  "normal_soft"),
 }
 
-MOOD_EMOJIS = {1: "😟¢", 2: "😟•", 3: "😟", 4: "😟Š", 5: "😟„"}
-MOOD_COLORS = {
-    1: "danger",
-    2: "alto",
-    3: "medio",
-    4: "success",
-    5: "primary",
-}
-MOOD_LABELS = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo"}
+# MOOD_* movidos para ser_pleno.ui.components.icons para evitar corrupção
+# de encoding e centralizar emojis em uma única fonte.
 

@@ -18,6 +18,7 @@ from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
     Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable
 )
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 
 
 # Avatar cores por inicial (ciclo)
@@ -113,7 +114,7 @@ class _Field(ctk.CTkFrame):
         return self.entry.get()
 
     def set_error(self, msg: str):
-        self._err.configure(text=f"⚡   {msg}", text_color=THEME["danger"])
+        self._err.configure(text=f"{ICONS['bolt']}   {msg}", text_color=THEME["danger"])
 
     def clear_error(self):
         self._err.configure(text="", text_color=THEME["text_secondary"])
@@ -150,7 +151,7 @@ class EstudantesFrame(ctk.CTkFrame):
         right.pack(side="right")
 
         PrimaryButton(
-            right, text="➕  Novo Estudante",
+            right, text=f"{ICONS['add']}  Novo Estudante",
             command=self.novo_estudante_click,
             height=40, width=168,
         ).pack()
@@ -181,7 +182,7 @@ class EstudantesFrame(ctk.CTkFrame):
         search_wrap = ctk.CTkFrame(sidebar, fg_color=THEME["bg_alt"], corner_radius=RADIUS["input"])
         search_wrap.grid(row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["page_y"], SPACING["item_gap"]))
 
-        ctk.CTkLabel(search_wrap, text="🔍",
+        ctk.CTkLabel(search_wrap, text=ICONS["search"],
                      font=themed_font("body"),
                      text_color=THEME["text_muted"]).pack(side="left", padx=(10, 0))
 
@@ -294,7 +295,7 @@ class EstudantesFrame(ctk.CTkFrame):
         actions.pack(side="right", anchor="n")
 
         self.btn_editar = PrimaryButton(
-            actions, text="✖  Editar",
+            actions, text=f"{ICONS['edit']}  Editar",
             command=lambda: None,
             height=36, width=100,
             fg_color=THEME["primary_soft"],
@@ -304,7 +305,7 @@ class EstudantesFrame(ctk.CTkFrame):
         self.btn_editar.pack(side="left", padx=(0, 8))
 
         DangerButton(
-            actions, text="🗑️  Excluir",
+            actions, text=f"{ICONS['delete']}  Excluir",
             command=lambda: None,
             height=36, width=100,
         ).pack(side="left")
@@ -368,10 +369,10 @@ class EstudantesFrame(ctk.CTkFrame):
         grid.grid_columnconfigure((0, 1), weight=1)
 
         cfg = [
-            ("Contato",       "--", "📊", 0, 0, "card_email"),
-            ("Idade",         "--", "🎂", 0, 1, "card_idade"),
-            ("Curso / Turma", "--", "👥", 1, 0, "card_curso"),
-            ("Laudo Médico",  "--", "📄", 1, 1, "card_laudo"),
+            ("Contato",       "--", ICONS["chart"], 0, 0, "card_email"),
+            ("Idade",         "--", ICONS["cake"], 0, 1, "card_idade"),
+            ("Curso / Turma", "--", ICONS["group"], 1, 0, "card_curso"),
+            ("Laudo Médico",  "--", ICONS["file"], 1, 1, "card_laudo"),
         ]
         for label, value, icon, r, c, attr in cfg:
             lbl = self._info_box(grid, label, value, icon, r, c)
@@ -494,7 +495,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
         if not lista:
             EmptyState(
-                self.scroll_list, icon="😟", title="Nenhum estudante encontrado",
+                self.scroll_list, icon=ICONS["mood_bad"], title="Nenhum estudante encontrado",
                 subtitle="Tente ajustar os filtros de busca"
             ).pack(pady=24)
             self.lbl_count.configure(text="0 estudantes")
@@ -551,7 +552,7 @@ class EstudantesFrame(ctk.CTkFrame):
             badge = ctk.CTkFrame(inner, fg_color=THEME["danger_soft"], corner_radius=RADIUS["sm"])
             badge.grid(row=0, column=2, rowspan=2, padx=(6, 0))
             ctk.CTkLabel(
-                badge, text="⚡ ",
+                badge, text=f"{ICONS['bolt']} ",
                 font=themed_font("caption"),
                 text_color=THEME["danger"],
             ).pack(padx=spacing("sm"), pady=spacing("xs"))
@@ -629,21 +630,21 @@ class EstudantesFrame(ctk.CTkFrame):
             self.card_curso.configure(text=curso)
         if self.card_laudo:
             self.card_laudo.configure(
-                text="✖”  Sim" if st.get("has_medical_report") else "✖—  Não",
+                text=f"{ICONS['check']}  Sim" if st.get("has_medical_report") else f"{ICONS['cross']}  Não",
                 text_color=THEME["success"] if st.get("has_medical_report") else THEME["text_secondary"],
             )
 
         # Status bar
         if atenção:
             self.status_bar.configure(fg_color=THEME["danger_soft"])
-            self.lbl_status_icon.configure(text="●", text_color=THEME["danger"])
+            self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["danger"])
             self.lbl_status_det.configure(
                 text="Requer atendimento prioritário",
                 text_color=THEME["danger"],
             )
         else:
             self.status_bar.configure(fg_color=THEME["success_soft"])
-            self.lbl_status_icon.configure(text="●", text_color=THEME["success"])
+            self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["success"])
             self.lbl_status_det.configure(
                 text="Sem alertas —” situação normal",
                 text_color=THEME["success"],
@@ -678,7 +679,7 @@ class EstudantesFrame(ctk.CTkFrame):
                                corner_radius=RADIUS["lg"], fg_color=THEME["primary"])
         icon_bg.pack(side="left", padx=(0, 12))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="👤",
+        ctk.CTkLabel(icon_bg, text=ICONS["user"],
                      font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
 
         title_stack = ctk.CTkFrame(b_inner, fg_color="transparent")
@@ -694,11 +695,11 @@ class EstudantesFrame(ctk.CTkFrame):
         body = ctk.CTkFrame(modal, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=20)
 
-        en_nome = _Field(body, "Nome Completo", "Ex: Ana Silva", icon="👤",
+        en_nome = _Field(body, "Nome Completo", "Ex: Ana Silva", icon=ICONS["user"],
                          helper="Nome completo do estudante")
         en_nome.pack(fill="x", pady=(0, 12))
 
-        en_email = _Field(body, "Email de Contato", "email@exemplo.com", icon="📊",
+        en_email = _Field(body, "Email de Contato", "email@exemplo.com", icon=ICONS["chart"],
                           helper="Email institucional ou pessoal")
         en_email.pack(fill="x", pady=(0, 12))
 
@@ -706,9 +707,9 @@ class EstudantesFrame(ctk.CTkFrame):
         row_mid.pack(fill="x", pady=(0, 12))
         row_mid.grid_columnconfigure((0, 1), weight=1)
 
-        en_curso = _Field(row_mid, "Curso / Turma", "Ex: Psicologia", icon="👥")
+        en_curso = _Field(row_mid, "Curso / Turma", "Ex: Psicologia", icon=ICONS["group"])
         en_curso.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        en_idade = _Field(row_mid, "Idade", "Ex: 22", icon="🎂")
+        en_idade = _Field(row_mid, "Idade", "Ex: 22", icon=ICONS["cake"])
         en_idade.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
         # Switches
@@ -718,12 +719,12 @@ class EstudantesFrame(ctk.CTkFrame):
         sw_frame.pack(fill="x", pady=(0, 16))
 
         sw_laudo = self._switch_row(
-            sw_frame, "📄", "Possui laudo médico",
+            sw_frame, ICONS["file"], "Possui laudo médico",
             "Estudante possui documentação médica", THEME["primary"]
         )
         ctk.CTkFrame(sw_frame, height=1, fg_color=THEME["divider"]).pack(fill="x")
         sw_aten = self._switch_row(
-            sw_frame, "⚡ ", "Requer atendimento prioritário",
+            sw_frame, ICONS["bolt"], "Requer atendimento prioritário",
             "Estudante necessita de atenção especial", THEME["danger"]
         )
 
@@ -760,7 +761,7 @@ class EstudantesFrame(ctk.CTkFrame):
                 self.load_data()
 
         PrimaryButton(
-            footer, text="✖”  Salvar Estudante",
+            footer, text=f"{ICONS['check']}  Salvar Estudante",
             command=salvar,
             height=38, width=180,
         ).pack(side="right", pady=13)

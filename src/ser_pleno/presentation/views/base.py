@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
+from ser_pleno.presentation.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import PageHeader, Divider, PrimaryButton, GhostButton, BaseModal
 
 
@@ -28,7 +29,7 @@ class _ErrorModal(BaseModal):
                                  corner_radius=RADIUS["lg"])
         icon_box.pack(pady=(0, 14))
         icon_box.pack_propagate(False)
-        ctk.CTkLabel(icon_box, text="⚡ ", font=themed_font("h2"),
+        ctk.CTkLabel(icon_box, text=f"{ICONS['alert']} ", font=themed_font("h2"),
                      text_color=THEME["danger"]).place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(wrapper, text=title, font=themed_font("h4", "bold"),

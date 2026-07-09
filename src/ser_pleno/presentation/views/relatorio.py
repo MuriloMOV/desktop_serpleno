@@ -1,6 +1,7 @@
 import logging
 import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.application.services.relatorios import ServicoRelatorio
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
@@ -24,10 +25,10 @@ _CHIP = {
 
 # KPIs (título, ícone, acento, soft, chave nos dados)
 _KPIS = [
-    ("Estudantes",    "👥", THEME["kpi_blue"],   THEME["kpi_blue_soft"],   "students_total"),
-    ("Agendamentos",  "📅", THEME["kpi_green"],  THEME["kpi_green_soft"],  "appointments_total"),
-    ("Intervenções",  "👤", THEME["kpi_violet"], THEME["kpi_violet_soft"], "interventions_total"),
-    ("Triagens",      "🔍", THEME["kpi_amber"],  THEME["kpi_amber_soft"],  "screenings_total"),
+    ("Estudantes",    ICONS["group"], THEME["kpi_blue"],   THEME["kpi_blue_soft"],   "students_total"),
+    ("Agendamentos",  ICONS["calendar"], THEME["kpi_green"],  THEME["kpi_green_soft"],  "appointments_total"),
+    ("Intervenções",  ICONS["user"], THEME["kpi_violet"], THEME["kpi_violet_soft"], "interventions_total"),
+    ("Triagens",      ICONS["search"], THEME["kpi_amber"],  THEME["kpi_amber_soft"],  "screenings_total"),
 ]
 
 # ——————————————————————————————————————————————————————————————————————————————
@@ -424,7 +425,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], SPACING["section_gap"]))
 
         ctk.CTkLabel(
-            hdr, text="📥  Exportação de Dados",
+            hdr, text=f"{ICONS['export']}  Exportação de Dados",
             font=themed_font("body", "bold"),
             text_color=THEME["text"],
         ).pack(side="left")
@@ -435,10 +436,10 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         btn_row.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
 
         exports = [
-            ("📊  Estudantes",    "CSV",  self.servico_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
-            ("📅  Agenda",        "CSV",  self.servico_relatorio.exportar_agendamentos,   THEME["kpi_green"],  THEME["kpi_green_soft"]),
-            ("🔍  Triagens",      "CSV",  self.servico_relatorio.exportar_triagens,       THEME["kpi_amber"],  THEME["kpi_amber_soft"]),
-            ("📊  Relatório PDF", "PDF",  lambda: None,                                   THEME["kpi_violet"], THEME["kpi_violet_soft"]),
+            (f"{ICONS['chart']}  Estudantes",    "CSV",  self.servico_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
+            (f"{ICONS['calendar']}  Agenda",        "CSV",  self.servico_relatorio.exportar_agendamentos,   THEME["kpi_green"],  THEME["kpi_green_soft"]),
+            (f"{ICONS['search']}  Triagens",      "CSV",  self.servico_relatorio.exportar_triagens,       THEME["kpi_amber"],  THEME["kpi_amber_soft"]),
+            (f"{ICONS['chart']}  Relatório PDF", "PDF",  lambda: None,                                   THEME["kpi_violet"], THEME["kpi_violet_soft"]),
         ]
 
         for label, fmt, cmd, accent, soft in exports:
@@ -553,7 +554,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             ).pack(fill="x", pady=8)
             EmptyState(
                 self.reports_container,
-                icon="📄",
+                icon=ICONS["file"],
                 title="Nenhum relatório encontrado",
                 subtitle="",
             ).pack(pady=SPACING["section_gap"])
@@ -586,7 +587,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
                                fg_color=THEME["kpi_blue_soft"])
         icon_bg.pack(side="left", padx=(0, SPACING["icon_gap"]))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="📄",
+        ctk.CTkLabel(icon_bg, text=ICONS["file"],
                      font=themed_font("h4")).place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
@@ -617,9 +618,9 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         actions.grid(row=0, column=3, sticky="e", padx=SPACING["icon_gap"], pady=SPACING["icon_gap"])
 
         for icon, tip, cmd in [
-            ("👁", "Visualizar", lambda: None),
-            ("📥", "Baixar",     lambda: None),
-            ("😀", "Excluir",    lambda: None),
+            (ICONS["view"], "Visualizar", lambda: None),
+            (ICONS["export"], "Baixar",     lambda: None),
+            (ICONS["delete"], "Excluir",    lambda: None),
         ]:
             GhostButton(
                 actions, text=icon,

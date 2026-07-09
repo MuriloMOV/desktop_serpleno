@@ -16,11 +16,12 @@ class TriagemController:
 
     def obter_metricas(self):
         """Calcula as métricas e devolve para a View."""
+        from ser_pleno.presentation.components.icons import ICONS
         return [
-            {"label": "Total", "value": str(len(self.data_master)), "icon": "📋", "color": "#3B82F6"},
-            {"label": "Pendentes", "value": "3", "icon": "⏳", "color": "#F59E0B"},
-            {"label": "Concluídas", "value": "1", "icon": "✅", "color": "#10B981"},
-            {"label": "Alta Prioridade", "value": "2", "icon": "⚠️", "color": "#EF4444"}
+            {"label": "Total", "value": str(len(self.data_master)), "icon": ICONS["empty"], "color": "#3B82F6"},
+            {"label": "Pendentes", "value": "3", "icon": ICONS["hourglass"], "color": "#F59E0B"},
+            {"label": "Concluídas", "value": "1", "icon": ICONS["check_circle"], "color": "#10B981"},
+            {"label": "Alta Prioridade", "value": "2", "icon": ICONS["priority_high"], "color": "#EF4444"}
         ]
 
     def aplicar_filtros(self, status, prioridade):

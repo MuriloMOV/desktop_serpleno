@@ -17,6 +17,7 @@ from ser_pleno.presentation.components.ui_components import (
     Badge,
     BaseModal,
 )
+from ser_pleno.presentation.components.icons import IconLabel, ICONS
 
 logger = logging.getLogger("apps.desktop")
 
@@ -253,7 +254,7 @@ class FormModal(BaseModal):
     """Modal reutilizável para formulários."""
 
     def __init__(self, parent, title: str, width: int = 420, height: int = 340,
-                  icon: str = "🔒"):
+                  icon: str = ICONS["lock"]):
         super().__init__(parent, title, width, height, fg_color=THEME["surface"])
         self.withdraw()
         self._icon = icon
@@ -312,12 +313,12 @@ class FormModal(BaseModal):
 
 class AlterarSenhaModal(FormModal):
     def __init__(self, parent, on_save):
-        super().__init__(parent, "Alterar Senha", width=420, height=380, icon="🔑")
+        super().__init__(parent, "Alterar Senha", width=420, height=380, icon=ICONS["key"])
         self._on_save = on_save
 
-        self.f_senha_atual    = ConfigInputField(self._fields_frame, "Senha Atual",    placeholder="••••••••", password=True, icon="🔒")
-        self.f_nova_senha     = ConfigInputField(self._fields_frame, "Nova Senha",     placeholder="mín. 6 caracteres", password=True, icon="🔑")
-        self.f_confirmar_senha= ConfigInputField(self._fields_frame, "Confirmar Senha",placeholder="confirme a nova senha", password=True, icon="🔑")
+        self.f_senha_atual    = ConfigInputField(self._fields_frame, "Senha Atual",    placeholder="••••••••", password=True, icon=ICONS["lock"])
+        self.f_nova_senha     = ConfigInputField(self._fields_frame, "Nova Senha",     placeholder="mín. 6 caracteres", password=True, icon=ICONS["key"])
+        self.f_confirmar_senha= ConfigInputField(self._fields_frame, "Confirmar Senha",placeholder="confirme a nova senha", password=True, icon=ICONS["key"])
 
         for f in (self.f_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
             f.pack(fill="x", pady=(0, 10))
@@ -413,7 +414,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     # —— cartão pessoal -------------------------------------------------------
     def _build_cartao_pessoal(self, container):
-        card = SectionCard(container, "👤", "Informações Pessoais")
+        card = SectionCard(container, ICONS["user"], "Informações Pessoais")
         card.pack(fill="both", expand=True)
 
         profile = self._profile_data()
@@ -430,7 +431,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         img = self._load_image(avatar_name, (118, 118))
         self.avatar_display = ctk.CTkLabel(
-            av_ring, text="" if img else "👤", image=img,
+            av_ring, text="" if img else ICONS["user"], image=img,
             font=themed_font("h2", "bold"))
         self.avatar_display.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -468,9 +469,9 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         _divider(card.body)
 
-        ConfigInputField(card.body, "Nome de exibição", value=nome, icon="👤")\
+        ConfigInputField(card.body, "Nome de exibição", value=nome, icon=ICONS["user"])\
             .pack(fill="x", pady=(0, 8))
-        ConfigInputField(card.body, "Endereço de E-mail", value=email, icon="📊§")\
+        ConfigInputField(card.body, "Endereço de E-mail", value=email, icon=ICONS["mail"])\
             .pack(fill="x", pady=(0, 8))
 
     def _fill_gallery(self):
@@ -513,7 +514,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     # —— central de avisos ----------------------------------------------------
     def _build_central_avisos(self, container):
-        card = SectionCard(container, "🔔", "Central de Avisos", badge="Tempo Real")
+        card = SectionCard(container, ICONS["notification"], "Central de Avisos", badge="Tempo Real")
         card.pack(fill="x", pady=(0, 16))
 
         itens = [
@@ -533,7 +534,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     # —— aparência ------------------------------------------------------------
     def _build_aparencia(self, container):
-        card = SectionCard(container, "🎨", "Aparência & Acessibilidade")
+        card = SectionCard(container, ICONS["heart"], "Aparência & Acessibilidade")
         card.pack(fill="x", pady=(0, 16))
 
         row = ctk.CTkFrame(card.body, fg_color="transparent")
@@ -567,7 +568,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         tip.pack(fill="x")
         ctk.CTkLabel(
             tip.body,
-            text="📊O Modo Foco reduz a emissão de luz azul, ideal para sessões noturnas.",
+            text=f"{ICONS['chart']} O Modo Foco reduz a emissão de luz azul, ideal para sessões noturnas.",
             font=themed_font("body"),
             text_color=THEME["text_secondary"],
             wraplength=420, justify="left",
@@ -585,24 +586,24 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     # —— segurança ------------------------------------------------------------
     def _build_seguranca(self, container):
-        card = SectionCard(container, "🔐", "Sessão & Segurança")
+        card = SectionCard(container, ICONS["settings"], "Sessão & Segurança")
         card.pack(fill="x")
 
         ActionItemRow(
-            card.body, "👥", "Perfil Público",
+            card.body, ICONS["users"], "Perfil Público",
             "Permitir que outros visualizem suas conquistas",
             btn_text="", on_action=lambda t: self._on_seguranca_action(t),
         ).pack(fill="x", pady=2)
 
         ActionItemRow(
-            card.body, "🔑", "Credenciais",
+            card.body, ICONS["key"], "Credenciais",
             "Última alteração há 3 meses",
             btn_text="Alterar Senha",
             on_action=lambda t: self._on_seguranca_action(t),
         ).pack(fill="x", pady=2)
 
         ActionItemRow(
-            card.body, "💻", "Este Dispositivo",
+            card.body, ICONS["code"], "Este Dispositivo",
             "Sessão ativa agora — Windows Desktop",
             btn_text="Encerrar Acesso",
             danger=True,

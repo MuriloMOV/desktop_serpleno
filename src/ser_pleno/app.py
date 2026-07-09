@@ -30,6 +30,7 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, ELEVATION, font, themed_font,
     get_mode, apply_global_style, toggle_mode, on_theme_change,
 )
+from ser_pleno.presentation.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import (
     PageHeader,
     SectionHeader,
@@ -64,25 +65,25 @@ from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
 # `key` é usado para destacar o item ativo e para reconstruir a tela certa
 # depois de um rebuild (ex.: ao alternar o tema).
 MENU_ITEMS = [
-    {"key": "dashboard",     "label": "Dashboard",         "icon": "📊", "frame": DashboardFrame,
+    {"key": "dashboard",     "label": "Dashboard",         "icon": ICONS["chart"], "frame": DashboardFrame,
      "header": ("Dashboard", "Resumo geral do ambiente")},
-    {"key": "estudantes",    "label": "Estudantes",        "icon": "👥", "frame": EstudantesFrame,
+    {"key": "estudantes",    "label": "Estudantes",        "icon": ICONS["users"], "frame": EstudantesFrame,
      "header": ("Estudantes", "Acompanhamento e gestão acadêmica")},
-    {"key": "agenda",        "label": "Agenda",            "icon": "📅", "frame": AgendaFrame,
+    {"key": "agenda",        "label": "Agenda",            "icon": ICONS["calendar"], "frame": AgendaFrame,
      "header": ("Agenda", "Planejamento e compromissos")},
-    {"key": "bem_estar",     "label": "Bem-estar",         "icon": "💙", "frame": BemEstarFrame,
+    {"key": "bem_estar",     "label": "Bem-estar",         "icon": ICONS["heart_blue"], "frame": BemEstarFrame,
      "header": ("Bem-estar", "Monitoramento e apoio emocional")},
-    {"key": "analise",       "label": "Análise",           "icon": "🔍", "frame": AnaliseTriagemFrame,
+    {"key": "analise",       "label": "Análise",           "icon": ICONS["search"], "frame": AnaliseTriagemFrame,
      "header": ("Análise", "Triagem e classificação")},
-    {"key": "relatorios",    "label": "Relatórios",        "icon": "📋", "frame": RelatorioFrame,
+    {"key": "relatorios",    "label": "Relatórios",        "icon": ICONS["empty"], "frame": RelatorioFrame,
      "header": ("Relatórios", "Indicadores e exportações")},
-    {"key": "comunicacao",   "label": "Comunicação",       "icon": "💬", "frame": ComunicacaoInternaFrame,
+    {"key": "comunicacao",   "label": "Comunicação",       "icon": ICONS["chat"], "frame": ComunicacaoInternaFrame,
      "header": ("Comunicação", "Mensagens internas e suporte")},
-    {"key": "orientacoes",   "label": "Orientações",       "icon": "🧭", "frame": OrientacoesFrame,
+    {"key": "orientacoes",   "label": "Orientações",       "icon": ICONS["compass"], "frame": OrientacoesFrame,
      "header": ("Orientações", "Fluxo de apoio e encaminhamentos")},
-    {"key": "avisos",        "label": "Quadro de avisos",  "icon": "📢", "frame": QuadroAvisosFrame,
+    {"key": "avisos",        "label": "Quadro de avisos",  "icon": ICONS["megaphone"], "frame": QuadroAvisosFrame,
      "header": ("Avisos", "Quadro de comunicação institucional")},
-    {"key": "configuracoes", "label": "Configurações",     "icon": "⚙️", "frame": ConfiguracoesFrame,
+    {"key": "configuracoes", "label": "Configurações",     "icon": ICONS["settings"], "frame": ConfiguracoesFrame,
      "header": ("Configurações", "Preferências da aplicação")},
 ]
 _MENU_BY_KEY = {item["key"]: item for item in MENU_ITEMS}
@@ -236,7 +237,7 @@ class App(ctk.CTk):
 
         icon_lbl = ctk.CTkLabel(
             brand_frame,
-            text="👥 ",
+            text=f"{ICONS['group']} ",
             font=font(22, "bold"),
             text_color=THEME["brand_accent"],
         )
@@ -290,7 +291,7 @@ class App(ctk.CTk):
         ).pack(fill="x")
 
         modo_atual = get_mode()
-        rotulo = "🌙  Modo escuro" if modo_atual == "light" else "☀️  Modo claro"
+        rotulo = f"{ICONS['moon']}  Modo escuro" if modo_atual == "light" else f"{ICONS['sun']}  Modo claro"
         self.theme_toggle_btn = ctk.CTkButton(
             footer,
             text=rotulo,

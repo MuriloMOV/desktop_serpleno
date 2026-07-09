@@ -7,6 +7,7 @@ from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.application.services.comunicacao import ServicoComunicacao
 from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +28,14 @@ _CHAT_AVATAR_COLORS = {
 # Iniciais padrão por papel
 _AVATAR_INITIALS = {
     "admin": "AD", "analista": "AN",
-    "coordenador": "CO", "suporte": "SP", "group": "👥",
+    "coordenador": "CO", "suporte": "SP", "group": ICONS["group"],
 }
 
 # Ícones de tipo de arquivo
 _FILE_ICONS = {
-    "Imagens": "📁", "Videos": "🎥", "Audio": "🎵",
-    "Planilhas": "📊", "Presentações": "📊",
-    "Arquivos Zip": "🗜", "Code": "💻",
+    "Imagens": ICONS["folder"], "Videos": ICONS["video"], "Audio": ICONS["audio"],
+    "Planilhas": ICONS["spreadsheet"], "Presentações": ICONS["presentation"],
+    "Arquivos Zip": ICONS["zip"], "Code": ICONS["code"],
 }
 
 
@@ -148,13 +149,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         ).pack(side="left")
 
         # Botão nova conversa
-        ctk.CTkButton(
-            hdr, text="✖",
-            width=34, height=34, corner_radius=10,
+        IconButton(
+            hdr, icon=ICONS["close"], size=34,
             fg_color=THEME["primary_soft"],
             hover_color=THEME["primary_hover"],
             text_color=THEME["primary"],
-            font=font(size=15),
             command=lambda: None,
         ).pack(side="right")
 
@@ -165,10 +164,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         )
         search_wrap.grid(row=1, column=0, sticky="ew", padx=spacing("md"), pady=(0, spacing("item_gap")))
 
-        ctk.CTkLabel(
-            search_wrap, text="🔍",
-            font=font(size=13),
-            text_color=THEME["text_muted"],
+        IconLabel(
+            search_wrap, icon=ICONS["search"], size=20,
+            fg_color="transparent", text_color=THEME["text_muted"],
         ).pack(side="left", padx=(10, 0))
 
         self.entry_busca = ctk.CTkEntry(
@@ -249,7 +247,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # Avatar colorido com inicial
         av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
-        av_init  = nome[:2].upper() if papel != "group" else "👥"
+        av_init  = nome[:2].upper() if papel != "group" else ICONS["group"]
         av = _make_avatar(inner, av_init, av_color, size=44)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="nsew")
 
@@ -337,7 +335,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # Atualiza avatar no header
         av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
-        av_init  = nome[:2].upper() if papel != "group" else "👥"
+        av_init  = nome[:2].upper() if papel != "group" else ICONS["group"]
         for w in self._header_av_slot.winfo_children():
             w.destroy()
         av = _make_avatar(self._header_av_slot, av_init, av_color, size=42)
@@ -416,14 +414,12 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         actions = ctk.CTkFrame(inner, fg_color="transparent")
         actions.pack(side="right")
 
-        for icon in ("📎", "📄", "📤"):
-            ctk.CTkButton(
-                actions, text=icon,
-                width=36, height=36, corner_radius=10,
+        for icon_key in ("attach", "document", "send"):
+            IconButton(
+                actions, icon=ICONS[icon_key], size=36,
                 fg_color="transparent",
                 hover_color=THEME["primary_soft"],
                 text_color=THEME["text_secondary"],
-                font=font(size=16),
             ).pack(side="left", padx=spacing("xs"))
 
     # —— Área de mensagens ———————————————————————————————————————————————————
@@ -463,13 +459,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         box.pack(fill="x", expand=True)
 
         # Botão clipe
-        self.btn_clip = ctk.CTkButton(
-            box, text="🔍",
-            width=36, height=36, corner_radius=10,
+        self.btn_clip = IconButton(
+            box, icon=ICONS["attach"], size=36,
             fg_color="transparent",
             hover_color=THEME["primary_soft"],
             text_color=THEME["text_secondary"],
-            font=font(size=16),
             command=self.toggle_modal_arquivos,
         )
         self.btn_clip.pack(side="left", padx=(8, 0))
@@ -491,23 +485,19 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.entry_mensagem.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
 
         # Emoji
-        ctk.CTkButton(
-            box, text="😀",
-            width=36, height=36, corner_radius=10,
+        IconButton(
+            box, icon=ICONS["emoji"], size=36,
             fg_color="transparent",
             hover_color=THEME["primary_soft"],
             text_color=THEME["text_secondary"],
-            font=font(size=16),
         ).pack(side="left", padx=spacing("xs"))
 
         # Enviar
-        self.btn_enviar = ctk.CTkButton(
-            box, text="📫",
-            width=40, height=40, corner_radius=12,
+        self.btn_enviar = IconButton(
+            box, icon=ICONS["send_plane"], size=40,
             fg_color=THEME["primary"],
             hover_color=THEME["primary_hover"],
             text_color="#FFFFFF",
-            font=font(size=16, weight="bold"),
             command=self.enviar_mensagem,
         )
         self.btn_enviar.pack(side="right", padx=(4, 8))
@@ -532,15 +522,15 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         self.modal_arquivos.grid_remove()
 
         categorias = [
-            ("📄", "Documentos",   [".pdf", ".doc", ".docx", ".txt"]),
-            ("📁", "Imagens",      [".jpg", ".jpeg", ".png", ".gif"]),
-            ("🎥", "Vídeos",       [".mp4", ".avi", ".mov"]),
-            ("🎵", "Áudio",        [".mp3", ".wav", ".ogg"]),
-            ("📊", "Planilhas",    [".xls", ".xlsx", ".csv"]),
-            ("📊", "Apresentações",[".ppt", ".pptx"]),
-            ("🗜", "Compactados",  [".zip", ".rar", ".7z"]),
-            ("💻", "Código",       [".py", ".js", ".html", ".css"]),
-            ("📊", "Todos",        []),
+            (ICONS["file"], "Documentos",   [".pdf", ".doc", ".docx", ".txt"]),
+            (ICONS["folder"], "Imagens",      [".jpg", ".jpeg", ".png", ".gif"]),
+            (ICONS["video"], "Vídeos",       [".mp4", ".avi", ".mov"]),
+            (ICONS["audio"], "Áudio",        [".mp3", ".wav", ".ogg"]),
+            (ICONS["spreadsheet"], "Planilhas",    [".xls", ".xlsx", ".csv"]),
+            (ICONS["presentation"], "Apresentações",[".ppt", ".pptx"]),
+            (ICONS["zip"], "Compactados",  [".zip", ".rar", ".7z"]),
+            (ICONS["code"], "Código",       [".py", ".js", ".html", ".css"]),
+            (ICONS["chart"], "Todos",        []),
         ]
 
         # Título do popover
@@ -715,7 +705,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         if is_mine:
             ctk.CTkLabel(
-                meta, text=" ✖“✖“",
+                meta, text=f" {ICONS['check']}{ICONS['check']}",
                 font=font(size=10),
                 text_color=THEME["primary"] if msg.get("read") else THEME["text_muted"],
             ).pack(side="left")
@@ -725,7 +715,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         tam    = self._formatar_tamanho(
             os.path.getsize(msg["caminho_arquivo"]) if os.path.exists(msg["caminho_arquivo"]) else 0
         )
-        icon   = _FILE_ICONS.get(msg.get("tipo_arquivo", ""), "📄")
+        icon   = _FILE_ICONS.get(msg.get("tipo_arquivo", ""), ICONS["file"])
 
         card = ctk.CTkFrame(
             bubble,
@@ -758,8 +748,8 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         btns.grid(row=0, column=2, rowspan=2, padx=(4, 10))
 
         for icon_btn, cmd in [
-            ("👁", lambda p=msg["caminho_arquivo"]: self.visualizar_arquivo(p)),
-            ("📥", lambda p=msg["caminho_arquivo"], n=nome: self.download_arquivo(p, n)),
+            (ICONS["view"], lambda p=msg["caminho_arquivo"]: self.visualizar_arquivo(p)),
+            (ICONS["download"], lambda p=msg["caminho_arquivo"], n=nome: self.download_arquivo(p, n)),
         ]:
             ctk.CTkButton(
                 btns, text=icon_btn,
