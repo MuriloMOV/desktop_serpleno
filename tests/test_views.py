@@ -1,25 +1,25 @@
-import pytest
+﻿import pytest
 from unittest.mock import MagicMock, patch
 import customtkinter as ctk
 import time
-from views.login import LoginFrame
-from views.dashboard import DashboardFrame
-from views.agenda import AgendaFrame
-from views.estudantes import EstudantesFrame
-from views.orientacoes import OrientacoesFrame
-from views.analise_triagem import AnaliseTriagemFrame
-from views.quadro_avisos import QuadroAvisosFrame
-from views.comunicacao_interna import ComunicacaoInternaFrame
-from views.configuracoes import ConfiguracoesFrame
-from services.dashboard import ServicoDashboard
-from services.agendamentos import ServicoAgendamento
-from services.estudantes import ServicoEstudante
-from services.mural import servico_mural
+from ser_pleno.presentation.views.login import LoginFrame
+from ser_pleno.presentation.views.dashboard import DashboardFrame
+from ser_pleno.presentation.views.agenda import AgendaFrame
+from ser_pleno.presentation.views.estudantes import EstudantesFrame
+from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
+from ser_pleno.presentation.views.analise_triagem import AnaliseTriagemFrame
+from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
+from ser_pleno.presentation.views.comunicacao_interna import ComunicacaoInternaFrame
+from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
+from ser_pleno.application.services.dashboard import ServicoDashboard
+from ser_pleno.application.services.agendamentos import ServicoAgendamento
+from ser_pleno.application.services.estudantes import ServicoEstudante
+from ser_pleno.infrastructure.api.mural import servico_mural
 
 
 class TestViews:
     
-    @patch('views.login.ServicoAutenticacao')
+    @patch('ser_pleno.presentation.views.login.ServicoAutenticacao')
     def test_login_view(self, MockAuth, app, controller):
         # Setup
         view = LoginFrame(app, controller)
@@ -39,7 +39,7 @@ class TestViews:
         # Verify
         service.login.assert_called_with("admin", "password")
 
-    @patch('views.dashboard.ServicoDashboard')
+    @patch('ser_pleno.presentation.views.dashboard.ServicoDashboard')
     def test_dashboard_view(self, MockService, app, controller):
         # Setup
         view = DashboardFrame(app, controller)
@@ -49,7 +49,7 @@ class TestViews:
         assert hasattr(view, 'servico_dashboard')
         assert hasattr(view, 'kpi_frame')
 
-    @patch('views.agenda.ServicoAgendamento')
+    @patch('ser_pleno.presentation.views.agenda.ServicoAgendamento')
     def test_agenda_view(self, MockService, app, controller):
         view = AgendaFrame(app, controller)
         
@@ -58,7 +58,7 @@ class TestViews:
         assert hasattr(view, 'servico_agendamento')
         assert hasattr(view, 'data_selecionada')
 
-    @patch('views.agenda.ServicoAgendamento')
+    @patch('ser_pleno.presentation.views.agenda.ServicoAgendamento')
     def test_agenda_robustness(self, MockService, app, controller):
         view = AgendaFrame(app, controller)
         
@@ -68,7 +68,7 @@ class TestViews:
         assert hasattr(view, 'container_grid')
         assert hasattr(view, 'container_semana')
 
-    @patch('views.estudantes.ServicoEstudante')
+    @patch('ser_pleno.presentation.views.estudantes.ServicoEstudante')
     def test_estudantes_view(self, MockService, app, controller):
         view = EstudantesFrame(app, controller)
         
@@ -76,7 +76,7 @@ class TestViews:
         assert view is not None
         assert hasattr(view, 'servico_estudante')
 
-    @patch('views.orientacoes.servico_orientacoes')
+    @patch('ser_pleno.presentation.views.orientacoes.servico_orientacoes')
     def test_orientacoes_view(self, MockOrientacoes, app, controller):
         view = OrientacoesFrame(app, controller)
         
@@ -101,7 +101,7 @@ class TestViews:
         # We can test that it renders correctly
         assert view is not None
 
-    @patch('views.quadro_avisos.servico_mural')
+    @patch('ser_pleno.presentation.views.quadro_avisos.servico_mural')
     def test_quadro_avisos_view(self, MockMural, app, controller):
         view = QuadroAvisosFrame(app, controller)
         
@@ -126,3 +126,4 @@ class TestViews:
     def test_configuracoes_view(self, app, controller):
         view = ConfiguracoesFrame(app, controller)
         assert view is not None
+

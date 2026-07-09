@@ -2,7 +2,7 @@ import importlib
 
 
 def test_database_config_reads_environment(monkeypatch):
-    from config import db_config
+    from ser_pleno.config import db_config
 
     with monkeypatch.context() as env:
         env.setenv("SERPLENO_DB_HOST", "db.internal")
@@ -25,7 +25,7 @@ def test_database_config_reads_environment(monkeypatch):
 
 
 def test_api_config_reads_environment(monkeypatch):
-    from config import config
+    from ser_pleno.config import config
 
     with monkeypatch.context() as env:
         env.setenv("SERPLENO_API_URL", "https://api.example.test/")

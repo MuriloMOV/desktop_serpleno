@@ -1,13 +1,13 @@
-import pytest
+﻿import pytest
 from unittest.mock import MagicMock, patch
-from services.autenticacao import ServicoAutenticacao
-from services.dashboard import ServicoDashboard
-from services.estudantes import ServicoEstudante
-from services.agendamentos import ServicoAgendamento
+from ser_pleno.application.services.autenticacao import ServicoAutenticacao
+from ser_pleno.application.services.dashboard import ServicoDashboard
+from ser_pleno.application.services.estudantes import ServicoEstudante
+from ser_pleno.application.services.agendamentos import ServicoAgendamento
 
 class TestServices:
     
-    @patch('services.autenticacao.requests')
+    @patch('ser_pleno.infrastructure.api.api.requests')
     def test_auth_service(self, mock_requests):
         service = ServicoAutenticacao()
         
@@ -21,14 +21,14 @@ class TestServices:
         assert resp["success"] is True
         mock_requests.Session.return_value.post.assert_called()
 
-    @patch('services.estudantes.api')
+    @patch('ser_pleno.infrastructure.api.api.api')
     def test_student_service(self, mock_api):
         service = ServicoEstudante()
         
         # Test that service was created
         assert service is not None
 
-    @patch('services.dashboard.api')
+    @patch('ser_pleno.infrastructure.api.api.api')
     def test_dashboard_service(self, mock_api):
         service = ServicoDashboard()
         
@@ -50,3 +50,4 @@ class TestServices:
         service = ServicoAutenticacao()
         assert service is not None
         assert hasattr(service, 'login')
+

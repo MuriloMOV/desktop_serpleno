@@ -5,8 +5,13 @@ from tkinter import TclError
 import sys
 import os
 
-# Add project root to path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add project root and src to path for imports
+_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+_src = os.path.join(_root, 'src')
+if _src not in sys.path:
+    sys.path.insert(0, _src)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 @pytest.fixture(scope="session")
 def app():

@@ -1,16 +1,18 @@
-import os
+﻿import os
 import sys
 from unittest.mock import MagicMock, patch
 
 import customtkinter as ctk
 
-sys.path.insert(
-    0,
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ser_pleno")),
-)
+# Add project root and src to path for imports
+_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_src = os.path.join(_root, "src")
+for _p in [_src, _root]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
-from app import App
-from views.agenda import AgendaFrame
+from ser_pleno.app import App
+from ser_pleno.presentation.views.agenda import AgendaFrame
 
 
 @patch.object(App, "mostrar_login")
@@ -57,3 +59,4 @@ def test_navigation_flow():
 
     app.atualizar_menu.assert_called_once_with("agenda")
     app.trocar_frame.assert_called_once_with(AgendaFrame)
+

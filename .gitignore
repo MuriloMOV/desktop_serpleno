@@ -44,3 +44,5 @@ debug.log
 
 # Docker (se aplicável)
 docker-compose.override.yml
+
+src/ser_pleno/__pycache__/
