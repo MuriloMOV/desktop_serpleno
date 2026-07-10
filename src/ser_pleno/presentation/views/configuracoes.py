@@ -9,6 +9,7 @@ from typing import Any
 
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.application.controllers.configuracoes import ConfiguracoesController
 from ser_pleno.presentation.components.ui_components import (
     PageHeader,
     Card,
@@ -354,6 +355,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
+        self.controller_configuracoes = ConfiguracoesController()
         self.base_path  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self._images: dict[str, Any] = {}
 
@@ -620,9 +622,11 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         AlterarSenhaModal(self, on_save=self._salvar_senha)
 
     def _salvar_senha(self, senha_atual: str, nova_senha: str):
-        # integração com backend pendente
-        logger.info("Alteração de senha solicitada")
-        messagebox.showinfo("Sucesso", "Senha alterada com sucesso.")
+        res = self.controller_configuracoes.alterar_senha(senha_atual, nova_senha)
+        if res.get("success"):
+            messagebox.showinfo("Sucesso", res.get("message", "Senha alterada com sucesso."))
+        else:
+            messagebox.showerror("Erro", res.get("message", "Falha ao alterar senha."))
 
     def _encerrar_sessao(self):
         if messagebox.askyesno("Confirmação", "Deseja encerrar a sessão atual?"):

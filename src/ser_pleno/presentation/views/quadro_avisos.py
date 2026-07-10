@@ -616,8 +616,8 @@ class PublicacaoModal(BaseModal):
 
             acts = ctk.CTkFrame(body, fg_color="transparent")
             acts.pack(fill="x")
-            for txt_btn, cmd in [("â†‘", lambda f=card: self._move_block(f, -1)),
-                                  ("â†“", lambda f=card: self._move_block(f,  1))]:
+            for txt_btn, cmd in [("↑", lambda f=card: self._move_block(f, -1)),
+                                  ("↓", lambda f=card: self._move_block(f,  1))]:
                 ctk.CTkButton(acts, text=txt_btn, width=30, height=28,
                               corner_radius=7, fg_color=Q["accent_soft"],
                               hover_color=Q["accent"], text_color=Q["accent"],

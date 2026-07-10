@@ -2,7 +2,7 @@ import logging
 import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
-from ser_pleno.application.services.relatorios import ServicoRelatorio
+from ser_pleno.application.controllers.relatorio import RelatorioController
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
 from ser_pleno.ui.theme_extensions import spacing
@@ -125,7 +125,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color="#A5B4FC",
         )
         self.controller        = controller
-        self.servico_relatorio = ServicoRelatorio()
+        self.controller_relatorio = RelatorioController()
         self._kpi_cards: dict[str, _KPICard] = {}
         self._summary_vals: dict[str, ctk.CTkLabel] = {}
         self._chart_data   = []
@@ -141,8 +141,8 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     def _carregar_dados(self):
         def fetch():
-            stats   = self.servico_relatorio.obter_estatisticas()
-            reports = self.servico_relatorio.listar_relatorios()
+            stats   = self.controller_relatorio.obter_estatisticas()
+            reports = self.controller_relatorio.listar_relatorios()
             return stats, reports
 
         AsyncRunner.run(
@@ -439,7 +439,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             (f"{ICONS['chart']}  Estudantes",    "CSV",  self.servico_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
             (f"{ICONS['calendar']}  Agenda",        "CSV",  self.servico_relatorio.exportar_agendamentos,   THEME["kpi_green"],  THEME["kpi_green_soft"]),
             (f"{ICONS['search']}  Triagens",      "CSV",  self.servico_relatorio.exportar_triagens,       THEME["kpi_amber"],  THEME["kpi_amber_soft"]),
-            (f"{ICONS['chart']}  Relatório PDF", "PDF",  lambda: None,                                   THEME["kpi_violet"], THEME["kpi_violet_soft"]),
+            (f"{ICONS['chart']}  Relatório PDF", "PDF",  self._exportar_pdf,                            THEME["kpi_violet"], THEME["kpi_violet_soft"]),
         ]
 
         for label, fmt, cmd, accent, soft in exports:
@@ -617,10 +617,11 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         actions = ctk.CTkFrame(row, fg_color="transparent")
         actions.grid(row=0, column=3, sticky="e", padx=SPACING["icon_gap"], pady=SPACING["icon_gap"])
 
+        report_id = report.get("id")
         for icon, tip, cmd in [
-            (ICONS["view"], "Visualizar", lambda: None),
-            (ICONS["export"], "Baixar",     lambda: None),
-            (ICONS["delete"], "Excluir",    lambda: None),
+            (ICONS["view"], "Visualizar", lambda r=report: self._visualizar_relatorio(r)),
+            (ICONS["export"], "Baixar",     lambda r=report: self._baixar_relatorio(r)),
+            (ICONS["delete"], "Excluir",    lambda r=report: self._excluir_relatorio(r)),
         ]:
             GhostButton(
                 actions, text=icon,
@@ -642,6 +643,72 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
 
     def criar_secao_inferior(self):
         self._criar_grid_central()
+
+    def _exportar_pdf(self):
+        try:
+            from tkinter import filedialog
+            res = self.servico_relatorio.gerar_relatorio({
+                "name": "Relatório Geral PDF",
+                "report_type": "geral",
+                "format": "pdf",
+                "generated_by_id": 1,
+            })
+            if res.get("success"):
+                messagebox.showinfo("Sucesso", "Relatório PDF gerado com sucesso.")
+                self._carregar_dados()
+            else:
+                messagebox.showerror("Erro", "Falha ao gerar relatório PDF.")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao gerar PDF.\n{e}")
+
+    def _visualizar_relatorio(self, report):
+        path = report.get("file_path")
+        if not path:
+            messagebox.showinfo("Informação", "Este relatório ainda não possui arquivo associado.")
+            return
+        try:
+            import os, webbrowser
+            if os.path.exists(path):
+                webbrowser.open(path)
+            else:
+                messagebox.showerror("Erro", f"Arquivo não encontrado:\n{path}")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao abrir relatório.\n{e}")
+
+    def _baixar_relatorio(self, report):
+        path = report.get("file_path")
+        if not path:
+            messagebox.showinfo("Informação", "Este relatório ainda não possui arquivo associado.")
+            return
+        try:
+            from tkinter import filedialog
+            import os, shutil
+            nome = os.path.basename(path)
+            destino = filedialog.asksaveasfilename(initialfile=nome, defaultextension=os.path.splitext(nome)[1])
+            if destino:
+                if os.path.exists(path):
+                    shutil.copy2(path, destino)
+                    messagebox.showinfo("Sucesso", f"Relatório salvo em:\n{destino}")
+                else:
+                    messagebox.showerror("Erro", "Arquivo de origem não encontrado.")
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao baixar relatório.\n{e}")
+
+    def _excluir_relatorio(self, report):
+        rid = report.get("id")
+        if not rid:
+            return
+        if not messagebox.askyesno("Confirmar", "Excluir este relatório?"):
+            return
+        try:
+            res = self.servico_relatorio.deletar_relatorio(rid)
+            if res.get("success"):
+                messagebox.showinfo("Sucesso", "Relatório excluído.")
+                self._carregar_dados()
+            else:
+                messagebox.showerror("Erro", res.get("message", "Falha ao excluir."))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao excluir relatório.\n{e}")
 
     def item_resumo(self, parent, texto, valor, cor_valor=None):
         row = ctk.CTkFrame(parent, fg_color="transparent")

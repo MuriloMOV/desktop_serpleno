@@ -13,3 +13,4 @@ MURAL_API_URL = os.getenv(
     "SERPLENO_MURAL_API_URL",
     f"{API_ROOT_URL}/api/mural",
 ).rstrip("/")
+DESKTOP_API_TOKEN = os.getenv("SERPLENO_DESKTOP_API_TOKEN", "")

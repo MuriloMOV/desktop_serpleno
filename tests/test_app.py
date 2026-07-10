@@ -39,7 +39,7 @@ def test_app_initialization(
     mock_ctk_init.assert_called_once_with()
     mock_title.assert_called_once_with("SerPleno")
     mock_geometry.assert_called_once_with("1280x720")
-    mock_minsize.assert_called_once_with(800, 480)
+    mock_minsize.assert_called_once_with(1000, 600)
     container.pack.assert_called_once_with(fill="both", expand=True)
     mock_mostrar_login.assert_called_once_with()
     assert app.usuario_logado is None

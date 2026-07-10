@@ -6,10 +6,13 @@ from ser_pleno.ui.theme import (
 )
 from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.presentation.components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal
+    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState
 )
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.application.controllers.analise_triagem import AnaliseTriagemController
+from ser_pleno.utils.async_runner import AsyncRunner
+from tkinter import messagebox
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Design tokens —“ mapeamentos semânticos específicos da triagem
@@ -98,23 +101,14 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
                          scrollbar_button_color=THEME["primary_medium"],
                          scrollbar_button_hover_color=THEME["primary"])
         self.controller = controller
-        self.data_master = [
-            {"student": "Bruno Henrique", "date": "23/01/2026",
-             "priority": "Alta",    "status": "Pendente"},
-            {"student": "Diego Martins",  "date": "22/01/2026",
-             "priority": "Média",   "status": "Pendente"},
-            {"student": "Carla Diaz",     "date": "20/01/2026",
-             "priority": "Baixa",   "status": "Concluída"},
-            {"student": "Ana Beatriz",    "date": "19/01/2026",
-             "priority": "Urgente", "status": "Pendente"},
-            {"student": "Ana Laura",      "date": "24/01/2026",
-             "priority": "Baixa",   "status": "Cancelada"},
-        ]
+        self.controller_triagem = AnaliseTriagemController()
+        self.data_master = []
 
         self._criar_toolbar_acoes()
         self._criar_kpis()
         self._criar_filtros()
         self._criar_tabela()
+        self._carregar_triagens()
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  CABEÇALHO
@@ -151,12 +145,15 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
 
             ("Alta Prioridade",   str(alta_p),     f"{ICONS['bolt']} ", THEME["kpi_red"],   THEME["kpi_red_soft"],   "Urgente ou Alta"),
         ]
+        self._kpi_widgets = []
         for i, (title, val, icon, accent, soft, sub) in enumerate(kpis):
             row.grid_columnconfigure(i, weight=1)
-            KPICard(
+            card = KPICard(
                 row, title=title, value=val, icon=icon,
                 accent=accent, unit="", size=TRI_TOKENS.get("kpi_size", "md"),
-            ).grid(row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
+            )
+            card.grid(row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
+            self._kpi_widgets.append(card._value_label if hasattr(card, "_value_label") else None)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  FILTROS
@@ -336,7 +333,8 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         acts = ctk.CTkFrame(row, fg_color="transparent")
         acts.grid(row=0, column=4, sticky="e", padx=(0, SPACING["icon_gap"]), pady=SPACING["icon_gap"])
         for icon, cmd, tip in [(ICONS["view"], lambda s=item: self._ver_detalhe(s), "Ver detalhe"),
-                                (ICONS["cross"], lambda s=item: self._editar(s), "Editar")]:
+                                (ICONS["edit"], lambda s=item: self._editar(s), "Editar"),
+                                (ICONS["delete"], lambda s=item: self._excluir_triagem(s), "Excluir")]:
             GhostButton(
                 acts, icon=icon, tooltip=tip, width=30, height=30,
                 corner_radius=RADIUS["xs"],
@@ -372,7 +370,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         self._modal_detalhe(item)
 
     def _editar(self, item: dict):
-        print(f"Editar: {item['student']}")
+        self._modal_editar_triagem(item)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  MODAL: Nova Triagem
@@ -505,6 +503,173 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     #  MODAL: Detalhe
     # ••••••••••••••••••••••••••••••••••••••••••
+    def _modal_editar_triagem(self, item: dict):
+        triagem_id = item.get("id")
+        modal = BaseModal(self, title="Editar Triagem", width=520, height=580)
+        modal.configure(fg_color=THEME["surface_elevated"])
+
+        banner = ctk.CTkFrame(modal, fg_color=THEME["primary_soft"],
+                              corner_radius=RADIUS["none"], height=68)
+        banner.pack(fill="x"); banner.pack_propagate(False)
+        bi = ctk.CTkFrame(banner, fg_color="transparent")
+        bi.pack(fill="both", expand=True, padx=SPACING["card_pad"])
+
+        ib = ctk.CTkFrame(bi, width=40, height=40,
+                          corner_radius=RADIUS["button"], fg_color=THEME["primary"])
+        ib.pack(side="left", padx=(0, SPACING["icon_gap"])); ib.pack_propagate(False)
+        IconLabel(
+            ib, icon=ICONS["chart"], size=22,
+            fg_color="transparent", text_color="white",
+        ).place(relx=0.5, rely=0.5, anchor="center")
+
+        ts = ctk.CTkFrame(bi, fg_color="transparent")
+        ts.pack(side="left")
+        ctk.CTkLabel(ts, text="Editar Triagem",
+                     font=themed_font("h3", "bold"),
+                     text_color=THEME["primary"]).pack(anchor="w")
+        ctk.CTkLabel(ts, text="Atualize os dados da triagem",
+                     font=themed_font("body_sm"),
+                     text_color=THEME["text_secondary"]).pack(anchor="w")
+
+        body = ctk.CTkFrame(modal, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["section_gap"])
+
+        def field(parent, label, placeholder, icon=""):
+            wrap = ctk.CTkFrame(parent, fg_color="transparent")
+            wrap.pack(fill="x", pady=(0, SPACING["item_gap"]))
+            ctk.CTkLabel(wrap, text=label,
+                         font=themed_font("body"),
+                         text_color=THEME["text_secondary"], anchor="w").pack(fill="x", pady=(0, SPACING["label_gap"]))
+            box = ctk.CTkFrame(wrap, fg_color=THEME["input_bg"],
+                               corner_radius=RADIUS["input"], border_width=1,
+                               border_color=THEME["input_border"])
+            box.pack(fill="x")
+            if icon:
+                ctk.CTkLabel(box, text=icon,
+                             font=themed_font("body"),
+                             text_color=THEME["text_muted"],
+                             width=32).pack(side="left", padx=(SPACING["icon_gap"], 0))
+            en = ctk.CTkEntry(box, placeholder_text=placeholder,
+                              fg_color=THEME["input_bg"], border_width=0,
+                              text_color=THEME["text"],
+                              placeholder_text_color=THEME["text_muted"],
+                              font=themed_font("body"), height=40)
+            en.pack(side="left", fill="x", expand=True, padx=(SPACING["label_gap"], SPACING["icon_gap"]))
+            en.bind("<FocusIn>",  lambda e: box.configure(border_color=THEME["input_border_focus"]))
+            en.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
+            return en
+
+        en_nome  = field(body, "Nome do Estudante", "Ex: Ana Silva", ICONS["view"])
+        en_nome.insert(0, item.get("student", ""))
+        en_data  = field(body, "Data da Triagem", "dd/mm/aaaa", ICONS["calendar"])
+        en_data.insert(0, item.get("date", ""))
+
+        opt_style = dict(
+            fg_color=THEME["primary_soft"], button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"], text_color=THEME["primary"],
+            dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+            height=40, corner_radius=RADIUS["input"], font=themed_font("body"),
+        )
+
+        row2 = ctk.CTkFrame(body, fg_color="transparent")
+        row2.pack(fill="x", pady=(0, SPACING["item_gap"]))
+        row2.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(row2, text="Prioridade",
+                     font=themed_font("body"),
+                     text_color=THEME["text_secondary"]).grid(row=0, column=0, sticky="w", padx=(0, SPACING["icon_gap"] // 2))
+        ctk.CTkLabel(row2, text="Status",
+                     font=themed_font("body"),
+                     text_color=THEME["text_secondary"]).grid(row=0, column=1, sticky="w", padx=(SPACING["icon_gap"] // 2, 0))
+
+        om_prioridade = ctk.CTkOptionMenu(
+            row2, values=["Baixa", "Média", "Alta", "Urgente"], **opt_style)
+        om_prioridade.set(item.get("priority", "Média"))
+        om_prioridade.grid(row=1, column=0, sticky="ew", padx=(0, SPACING["icon_gap"] // 2))
+
+        om_status = ctk.CTkOptionMenu(
+            row2, values=["Pendente", "Em Andamento", "Concluída", "Cancelada"],
+            **opt_style)
+        om_status.set(item.get("status", "Pendente"))
+        om_status.grid(row=1, column=1, sticky="ew", padx=(SPACING["icon_gap"] // 2, 0))
+
+        en_obs = ctk.CTkTextbox(body, height=80, corner_radius=RADIUS["input"],
+                                border_width=1, border_color=THEME["input_border"],
+                                fg_color=THEME["input_bg"], text_color=THEME["text"],
+                                font=themed_font("body"))
+        en_obs.pack(fill="x")
+
+        # Rodapé
+        Divider(modal).pack(fill="x")
+        footer = ctk.CTkFrame(modal, fg_color="transparent", height=62)
+        footer.pack(fill="x", padx=SPACING["card_pad"]); footer.pack_propagate(False)
+
+        GhostButton(
+            footer, text="Cancelar", command=modal.destroy,
+            height=38, width=110, corner_radius=RADIUS["button"],
+            text_color=THEME["text_secondary"],
+        ).pack(side="left", pady=SPACING["item_gap"])
+
+        def salvar():
+            nome = en_nome.get().strip()
+            data = en_data.get().strip()
+            if not nome:
+                return
+            dados = {
+                "student_name": nome,
+                "scheduled_date": data or "—",
+                "priority": om_prioridade.get(),
+                "status": om_status.get(),
+            }
+            def _task():
+                return self.controller_triagem.atualizar_triagem(triagem_id, dados)
+            def _on_ok(_):
+                modal.destroy()
+                self._carregar_triagens()
+            def _on_err(e):
+                messagebox.showerror("Erro", f"Falha ao atualizar triagem.\n{e}")
+            AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
+
+        PrimaryButton(
+            footer, text=f"{ICONS['save']}  Salvar", command=salvar,
+            height=38, width=140, corner_radius=RADIUS["button"],
+        ).pack(side="right", pady=SPACING["item_gap"])
+
+    def _carregar_triagens(self):
+        """Carrega a lista de triagens via controller."""
+        def fetch():
+            return self.controller_triagem.listar_triagens()
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            triagens = []
+            if result.get("success"):
+                data = result.get("data", [])
+                if isinstance(data, list):
+                    triagens = [
+                        {
+                            "id": t.get("id"),
+                            "student": t.get("student_name", "Estudante"),
+                            "date": t.get("scheduled_date", "—"),
+                            "priority": t.get("priority", "Média"),
+                            "status": t.get("status", "Pendente"),
+                        }
+                        for t in data
+                    ]
+            self.data_master = triagens
+            self.renderizar_tabela(triagens)
+
+        def on_error(exc):
+            messagebox.showerror("Erro", f"Falha ao carregar triagens.\n{exc}")
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
     def _modal_detalhe(self, item: dict):
         modal = BaseModal(self, title="Detalhe da Triagem", width=420, height=340)
         modal.configure(fg_color=THEME["surface_elevated"])

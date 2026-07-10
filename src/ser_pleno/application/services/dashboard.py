@@ -1,4 +1,5 @@
 from ser_pleno.repositories.dashboard import DashboardRepository
+from ser_pleno.repositories.comunicacao import ComunicacaoRepository
 
 try:
     from ser_pleno.infrastructure.api.api import api
@@ -11,6 +12,7 @@ from ser_pleno.config.operation_mode import get_operation_config
 class ServicoDashboard:
     def __init__(self):
         self.repo = DashboardRepository()
+        self.repo_comunicacao = ComunicacaoRepository()
 
     def obter_notificacoes_ajuda(self):
         """Obtém notificações de ajuda do serpleno_web."""
@@ -60,60 +62,18 @@ class ServicoDashboard:
 
     def obter_notificacoes_alertas(self):
         """Obtém notificações de alertas do sistema."""
-        from ser_pleno.config.db_config import get_db_connection
-
-        connection = get_db_connection()
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT id, alert_type, message, created_at, is_read FROM desktop_alert WHERE is_read = 0 ORDER BY created_at DESC"
-        )
-        alertas = cursor.fetchall()
-        connection.close()
-
-        return [
-            {
-                "id": alerta["id"],
-                "titulo": self.formatar_tipo_alerta(alerta["alert_type"]) or "Alerta",
-                "descricao": alerta["message"] or "Mensagem de alerta",
-                "data": alerta["created_at"].strftime("%Y-%m-%d")
-                if hasattr(alerta["created_at"], "strftime")
-                else str(alerta["created_at"]),
-                "lida": alerta["is_read"],
-            }
-            for alerta in alertas
-        ]
-
-    def formatar_tipo_alerta(self, alert_type):
-        """Formata o tipo de alerta para exibição."""
-        tipos = {
-            "screening_pending": "Triagem Pendente",
-            "appointment_reminder": "Lembrete de Consulta",
-            "followup_required": "Acompanhamento Necessário",
-            "high_risk": "Alto Risco",
-            "missed_appointment": "Falta em Consulta",
-            "system": "Alerta do Sistema",
-        }
-        return tipos.get(alert_type, alert_type.replace("_", " ").title())
+        return self.repo.obter_notificacoes_alertas()
 
     def marcar_notificacao_como_lida(self, notificacao_id, tipo="alerta"):
         """Marca uma notificação como lida."""
-        config = get_operation_config()
         if tipo == "alerta":
-            from ser_pleno.config.db_config import get_db_connection
-
-            connection = get_db_connection()
-            cursor = connection.cursor()
-            cursor.execute(
-                "UPDATE desktop_alert SET is_read = 1 WHERE id = %s", (notificacao_id,)
-            )
-            connection.commit()
-            connection.close()
+            self.repo.marcar_notificacao_como_lida(notificacao_id)
         elif tipo == "ajuda":
+            config = get_operation_config()
             if not config.should_use_api():
                 return
             try:
                 from ser_pleno.infrastructure.api.api import api
-
                 api.put(f"help/notifications/{notificacao_id}/read/")
             except Exception as e:
                 print(f"Erro ao marcar notificação de ajuda como lida: {e}")
@@ -121,4 +81,3 @@ class ServicoDashboard:
     def obter_kpis(self):
         """Obtém estatísticas consolidadas do dashboard via repositório."""
         return self.repo.obter_kpis()
-

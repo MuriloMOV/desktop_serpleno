@@ -138,6 +138,8 @@ LIGHT_THEME = {
     "input_border":      "#D5D7E4",
     "input_border_focus": "#4F46E5",
     "input_placeholder":  "#9C9FB4",
+    "input_error":       "#DC2626",
+    "input_error_soft":  "#FEE7E7",
 
     # Música
     "card_music":       "#4F46E5",
@@ -297,6 +299,8 @@ DARK_THEME = {
     "input_border":      "#3C426B",
     "input_border_focus": "#818CF8",
     "input_placeholder":  "#666B92",
+    "input_error":       "#F87171",
+    "input_error_soft":  "#3E1518",
 
     # Música
     "card_music":       "#6366F1",

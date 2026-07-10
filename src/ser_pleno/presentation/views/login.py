@@ -10,7 +10,7 @@ import customtkinter as ctk
 from tkinter import PhotoImage
 from PIL import Image, ImageTk, ImageDraw, ImageFilter
 
-from ser_pleno.application.services.autenticacao import ServicoAutenticacao
+from ser_pleno.application.controllers.autenticacao import AutenticacaoController
 from ser_pleno.application.services.agendamentos import set_auth_service as set_auth_service_agendamentos
 from ser_pleno.infrastructure.api.api import set_auth_service as set_auth_service_api
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
@@ -219,7 +219,7 @@ class LoginFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=self.palette["grad_top_left"])
 
         self.controller = controller
-        self.servico_autenticacao = ServicoAutenticacao()
+        self.controller_autenticacao = AutenticacaoController()
         self.bolhas: list[dict] = []
         self._is_loading = False
         self._music_playing = False
@@ -692,7 +692,7 @@ class LoginFrame(ctk.CTkFrame):
 
         def run_login():
             try:
-                result = self.servico_autenticacao.login(username, password)
+                result = self.controller_autenticacao.login(username, password)
                 success = result.get("success", False)
                 user = result.get("user", {})
                 if success:
@@ -733,8 +733,8 @@ class LoginFrame(ctk.CTkFrame):
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text="")
-        set_auth_service_agendamentos(self.servico_autenticacao)
-        set_auth_service_api(self.servico_autenticacao)
+        set_auth_service_agendamentos(self.controller_autenticacao.auth_service)
+        set_auth_service_api(self.controller_autenticacao.auth_service)
         self.controller.iniciar_sistema(user)
 
     def _on_login_failure(self, msg):

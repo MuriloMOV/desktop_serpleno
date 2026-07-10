@@ -115,3 +115,40 @@ class DashboardRepository:
         total_agend = agendados.get("total") if agendados else 0
         return max(0, total_disp - total_agend)
 
+    def obter_notificacoes_alertas(self):
+        """Obtém notificações de alertas do sistema."""
+        query = """
+            SELECT id, alert_type, message, created_at, is_read 
+            FROM desktop_alert 
+            WHERE is_read = 0 
+            ORDER BY created_at DESC
+        """
+        rows = fetch_all(query)
+        return [
+            {
+                "id": alerta["id"],
+                "titulo": self._formatar_tipo_alerta(alerta["alert_type"]) or "Alerta",
+                "descricao": alerta["message"] or "Mensagem de alerta",
+                "data": alerta["created_at"].strftime("%Y-%m-%d") if hasattr(alerta["created_at"], "strftime") else str(alerta["created_at"]),
+                "lida": alerta["is_read"],
+            }
+            for alerta in rows
+        ]
+
+    def marcar_notificacao_como_lida(self, notificacao_id):
+        """Marca uma notificação como lida."""
+        query = "UPDATE desktop_alert SET is_read = 1 WHERE id = %s"
+        return execute_non_query(query, (notificacao_id,))
+
+    def _formatar_tipo_alerta(self, alert_type):
+        """Formata o tipo de alerta para exibição."""
+        tipos = {
+            "screening_pending": "Triagem Pendente",
+            "appointment_reminder": "Lembrete de Consulta",
+            "followup_required": "Acompanhamento Necessário",
+            "high_risk": "Alto Risco",
+            "missed_appointment": "Falta em Consulta",
+            "system": "Alerta do Sistema",
+        }
+        return tipos.get(alert_type, alert_type.replace("_", " ").title() if alert_type else "Alerta")
+

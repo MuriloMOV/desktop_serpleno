@@ -61,6 +61,21 @@ from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
 from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
 
 
+def _global_exception_handler(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+    logger = logging.getLogger("apps.desktop")
+    logger.error("Excecao nao tratada", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = _global_exception_handler
+
+try:
+    ctk.CTk.report_callback_exception = lambda *args: None
+except Exception:
+    pass
+
+
 # Navegação orientada por dados: cada entrada descreve uma tela.
 # `key` é usado para destacar o item ativo e para reconstruir a tela certa
 # depois de um rebuild (ex.: ao alternar o tema).

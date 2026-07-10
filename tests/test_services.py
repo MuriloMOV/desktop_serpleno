@@ -7,7 +7,7 @@ from ser_pleno.application.services.agendamentos import ServicoAgendamento
 
 class TestServices:
     
-    @patch('ser_pleno.infrastructure.api.api.requests')
+    @patch('ser_pleno.application.services.autenticacao.requests')
     def test_auth_service(self, mock_requests):
         service = ServicoAutenticacao()
         

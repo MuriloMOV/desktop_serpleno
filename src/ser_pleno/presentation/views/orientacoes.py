@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from ser_pleno.utils.async_runner import AsyncRunner
-from ser_pleno.application.services.orientacoes import servico_orientacoes
+from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
@@ -342,9 +342,10 @@ class OrientacoesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=O["page_bg"])
         self.controller          = controller
-        self.servico_orientacoes = servico_orientacoes
+        self.controller_orientacoes = OrientacoesController()
         self._selected_student: dict | None = None
         self._selected_card: StudentCard | None = None
+        self._orientacao_editando_id: int | None = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -557,8 +558,12 @@ class OrientacoesFrame(ctk.CTkFrame):
         footer = ctk.CTkFrame(card, fg_color="transparent", height=58)
         footer.pack(fill="x", padx=spacing("xl")); footer.pack_propagate(False)
 
+        def _cancelar():
+            self._orientacao_editando_id = None
+            self._mudar_tab("historico")
+
         ctk.CTkButton(footer, text="Cancelar",
-                      command=lambda: self._mudar_tab("historico"),
+                      command=_cancelar,
                       height=36, width=110, corner_radius=10,
                       fg_color=O["divider"], hover_color=THEME["border"],
                       text_color=THEME["text_muted"],
@@ -577,7 +582,7 @@ class OrientacoesFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     def _carregar_dados(self):
         def fetch():
-            return self.servico_orientacoes.listar_orientacoes()
+            return self.controller_orientacoes.listar_orientacoes()
 
         def on_success(resultado):
             self._renderizar(resultado)
@@ -723,10 +728,16 @@ class OrientacoesFrame(ctk.CTkFrame):
             "student_id":   (self._selected_student.get("id")
                              if self._selected_student else None),
         }
+
         def save():
-            return self.servico_orientacoes.criar_orientacao(dados)
+            if self._orientacao_editando_id is not None:
+                return self.controller_orientacoes.atualizar_orientacao(
+                    self._orientacao_editando_id, dados
+                )
+            return self.controller_orientacoes.criar_orientacao(dados)
 
         def on_ok(_):
+            self._orientacao_editando_id = None
             self._mudar_tab("historico")
             self._carregar_dados()
 
@@ -741,6 +752,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
     def _editar_orientacao(self, o: dict):
         # Popula o form com os dados da orientação e abre a tab
+        self._orientacao_editando_id = o.get("id")
         self.f_titulo.delete(0, "end")
         self.f_titulo.insert(0, o.get("title", ""))
         self.f_conteudo.delete("1.0", "end")
@@ -761,7 +773,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         if not messagebox.askyesno("Confirmar", "Excluir esta orientação?"):
             return
 
-        def delete(): return self.servico_orientacoes.excluir_orientacao(oid)
+        def delete(): return self.controller_orientacoes.deletar_orientacao(oid)
         def on_ok(_): self._carregar_dados()
         def on_err(e): messagebox.showerror("Erro", str(e))
 

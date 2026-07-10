@@ -11,7 +11,7 @@ from ser_pleno.presentation.components.ui_components import (
     GhostButton, EmptyState, Divider, KPICard
 )
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
-from ser_pleno.application.services.bem_estar import ServicoBemEstar
+from ser_pleno.application.controllers.bem_estar import BemEstarController
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.utils.mood import mood_emoji_from_score
 
@@ -111,7 +111,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.controller        = controller
-        self.servico_bem_estar = ServicoBemEstar()
+        self.controller_bem_estar = BemEstarController()
         self.colunas_risco: dict = {}
         self._chart_data: list  = []
 
@@ -129,9 +129,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._set_status_carregando()
 
         def fetch():
-            dash     = self.servico_bem_estar.obter_dashboard()
-            checkins = self.servico_bem_estar.listar_checkins()
-            risks    = self.servico_bem_estar.listar_estudantes_risco()
+            dash     = self.controller_bem_estar.obter_dashboard()
+            checkins = self.controller_bem_estar.listar_checkins()
+            risks    = self.controller_bem_estar.listar_estudantes_risco()
             return dash, checkins, risks
 
         def on_success(result):

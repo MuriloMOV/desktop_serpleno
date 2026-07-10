@@ -1,8 +1,8 @@
 import customtkinter as ctk
 from datetime import datetime, timedelta
 from tkinter import messagebox
-from ser_pleno.application.services.agendamentos import ServicoAgendamento
-from ser_pleno.config.db_config import get_db_connection
+from ser_pleno.application.controllers.agenda import AgendaController
+from ser_pleno.repositories.agendamentos import AgendamentoRepository
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color, darken, lighten
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
@@ -269,11 +269,11 @@ class AppointmentModal(BaseModal):
 
 class GradeManagementModal(BaseModal):
     """Modal de gestão de grade de horários."""
-    def __init__(self, parent, horarios_base: list[str], servico: ServicoAgendamento,
+    def __init__(self, parent, horarios_base: list[str], controller_agenda: AgendaController,
                  on_refresh):
         self._parent_window = parent.winfo_toplevel()
         self.horarios_base = horarios_base
-        self.servico = servico
+        self.controller_agenda = controller_agenda
         self.on_refresh = on_refresh
         super().__init__(parent, title="Gestão de Grade", width=420, height=580)
         self._build()
@@ -339,7 +339,7 @@ class GradeManagementModal(BaseModal):
             messagebox.showerror("Erro", "Formato de horário inválido. Use HH:MM.")
             return
         try:
-            res = self.servico.adicionar_horario_disponibilidade(horario)
+            res = self.controller_agenda.adicionar_horario_disponibilidade(horario)
             if res.get("success"):
                 self.entry_novo.delete(0, "end")
                 self._render_lista()
@@ -351,7 +351,7 @@ class GradeManagementModal(BaseModal):
     def _remover(self, horario):
         if messagebox.askyesno("Confirmar", f"Deseja realmente remover o horário {horario}?"):
             try:
-                res = self.servico.remover_horario_disponibilidade(horario)
+                res = self.controller_agenda.remover_horario_disponibilidade(horario)
                 if res.get("success"):
                     self._render_lista()
                 else:
@@ -368,7 +368,8 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_agendamento = ServicoAgendamento()
+        self.controller_agenda = AgendaController()
+        self.repo_agendamento = AgendamentoRepository()
 
         self.data_selecionada = datetime.now()
         self.horarios_base: list[str] = []
@@ -425,12 +426,12 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
     def load_grid_data(self):
         data_str = self.data_selecionada.strftime("%Y-%m-%d")
-        agendamentos_dia = self.servico_agendamento.listar_agendamentos(data=data_str)
+        agendamentos_dia = self.controller_agenda.listar_agendamentos(data=data_str)
         mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
         self._renderizar_grid(self.container_grid, mapa_dia)
 
         proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
-        agendamentos_prox = self.servico_agendamento.listar_agendamentos(data=proxima_semana_str)
+        agendamentos_prox = self.controller_agenda.listar_agendamentos(data=proxima_semana_str)
         mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
         self._renderizar_grid(self.container_semana, mapa_prox)
         self._atualizar_subtitulo_proxima_semana()
@@ -565,7 +566,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
     def _abrir_modal_gestao(self):
         GradeManagementModal(
-            self, self.horarios_base, self.servico_agendamento,
+            self, self.horarios_base, self.controller_agenda,
             on_refresh=self.fetch_horarios_base
         )
 
@@ -575,11 +576,11 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
     def _salvar_agendamento(self, id_antigo: int | None, dados: dict):
         return (
-            self.servico_agendamento.atualizar_agendamento(id_antigo, dados)
+            self.controller_agenda.atualizar_agendamento(id_antigo, dados)
             if id_antigo
-            else self.servico_agendamento.criar_agendamento(dados)
+            else self.controller_agenda.criar_agendamento(dados)
         )
 
     def remover_agendamento(self, id_agendamento: int):
-        return self.servico_agendamento.deletar_agendamento(id_agendamento)
+        return self.controller_agenda.deletar_agendamento(id_agendamento)
 

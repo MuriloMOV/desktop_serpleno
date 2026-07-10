@@ -1,7 +1,7 @@
 import logging
 import customtkinter as ctk
 from datetime import datetime
-from ser_pleno.application.services.estudantes import ServicoEstudante
+from ser_pleno.application.controllers.estudantes import EstudantesController
 from ser_pleno.utils.async_runner import AsyncRunner
 
 from ser_pleno.ui.theme import (
@@ -127,7 +127,7 @@ class EstudantesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller        = controller
-        self.servico_estudante = ServicoEstudante()
+        self.controller_estudantes = EstudantesController()
         self._todos_estudantes: list = []
         self._selecionado: dict | None = None
         self._item_widgets: dict = {}   # id → frame widget
@@ -296,7 +296,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
         self.btn_editar = PrimaryButton(
             actions, text=f"{ICONS['edit']}  Editar",
-            command=lambda: None,
+            command=self._editar_estudante,
             height=36, width=100,
             fg_color=THEME["primary_soft"],
             hover_color=THEME["primary"],
@@ -306,7 +306,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
         DangerButton(
             actions, text=f"{ICONS['delete']}  Excluir",
-            command=lambda: None,
+            command=self._excluir_estudante,
             height=36, width=100,
         ).pack(side="left")
 
@@ -454,7 +454,7 @@ class EstudantesFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def load_data(self):
         def fetch():
-            return self.servico_estudante.listar_estudantes()
+            return self.controller_estudantes.listar_estudantes()
 
         def on_success(result):
             self.render_list(result)
@@ -651,6 +651,96 @@ class EstudantesFrame(ctk.CTkFrame):
             )
 
     # ••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••
+    #  Ações do estudante selecionado
+    # •••••••••••••••••••••••••••••••••••••••
+    def _editar_estudante(self):
+        if not getattr(self, "_selecionado", None):
+            messagebox.showinfo("Atenção", "Selecione um estudante primeiro.")
+            return
+        st = self._selecionado
+        modal = ctk.CTkToplevel(self)
+        modal.title("Editar Estudante")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+
+        w, h = 560, 680
+        sx = modal.winfo_screenwidth()  // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+
+        card = ctk.CTkFrame(modal, fg_color=THEME["surface"], corner_radius=RADIUS["lg"])
+        card.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(card, text="Editar Estudante",
+                     font=themed_font("h2", "bold"),
+                     text_color=THEME["text"]).pack(anchor="w", pady=(0, 16))
+
+        entry_nome = ctk.CTkEntry(card, placeholder_text="Nome completo")
+        entry_nome.insert(0, st.get("name", ""))
+        entry_nome.pack(fill="x", pady=(0, 10))
+
+        entry_email = ctk.CTkEntry(card, placeholder_text="Email")
+        entry_email.insert(0, st.get("contact", ""))
+        entry_email.pack(fill="x", pady=(0, 10))
+
+        entry_curso = ctk.CTkEntry(card, placeholder_text="Curso/Turma")
+        entry_curso.insert(0, st.get("course", ""))
+        entry_curso.pack(fill="x", pady=(0, 10))
+
+        entry_idade = ctk.CTkEntry(card, placeholder_text="Idade")
+        entry_idade.insert(0, str(st.get("age", "")))
+        entry_idade.pack(fill="x", pady=(0, 10))
+
+        var_laudo = ctk.StringVar(value="Sim" if st.get("has_medical_report") else "Não")
+        ctk.CTkSwitch(card, text="Possui laudo médico",
+                      variable=var_laudo, onvalue="Sim", offvalue="Não").pack(anchor="w", pady=(0, 10))
+
+        footer = ctk.CTkFrame(card, fg_color="transparent")
+        footer.pack(fill="x", pady=(16, 0))
+
+        def _salvar():
+            dados = {
+                "name": entry_nome.get().strip(),
+                "contact": entry_email.get().strip(),
+                "course": entry_curso.get().strip(),
+                "age": entry_idade.get().strip(),
+                "has_medical_report": var_laudo.get() == "Sim",
+            }
+            try:
+                res = self.controller_estudantes.atualizar_estudante(st.get("id"), dados)
+                messagebox.showinfo("Sucesso", "Estudante atualizado com sucesso.")
+                modal.destroy()
+                self._carregar_estudantes()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao atualizar estudante.\n{e}")
+
+        ctk.CTkButton(footer, text="Cancelar", command=modal.destroy,
+                      width=110, height=36, corner_radius=10,
+                      fg_color=THEME["divider"], hover_color=THEME["border"],
+                      text_color=THEME["text_muted"]).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(footer, text=f"{ICONS['check']}  Salvar",
+                      command=_salvar, width=140, height=36, corner_radius=10,
+                      fg_color=THEME["primary"], hover_color=THEME["primary_hover"],
+                      text_color="white", font=themed_font("button", "bold")).pack(side="right")
+
+    def _excluir_estudante(self):
+        if not getattr(self, "_selecionado", None):
+            messagebox.showinfo("Atenção", "Selecione um estudante primeiro.")
+            return
+        st = self._selecionado
+        if not messagebox.askyesno("Confirmar", f'Excluir o estudante "{st.get("name")}"?'):
+            return
+        try:
+            self.controller_estudantes.deletar_estudante(st.get("id"))
+            messagebox.showinfo("Sucesso", "Estudante excluído.")
+            self._selecionado = None
+            self._carregar_estudantes()
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha ao excluir estudante.\n{e}")
+
     #  MODAL: Novo Estudante
     # ••••••••••••••••••••••••••••••••••••••
     def novo_estudante_click(self):
@@ -755,7 +845,7 @@ class EstudantesFrame(ctk.CTkFrame):
                 "course":              en_curso.get().strip(),
                 "age":                 en_idade.get().strip(),
             }
-            res = self.servico_estudante.criar_estudante(dados)
+            res = self.controller_estudantes.criar_estudante(dados)
             if res.get("success"):
                 modal.destroy()
                 self.load_data()

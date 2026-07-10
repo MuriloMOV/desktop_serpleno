@@ -7,7 +7,7 @@ from ser_pleno.utils.async_runner import AsyncRunner
 import customtkinter as ctk
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, FONT_FAMILY
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.application.services.dashboard import ServicoDashboard
+from ser_pleno.application.controllers.dashboard import DashboardController
 
 DASH_TOKENS = extend_theme(THEME, {
     "kpi_size": "wide",
@@ -359,7 +359,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.controller = controller
-        self.servico_dashboard = ServicoDashboard()
+        self.controller_dashboard = DashboardController()
 
         self._criar_toolbar_acoes()
         self._criar_kpi_container()
@@ -373,7 +373,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._mostrar_skeletons()
 
         def fetch():
-            data = self.servico_dashboard.obter_kpis()
+            data = self.controller_dashboard.carregar_kpis()
             return data
 
         def on_success(data):
@@ -703,7 +703,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     #  Notificações e badges
     # ——————————————————————————————————————————————————————————————————————
     def _abrir_notificacoes_ajuda(self):
-        notifs = self.servico_dashboard.obter_notificacoes_ajuda()
+        notifs = self.controller_dashboard.obter_notificacoes_ajuda()
         NotificationPanel(
             self, "Notificações de Ajuda", notifs, "ajuda",
             on_mark_read=self._marcar_lida,
@@ -711,7 +711,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         )
 
     def _abrir_notificacoes_alertas(self):
-        notifs = self.servico_dashboard.obter_notificacoes_alertas()
+        notifs = self.controller_dashboard.obter_notificacoes_alertas()
         NotificationPanel(
             self, "Notificações de Alerta", notifs, "alerta",
             on_mark_read=self._marcar_lida,
@@ -722,13 +722,75 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         ProfileModal(self, self.controller.usuario_logado, on_edit=self._editar_perfil)
 
     def _editar_perfil(self):
-        print("Editar perfil")
+        user = getattr(self.controller, "usuario_logado", {}) or {}
+        modal = ctk.CTkToplevel(self)
+        modal.title("Editar Perfil")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+        w, h = 480, 420
+        sx = modal.winfo_screenwidth()  // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+
+        card = ctk.CTkFrame(modal, fg_color=THEME["surface"], corner_radius=RADIUS["lg"])
+        card.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(card, text="Editar Perfil",
+                     font=themed_font("h2", "bold"),
+                     text_color=THEME["text"]).pack(anchor="w", pady=(0, 16))
+
+        entry_nome = ctk.CTkEntry(card, placeholder_text="Nome completo")
+        entry_nome.insert(0, user.get("first_name", ""))
+        entry_nome.pack(fill="x", pady=(0, 10))
+
+        entry_email = ctk.CTkEntry(card, placeholder_text="Email")
+        entry_email.insert(0, user.get("email", ""))
+        entry_email.pack(fill="x", pady=(0, 10))
+
+        entry_senha = ctk.CTkEntry(card, placeholder_text="Nova senha (opcional)", show="*")
+        entry_senha.pack(fill="x", pady=(0, 10))
+
+        footer = ctk.CTkFrame(card, fg_color="transparent")
+        footer.pack(fill="x", pady=(16, 0))
+
+        def _salvar():
+            nome = entry_nome.get().strip()
+            email = entry_email.get().strip()
+            senha = entry_senha.get().strip()
+            if not nome or not email:
+                messagebox.showerror("Erro", "Nome e email são obrigatórios.", parent=modal)
+                return
+            try:
+                user["first_name"] = nome
+                user["email"] = email
+                if senha:
+                    from ser_pleno.application.controllers.autenticacao import AutenticacaoController
+                    auth_controller = AutenticacaoController()
+                    res = auth_controller.alterar_senha(user.get("password", ""), senha)
+                    if not res.get("success"):
+                        messagebox.showerror("Erro", res.get("message", "Falha ao alterar senha."), parent=modal)
+                        return
+                messagebox.showinfo("Sucesso", "Perfil atualizado.", parent=modal)
+                modal.destroy()
+            except Exception as e:
+                messagebox.showerror("Erro", f"Falha ao atualizar perfil.\n{e}", parent=modal)
+
+        ctk.CTkButton(footer, text="Cancelar", command=modal.destroy,
+                      width=110, height=36, corner_radius=10,
+                      fg_color=THEME["divider"], hover_color=THEME["border"],
+                      text_color=THEME["text_muted"]).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(footer, text="Salvar",
+                      command=_salvar, width=140, height=36, corner_radius=10,
+                      fg_color=THEME["primary"], hover_color=THEME["primary_hover"],
+                      text_color="white", font=themed_font("button", "bold")).pack(side="right")
 
     def _atualizar_badge_notificacoes(self):
         if not hasattr(self, "help_badge") or not hasattr(self, "alert_badge"):
             return
-        ajuda   = self.servico_dashboard.obter_notificacoes_ajuda()
-        alertas = self.servico_dashboard.obter_notificacoes_alertas()
+        ajuda   = self.controller_dashboard.obter_notificacoes_ajuda()
+        alertas = self.controller_dashboard.obter_notificacoes_alertas()
         n_ajuda   = sum(1 for n in ajuda   if not n.get("lida", True))
         n_alertas = sum(1 for n in alertas if not n.get("lida", True))
         self._set_badge(self.help_badge,  n_ajuda)
@@ -745,15 +807,15 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             badge.place_forget()
 
     def _marcar_lida(self, notif_id, tipo):
-        self.servico_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
+        self.controller_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
         self._atualizar_badge_notificacoes()
 
     def _marcar_todas_lidas(self, tipo):
-        notifs = (self.servico_dashboard.obter_notificacoes_ajuda()
+        notifs = (self.controller_dashboard.obter_notificacoes_ajuda()
                   if tipo == "ajuda"
-                  else self.servico_dashboard.obter_notificacoes_alertas())
+                  else self.controller_dashboard.obter_notificacoes_alertas())
         for n in notifs:
-            self.servico_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
+            self.controller_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
         self._atualizar_badge_notificacoes()
 
     # ——————————————————————————————————————————————————————————————————————

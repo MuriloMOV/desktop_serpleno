@@ -5,7 +5,7 @@ import datetime
 import logging
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, font
 from ser_pleno.ui.theme_extensions import spacing
-from ser_pleno.application.services.comunicacao import ServicoComunicacao
+from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
 
@@ -62,7 +62,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller          = controller
-        self.servico_comunicacao = ServicoComunicacao()
+        self.controller_comunicacao = ComunicacaoController()
         self.contatos:     list  = []
         self.conversa_ativa      = None
         self.conversa_atual      = None
@@ -200,7 +200,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     def carregar_contatos(self):
         try:
-            res = self.servico_comunicacao.listar_contatos(self.usuario_logado_id)
+            res = self.controller_comunicacao.listar_contatos(self.usuario_logado_id)
             if res["success"]:
                 self.contatos = [
                     c for c in res["data"]
@@ -582,9 +582,9 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             return
         try:
             if self.conversa_ativa["role"] == "group":
-                res = self.servico_comunicacao.obter_mensagens_grupo()
+                res = self.controller_comunicacao.obter_mensagens_grupo()
             else:
-                res = self.servico_comunicacao.obter_mensagens(
+                res = self.controller_comunicacao.obter_mensagens(
                     self.usuario_logado_id, self.conversa_ativa["id"]
                 )
             if res["success"]:
@@ -600,7 +600,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         for msg in self.mensagens:
             if not msg.get("read"):
                 try:
-                    self.servico_comunicacao.marcar_mensagem_lida(msg.get("id"))
+                    self.controller_comunicacao.marcar_mensagem_lida(msg.get("id"))
                 except Exception as e:
                     print(f"Erro ao marcar como lida: {e}")
 
@@ -773,11 +773,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             return
         try:
             if self.conversa_ativa["role"] == "group":
-                res = self.servico_comunicacao.enviar_mensagem_grupo(
+                res = self.controller_comunicacao.enviar_mensagem_grupo_texto(
                     self.usuario_logado_id, txt
                 )
             else:
-                res = self.servico_comunicacao.enviar_mensagem(
+                res = self.controller_comunicacao.enviar_mensagem(
                     self.usuario_logado_id, self.conversa_ativa["id"], txt
                 )
             if res["success"]:
@@ -811,11 +811,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         try:
             nome = os.path.basename(caminho)
             if self.conversa_ativa["role"] == "group":
-                res = self.servico_comunicacao.enviar_mensagem_grupo(
+                res = self.controller_comunicacao.enviar_mensagem_grupo_arquivo(
                     self.usuario_logado_id, nome, caminho, categoria
                 )
             else:
-                res = self.servico_comunicacao.enviar_mensagem(
+                res = self.controller_comunicacao.enviar_mensagem(
                     self.usuario_logado_id, self.conversa_ativa["id"],
                     nome, caminho, categoria
                 )
@@ -884,7 +884,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
     def carregar_contador_nao_lidas(self):
         try:
-            data = self.servico_comunicacao.contar_mensagens_nao_lidas(
+            data = self.controller_comunicacao.contar_mensagens_nao_lidas(
                 self.usuario_logado_id
             )
             if data and data.get("success"):

@@ -1,5 +1,6 @@
-
 from ser_pleno.config.db_config import get_db_connection
+from ser_pleno.config.config import API_ROOT_URL
+from ser_pleno.repositories.autenticacao import AutenticacaoRepository
 from passlib.hash import django_pbkdf2_sha256, django_pbkdf2_sha1, bcrypt_sha256, argon2
 import logging
 import re
@@ -16,10 +17,11 @@ logger = logging.getLogger(__name__)
 class ServicoAutenticacao:
     """Serviço de autenticação que funciona de forma independente ou conectada"""
     
-    # URL base da API
-    API_BASE_URL = "http://127.0.0.1:8000"
+    # URL base da API (agora usa config oficial)
+    API_BASE_URL = API_ROOT_URL
     
     def __init__(self):
+        self.repo = AutenticacaoRepository()
         # Sessão para manter cookies de autenticação
         self.session = requests.Session() if requests else None
         self.user: Optional[Dict[str, Any]] = None
@@ -40,24 +42,20 @@ class ServicoAutenticacao:
         """Verifica se deve tentar usar a API"""
         config = self._get_operation_config()
         if config is None:
-            return True  # Comportamento padrão: tentar API
+            return True
         return config.should_use_api()
     
     def _extract_csrf_token(self, response):
         """Extrai o CSRF token dos cookies ou do corpo da resposta"""
-        # Tenta obter do cookie
         csrf_cookie = self.session.cookies.get('csrftoken', None)
         if csrf_cookie:
             return csrf_cookie
         
-        # Tenta obter do corpo da resposta (HTML ou JSON)
         if response.text:
-            # Procura em meta tag HTML
             match = re.search(r'name="csrfmiddlewaretoken"\s+value="([^"]+)"', response.text)
             if match:
                 return match.group(1)
             
-            # Procura em JSON
             try:
                 data = response.json()
                 if 'csrf_token' in data:
@@ -70,21 +68,14 @@ class ServicoAutenticacao:
     def _get_csrf_token(self):
         """Obtém o CSRF token fazendo uma requisição para obter o cookie"""
         try:
-            # Limpa cookies duplicados antes de fazer a requisição
             self._clear_duplicate_cookies()
-            
-            # Faz uma requisição GET para obter o cookie CSRF
             response = self.session.get(
                 f"{self.API_BASE_URL}/api/v1/desktop/schedule/times/",
                 timeout=5
             )
-            
-            # Extrai o token do cookie
             self.csrf_token = self.session.cookies.get('csrftoken', None)
-            
             if self.csrf_token:
                 logging.info(f"CSRF token obtido: {self.csrf_token[:10]}...")
-            
             return self.csrf_token
         except Exception as e:
             logging.warning(f"Erro ao obter CSRF token: {e}")
@@ -93,19 +84,12 @@ class ServicoAutenticacao:
     def _clear_duplicate_cookies(self):
         """Remove cookies duplicados da sessão"""
         try:
-            # Obtém todos os cookies
             cookies_dict = {}
             for cookie in self.session.cookies:
                 cookies_dict[cookie.name] = cookie.value
-            
-            # Limpa todos os cookies
             self.session.cookies.clear()
-            
-            # Re-adiciona cookies únicos
             for name, value in cookies_dict.items():
                 self.session.cookies.set(name, value)
-                
-            logging.debug(f"Cookies limpos. Cookies únicos: {list(cookies_dict.keys())}")
         except Exception as e:
             logging.warning(f"Erro ao limpar cookies duplicados: {e}")
     
@@ -167,7 +151,7 @@ class ServicoAutenticacao:
             return {'success': False, 'message': f'API status {response.status_code}'}
         except Exception as e:
             return {'success': False, 'message': str(e)}
-
+    
     def _try_establish_session_async(self, usuario, senha):
         """Estabelece sessão Django em background sem bloquear o login."""
         try:
@@ -183,11 +167,7 @@ class ServicoAutenticacao:
     def _get_user_id_from_db(self, username):
         """Obtém o ID do usuário do banco de dados pelo username"""
         try:
-            connection = get_db_connection()
-            cursor = connection.cursor(dictionary=True)
-            cursor.execute("SELECT id FROM auth_user WHERE username = %s", (username,))
-            user = cursor.fetchone()
-            connection.close()
+            user = self.repo.obter_usuario_por_username(username)
             if user:
                 return user['id']
         except Exception as e:
@@ -197,7 +177,6 @@ class ServicoAutenticacao:
     def _try_establish_session(self, usuario, senha):
         """
         Tenta estabelecer sessão Django via API após login local bem-sucedido.
-        Isso é necessário para que as requisições subsequentes funcionem com @login_required.
         """
         try:
             login_url = f"{self.API_BASE_URL}/api/v1/serpleno/auth/login/"
@@ -207,7 +186,6 @@ class ServicoAutenticacao:
                 timeout=5
             )
             if response.status_code == 200:
-                # Obtém o CSRF token após estabelecer a sessão
                 self._get_csrf_token()
                 logging.info("Sessão Django estabelecida via API após login local")
             else:
@@ -220,15 +198,9 @@ class ServicoAutenticacao:
         Realiza login consultando diretamente o banco MySQL (fallback).
         """
         try:
-            connection = get_db_connection()
-            cursor = connection.cursor(dictionary=True)
-            # Consulta na tabela de usuários do Django (auth_user)
-            cursor.execute("SELECT * FROM auth_user WHERE username = %s", (usuario,))
-            user = cursor.fetchone()
-            connection.close()
+            user = self.repo.obter_usuario_por_username(usuario)
             if user:
                 hash_value = user['password']
-                # Detecta o algoritmo usado pelo Django
                 if hash_value.startswith('pbkdf2_sha256$'):
                     valid = django_pbkdf2_sha256.verify(senha, hash_value)
                 elif hash_value.startswith('pbkdf2_sha1$'):
@@ -259,6 +231,34 @@ class ServicoAutenticacao:
             headers["X-CSRFToken"] = self.csrf_token
         return headers
 
+    def alterar_senha(self, senha_atual: str, nova_senha: str) -> Dict[str, Any]:
+        """Altera a senha do usuário logado no banco local."""
+        if not self.user:
+            return {"success": False, "message": "Nenhum usuário logado."}
+        try:
+            row = self.repo.obter_senha_usuario(self.user.get("id"))
+            if not row:
+                return {"success": False, "message": "Usuário não encontrado."}
+            hash_value = row["password"]
+            if hash_value.startswith("pbkdf2_sha256$"):
+                valid = django_pbkdf2_sha256.verify(senha_atual, hash_value)
+            elif hash_value.startswith("pbkdf2_sha1$"):
+                valid = django_pbkdf2_sha1.verify(senha_atual, hash_value)
+            elif hash_value.startswith("bcrypt_sha256$"):
+                valid = bcrypt_sha256.verify(senha_atual, hash_value)
+            elif hash_value.startswith("argon2$"):
+                valid = argon2.verify(senha_atual, hash_value)
+            else:
+                valid = False
+            if not valid:
+                return {"success": False, "message": "Senha atual incorreta."}
+            novo_hash = django_pbkdf2_sha256.hash(nova_senha)
+            self.repo.atualizar_senha_usuario(self.user.get("id"), novo_hash)
+            return {"success": True, "message": "Senha alterada com sucesso."}
+        except Exception as e:
+            logger.error(f"Erro ao alterar senha: {e}")
+            return {"success": False, "message": str(e)}
+
     def logout(self):
         """Encerra a sessão"""
         try:
@@ -269,4 +269,3 @@ class ServicoAutenticacao:
         self.session = requests.Session()
         self.user = None
         self.csrf_token = None
-
