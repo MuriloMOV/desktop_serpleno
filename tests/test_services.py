@@ -10,16 +10,20 @@ class TestServices:
     @patch('ser_pleno.application.services.autenticacao.requests')
     def test_auth_service(self, mock_requests):
         service = ServicoAutenticacao()
-        
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"success": True, "token": "123", "user": "test"}
-        mock_requests.Session.return_value.post.return_value = mock_response
-        
+        mock_repo_instance = MagicMock()
+        mock_user = {
+            "id": 1,
+            "username": "user",
+            "password": "pbkdf2_sha256$29000$4Xbq4peWIk4u$F0vpVOIL9jogA4tdMQ/V2z44/vlbVBhCxO0GRg8qfuc=",
+        }
+        mock_repo_instance.obter_usuario_por_username.return_value = mock_user
+        service.repo = mock_repo_instance
+
         resp = service.login("user", "pass")
-        
+
         assert resp["success"] is True
-        mock_requests.Session.return_value.post.assert_called()
+        assert resp["user"]["username"] == "user"
+        mock_repo_instance.obter_usuario_por_username.assert_called_with("user")
 
     @patch('ser_pleno.infrastructure.api.api.api')
     def test_student_service(self, mock_api):

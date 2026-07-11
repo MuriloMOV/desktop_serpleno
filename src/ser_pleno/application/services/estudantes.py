@@ -15,6 +15,14 @@ from ser_pleno.utils.service_helpers import with_api_fallback
 logger = logging.getLogger(__name__)
 
 
+def _invalidate_dashboard_cache() -> None:
+    try:
+        from ser_pleno.repositories.dashboard import invalidate_dashboard_cache
+        invalidate_dashboard_cache()
+    except Exception:
+        pass
+
+
 class ServicoEstudante:
     """Serviço para gerenciar estudantes - usa o cliente API central `api` quando disponível
     e faz fallback para o repositório local quando necessário.
@@ -233,6 +241,7 @@ class ServicoEstudante:
                 has_medical_report=bool(dados.get("has_medical_report", False)),
                 requires_attention=bool(dados.get("requires_attention", False)),
             )
+            _invalidate_dashboard_cache()
             return {"success": True, "message": "Estudante criado com sucesso"}
         except Exception as e:
             logger.error(f"Erro no fallback ao criar estudante: {e}")
@@ -270,6 +279,7 @@ class ServicoEstudante:
                 has_medical_report=bool(dados.get("has_medical_report", False)),
                 requires_attention=bool(dados.get("requires_attention", False)),
             )
+            _invalidate_dashboard_cache()
             return {"success": True, "message": "Estudante atualizado com sucesso"}
         except Exception as e:
             logger.error(f"Erro no fallback ao atualizar estudante: {e}")
@@ -293,6 +303,7 @@ class ServicoEstudante:
         """Fallback para deletar estudante no repositório local"""
         try:
             self.repo.deletar(id_estudante)
+            _invalidate_dashboard_cache()
             return {"success": True, "message": "Estudante deletado com sucesso"}
         except Exception as e:
             logger.error(f"Erro no fallback ao deletar estudante: {e}")

@@ -1,0 +1,109 @@
+{
+  "read_fallback_total": 221,
+  "write_fallback_total": 529,
+  "by_repository": {
+    "EstudanteRepository": {
+      "total": 97,
+      "read": 97,
+      "write": 0,
+      "methods": {
+        "listar": 97
+      }
+    },
+    "AgendamentoRepository": {
+      "total": 49,
+      "read": 49,
+      "write": 0,
+      "methods": {
+        "listar_proximos": 49
+      }
+    },
+    "TriagemRepository": {
+      "total": 53,
+      "read": 53,
+      "write": 0,
+      "methods": {
+        "listar": 53
+      }
+    },
+    "students": {
+      "total": 49,
+      "read": 0,
+      "write": 49,
+      "methods": {
+        "create": 49
+      }
+    },
+    "appointments": {
+      "total": 144,
+      "read": 0,
+      "write": 144,
+      "methods": {
+        "create": 48,
+        "update": 48,
+        "delete": 48
+      }
+    },
+    "messages": {
+      "total": 96,
+      "read": 0,
+      "write": 96,
+      "methods": {
+        "create": 48,
+        "update": 48
+      }
+    },
+    "orientations": {
+      "total": 48,
+      "read": 0,
+      "write": 48,
+      "methods": {
+        "create": 48
+      }
+    },
+    "screenings": {
+      "total": 48,
+      "read": 0,
+      "write": 48,
+      "methods": {
+        "create": 48
+      }
+    },
+    "reports": {
+      "total": 48,
+      "read": 0,
+      "write": 48,
+      "methods": {
+        "delete": 48
+      }
+    },
+    "user_preferences": {
+      "total": 48,
+      "read": 0,
+      "write": 48,
+      "methods": {
+        "update": 48
+      }
+    },
+    "alerts": {
+      "total": 48,
+      "read": 0,
+      "write": 48,
+      "methods": {
+        "update": 48
+      }
+    },
+    "DashboardRepository": {
+      "total": 22,
+      "read": 22,
+      "write": 0,
+      "methods": {
+        "obter_kpis": 21,
+        "obter_notificacoes_alertas": 1
+      }
+    }
+  },
+  "last_read_fallback": "2026-07-10T22:17:05.219535",
+  "last_write_fallback": "2026-07-10T22:17:05.193254",
+  "started_at": "2026-07-10T00:41:45.736401"
+}

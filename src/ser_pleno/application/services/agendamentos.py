@@ -1,6 +1,6 @@
-from ser_pleno.config.db_config import get_db_connection
 from ser_pleno.config.config import API_ROOT_URL, DESKTOP_API_URL, DESKTOP_API_TOKEN
 from ser_pleno.repositories.agendamentos import AgendamentoRepository
+from ser_pleno.repositories.estudantes import EstudanteRepository
 import logging
 from datetime import datetime, timedelta
 import requests
@@ -8,14 +8,24 @@ import requests
 # Instância global do serviço de autenticação
 _auth_service = None
 
+
 def set_auth_service(auth_service):
     """Define o serviço de autenticação global para usar nas requisições API"""
     global _auth_service
     _auth_service = auth_service
 
+
 def get_auth_service():
     """Retorna o serviço de autenticação global"""
     return _auth_service
+
+
+def _invalidate_dashboard_cache() -> None:
+    try:
+        from ser_pleno.repositories.dashboard import invalidate_dashboard_cache
+        invalidate_dashboard_cache()
+    except Exception:
+        pass
 
 class ServicoAgendamento:
     # URL base da API do Serpleno Web (agora usa config oficial)
@@ -27,6 +37,23 @@ class ServicoAgendamento:
     
     def __init__(self):
         self.repo = AgendamentoRepository()
+        self.repo_estudante = EstudanteRepository()
+    
+    def listar_estudantes(self):
+        """Retorna estudantes disponíveis para agendamento."""
+        try:
+            return self.repo_estudante.listar() or []
+        except Exception as e:
+            logging.error(f"Erro ao listar estudantes: {e}")
+            return []
+    
+    def listar_horarios_base(self):
+        """Retorna horários ativos da grade."""
+        try:
+            return self.repo.listar_horarios_base()
+        except Exception as e:
+            logging.error(f"Erro ao listar horários base: {e}")
+            return []
     
     def _get_session(self):
         """Retorna a sessão HTTP do serviço de autenticação"""
@@ -113,7 +140,8 @@ class ServicoAgendamento:
                 )
                 appointment_id = self.repo.obter_ultimo_id_inserido()
                 logging.info(f"Agendamento criado via banco local: {appointment_id}")
-                
+                _invalidate_dashboard_cache()
+
                 # Tenta sincronizar com o Serpleno Web em background
                 try:
                     self._sync_with_serpleno_web(appointment_id, id_aluno, data_hora, nome_agendamento, dados)
@@ -296,7 +324,8 @@ class ServicoAgendamento:
                 laudo=dados.get('laudo', None),
                 origem='desktop'
             )
-            
+            _invalidate_dashboard_cache()
+
             # Tenta sincronizar com a API (não bloqueante)
             try:
                 self._sync_with_api(id_agendamento)
@@ -314,6 +343,7 @@ class ServicoAgendamento:
             affected = self.repo.deletar_agendamento(id_agendamento)
             if affected > 0:
                 logging.info(f"Agendamento {id_agendamento} deletado via banco local")
+                _invalidate_dashboard_cache()
                 return {"success": True}
             logging.info("Agendamento não encontrado no banco local, tentando API")
         except Exception as e:
@@ -373,6 +403,7 @@ class ServicoAgendamento:
             
             self.repo.adicionar_horario_disponibilidade(horario)
             logging.info(f"Horário {horario} adicionado via banco local")
+            _invalidate_dashboard_cache()
             return {"success": True}
         except ValueError:
             return {"success": False, "message": "Formato de horário inválido. Use HH:MM"}
@@ -416,6 +447,7 @@ class ServicoAgendamento:
             if isinstance(result, dict) and not result.get("success"):
                 return result
             logging.info(f"Horário {horario} removido via banco local")
+            _invalidate_dashboard_cache()
             return {"success": True}
         except ValueError:
             return {"success": False, "message": "Formato de horário inválido. Use HH:MM"}

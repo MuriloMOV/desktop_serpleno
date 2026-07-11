@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import threading
 
 # Carrega .env da raiz do projeto antes de qualquer import que use os.getenv()
 _base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,7 +15,7 @@ if os.path.exists(_env_path):
             _k, _v = _line.split("=", 1)
             os.environ.setdefault(_k.strip(), _v.strip())
 
-# Logging centralizado (antes de importar módulos que usam logger)
+# Logging centralizado (antes de importar modulos que usam logger)
 from ser_pleno.utils.logging_config import setup_logging
 
 setup_logging()
@@ -76,30 +77,30 @@ except Exception:
     pass
 
 
-# Navegação orientada por dados: cada entrada descreve uma tela.
-# `key` é usado para destacar o item ativo e para reconstruir a tela certa
+# Navegacao orientada por dados: cada entrada descreve uma tela.
+# `key` e usado para destacar o item ativo e para reconstruir a tela certa
 # depois de um rebuild (ex.: ao alternar o tema).
 MENU_ITEMS = [
     {"key": "dashboard",     "label": "Dashboard",         "icon": ICONS["chart"], "frame": DashboardFrame,
      "header": ("Dashboard", "Resumo geral do ambiente")},
     {"key": "estudantes",    "label": "Estudantes",        "icon": ICONS["users"], "frame": EstudantesFrame,
-     "header": ("Estudantes", "Acompanhamento e gestão acadêmica")},
+     "header": ("Estudantes", "Acompanhamento e gestao academica")},
     {"key": "agenda",        "label": "Agenda",            "icon": ICONS["calendar"], "frame": AgendaFrame,
      "header": ("Agenda", "Planejamento e compromissos")},
     {"key": "bem_estar",     "label": "Bem-estar",         "icon": ICONS["heart_blue"], "frame": BemEstarFrame,
      "header": ("Bem-estar", "Monitoramento e apoio emocional")},
-    {"key": "analise",       "label": "Análise",           "icon": ICONS["search"], "frame": AnaliseTriagemFrame,
-     "header": ("Análise", "Triagem e classificação")},
-    {"key": "relatorios",    "label": "Relatórios",        "icon": ICONS["empty"], "frame": RelatorioFrame,
-     "header": ("Relatórios", "Indicadores e exportações")},
-    {"key": "comunicacao",   "label": "Comunicação",       "icon": ICONS["chat"], "frame": ComunicacaoInternaFrame,
-     "header": ("Comunicação", "Mensagens internas e suporte")},
-    {"key": "orientacoes",   "label": "Orientações",       "icon": ICONS["compass"], "frame": OrientacoesFrame,
-     "header": ("Orientações", "Fluxo de apoio e encaminhamentos")},
+    {"key": "analise",       "label": "Analise",           "icon": ICONS["search"], "frame": AnaliseTriagemFrame,
+     "header": ("Analise", "Triagem e classificacao")},
+    {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["empty"], "frame": RelatorioFrame,
+     "header": ("Relatorios", "Indicadores e exportacoes")},
+    {"key": "comunicacao",   "label": "Comunicacao",       "icon": ICONS["chat"], "frame": ComunicacaoInternaFrame,
+     "header": ("Comunicacao", "Mensagens internas e suporte")},
+    {"key": "orientacoes",   "label": "Orientacoes",       "icon": ICONS["compass"], "frame": OrientacoesFrame,
+     "header": ("Orientacoes", "Fluxo de apoio e encaminhamentos")},
     {"key": "avisos",        "label": "Quadro de avisos",  "icon": ICONS["megaphone"], "frame": QuadroAvisosFrame,
-     "header": ("Avisos", "Quadro de comunicação institucional")},
-    {"key": "configuracoes", "label": "Configurações",     "icon": ICONS["settings"], "frame": ConfiguracoesFrame,
-     "header": ("Configurações", "Preferências da aplicação")},
+     "header": ("Avisos", "Quadro de comunicacao institucional")},
+    {"key": "configuracoes", "label": "Configuracoes",     "icon": ICONS["settings"], "frame": ConfiguracoesFrame,
+     "header": ("Configuracoes", "Preferencias da aplicacao")},
 ]
 _MENU_BY_KEY = {item["key"]: item for item in MENU_ITEMS}
 
@@ -131,13 +132,21 @@ class App(ctk.CTk):
         self.container.grid_columnconfigure(1, weight=1)
         self.container.grid_rowconfigure(0, weight=1)
 
-        # Permite reconstrução real da UI ao alternar claro/escuro:
-        # CustomTkinter não propaga mudanças de cor para widgets já criados,
-        # então a forma confiável de "retemar" a tela é reconstruí-la.
+        # Permite reconstrucao real da UI ao alternar claro/escuro:
+        # CustomTkinter nao propaga mudancas de cor para widgets ja criados,
+        # entao a forma confiavel de "retemar" a tela e reconstrui-la.
         on_theme_change(self._on_theme_changed)
 
         try:
             atualizar_disponibilidade_api_async()
+        except Exception:
+            pass
+
+        try:
+            from ser_pleno.infrastructure.api.sync_service import get_sync_service
+            sync_service = get_sync_service()
+            if sync_service:
+                sync_service.start_background_sync()
         except Exception:
             pass
 
@@ -166,7 +175,7 @@ class App(ctk.CTk):
 
         self._controllers = {}
         self._t_controllers_start = time.perf_counter()
-        # Nenhum controller instanciado ainda — lazy-load na primeira navegação.
+        # Nenhum controller instanciado ainda — lazy-load na primeira navegacao.
         self._t_controllers_end = time.perf_counter()
 
         self._t_ui_start = time.perf_counter()
@@ -183,6 +192,25 @@ class App(ctk.CTk):
             )
         except Exception:
             pass
+
+        # Seed nao-bloqueante: popula o SQLite local com dados do MySQL
+        # para garantir funcionamento offline imediato.
+        self._run_post_login_seed()
+
+    def _run_post_login_seed(self) -> None:
+        """Executa seed do SQLite local em background apos login."""
+        def _seed_thread():
+            try:
+                from ser_pleno.infrastructure.local.seed_service import sync_critical_entities
+                result = sync_critical_entities()
+                if result.get("failed"):
+                    logger.warning("Seed pos-login parcial: %s", result)
+                else:
+                    logger.info("Seed pos-login concluido: %s", result)
+            except Exception as exc:
+                logger.warning("Seed pos-login falhou (nao-bloqueante): %s", exc)
+
+        threading.Thread(target=_seed_thread, daemon=True).start()
 
     # ================= TEMA =================
     def _on_theme_changed(self, mode: str) -> None:
@@ -210,7 +238,7 @@ class App(ctk.CTk):
         return not hasattr(self, "sidebar") or not self.sidebar.winfo_exists()
 
     def alternar_tema(self):
-        # _on_theme_changed cuida da reconstrução automaticamente.
+        # _on_theme_changed cuida da reconstrucao automaticamente.
         toggle_mode()
 
     # ================= SIDEBAR =================
@@ -230,7 +258,7 @@ class App(ctk.CTk):
 
         menu_label = ctk.CTkLabel(
             self.sidebar,
-            text="NAVEGAÇAO",
+            text="NAVEGACAO",
             font=font(11, "bold"),
             text_color=THEME["text_muted"],
         )
@@ -268,7 +296,7 @@ class App(ctk.CTk):
         ).pack(anchor="w")
         ctk.CTkLabel(
             title_frame,
-            text="Gestão escolar e bem-estar",
+            text="Gestao escolar e bem-estar",
             font=font(11),
             text_color=THEME["text_secondary"],
         ).pack(anchor="w")
@@ -277,7 +305,7 @@ class App(ctk.CTk):
         footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         footer.pack(fill="x", padx=18, pady=(12, 18), side="bottom")
 
-        nome = self.usuario_logado.get("first_name") or self.usuario_logado.get("username", "usuário")
+        nome = self.usuario_logado.get("first_name") or self.usuario_logado.get("username", "usuario")
         iniciais = "".join(p[0] for p in nome.split()[:2]).upper() or "U"
 
         self.user_chip = ctk.CTkFrame(footer, fg_color=THEME["primary_soft"], corner_radius=14)
@@ -292,14 +320,14 @@ class App(ctk.CTk):
         texto_frame.pack(side="left", fill="x", expand=True)
         ctk.CTkLabel(
             texto_frame,
-            text=f"Olá, {nome}",
+            text=f"Ola, {nome}",
             font=font(12, "bold"),
             text_color=THEME["primary"],
             anchor="w",
         ).pack(fill="x")
         ctk.CTkLabel(
             texto_frame,
-            text="Psicóloga(o) escolar",
+            text="Psicologa(o) escolar",
             font=font(10),
             text_color=THEME["text_muted"],
             anchor="w",
@@ -376,7 +404,7 @@ class App(ctk.CTk):
                 border_width=0,
             )
 
-    # ================= ÁREA DE CONTEÚDO =================
+    # ================= AREA DE CONTEUDO =================
     def criar_area_conteudo(self):
         self.content = ctk.CTkFrame(self.container, fg_color=THEME["bg"])
         self.content.grid(row=0, column=1, sticky="nsew")
@@ -408,7 +436,7 @@ class App(ctk.CTk):
         self.content_body = ctk.CTkFrame(self.content, fg_color="transparent")
         self.content_body.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
 
-    # ================= NAVEGAÇAO =================
+    # ================= NAVEGACAO =================
     def atualizar_menu(self, active_key: str) -> None:
         self._menu_ativo = active_key
         for key in self.menu_buttons:
@@ -434,8 +462,6 @@ class App(ctk.CTk):
         except Exception:
             pass
 
-    # Mantidos como métodos nomeados por compatibilidade com o restante do
-    # sistema e por clareza de leitura (ex.: chamadas vindas de outras views).
     def mostrar_dashboard(self):
         self._mostrar_por_key("dashboard")
 
@@ -488,4 +514,3 @@ class App(ctk.CTk):
 
 if __name__ == "__main__":
     App().mainloop()
-

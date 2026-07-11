@@ -33,6 +33,11 @@ Thumbs.db
 *.log
 debug.log
 
+# Local cache SQLite (não versionar — dados offline locais)
+config/ser_pleno_local.db
+config/ser_pleno_local.db-wal
+config/ser_pleno_local.db-shm
+
 # Secrets (não versionar)
 *.pem
 *.key

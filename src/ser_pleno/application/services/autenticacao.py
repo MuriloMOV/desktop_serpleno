@@ -95,49 +95,30 @@ class ServicoAutenticacao:
     
     def login(self, usuario, senha):
         """
-        Realiza login via API Django para obter sessão.
-        Executa API e DB em paralelo e retorna o primeiro resultado válido.
+        Realiza login via banco local (prioritário) com fallback para API.
+        A API só é tentada se o login local falhar, evitando delays desnecessários.
         """
         try:
-            from concurrent.futures import ThreadPoolExecutor, as_completed
-
-            with ThreadPoolExecutor(max_workers=2) as pool:
-                api_future = pool.submit(self._login_api, usuario, senha)
-                db_future = pool.submit(self._login_local, usuario, senha)
-                futures = {api_future: "api", db_future: "db"}
-
-                for future in as_completed(futures):
-                    try:
-                        result = future.result(timeout=4)
-                        if result.get("success"):
-                            if futures[future] == "db":
-                                self._try_establish_session_async(usuario, senha)
-                            return result
-                    except Exception:
-                        continue
-
-            return {"success": False, "message": "Credenciais inválidas"}
-
-        except requests.exceptions.ConnectionError:
-            logging.warning("API indisponível, usando banco local para login")
-            return self._login_local(usuario, senha)
-        except requests.exceptions.Timeout:
-            logging.warning("Timeout na API, usando banco local para login")
-            return self._login_local(usuario, senha)
+            result = self._login_local(usuario, senha)
+            if result.get("success"):
+                # Estabelece sessão Django em background sem bloquear o login.
+                self._try_establish_session_async(usuario, senha)
+                return result
+            return result
         except Exception as e:
-            logging.error(f"Erro no login: {e}")
-            return self._login_local(usuario, senha)
+            logging.error(f"Erro no login local: {e}")
+            return {'success': False, 'message': str(e)}
     
     def _login_api(self, usuario, senha):
-        """Tenta login via API HTTP. Usado em paralelo com DB."""
+        """Tenta login via API HTTP. Usado como fallback após DB local."""
         try:
             login_url = f"{self.API_BASE_URL}/api/v1/serpleno/auth/login/"
             response = self.session.post(
-                login_url, 
+                login_url,
                 json={"username": usuario, "password": senha},
-                timeout=4,
+                timeout=1.5,
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
                 if data.get('success'):
@@ -181,9 +162,9 @@ class ServicoAutenticacao:
         try:
             login_url = f"{self.API_BASE_URL}/api/v1/serpleno/auth/login/"
             response = self.session.post(
-                login_url, 
+                login_url,
                 json={"username": usuario, "password": senha},
-                timeout=5
+                timeout=1.5,
             )
             if response.status_code == 200:
                 self._get_csrf_token()

@@ -4,6 +4,7 @@ from typing import Generator
 
 import mysql.connector
 from mysql.connector import MySQLConnection
+from mysql.connector.pooling import MySQLConnectionPool
 
 
 def _env_int(name: str, default: int) -> int:
@@ -21,15 +22,34 @@ DB_CONFIG = {
     "port": _env_int("SERPLENO_DB_PORT", 3306),
 }
 
+_POOL_NAME = "ser_pleno_pool"
+_POOL_SIZE = int(os.getenv("SERPLENO_DB_POOL_SIZE", "5"))
+
+_pool: MySQLConnectionPool | None = None
+
+
+def _get_pool() -> MySQLConnectionPool:
+    global _pool
+    if _pool is None:
+        try:
+            _pool = MySQLConnectionPool(
+                pool_name=_POOL_NAME,
+                pool_size=_POOL_SIZE,
+                **DB_CONFIG,
+            )
+        except Exception:
+            _pool = None
+    if _pool is None:
+        raise RuntimeError("Não foi possível inicializar o pool de conexões MySQL")
+    return _pool
+
 
 def get_db_connection() -> MySQLConnection:
     """
-    Retorna uma nova conexão com o banco de dados MySQL.
-
-    Nota: wherever possível, prefira usar `get_connection()` como context manager
-    para garantir fechamento automático da conexão.
+    Retorna uma conexão do pool com o banco de dados MySQL.
+    Quem recebe a conexão é responsável por fechá-la para devolvê-la ao pool.
     """
-    return mysql.connector.connect(**DB_CONFIG)
+    return _get_pool().get_connection()
 
 
 @contextmanager

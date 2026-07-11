@@ -18,22 +18,7 @@ class ServicoDashboard:
         """Obtém notificações de ajuda do serpleno_web."""
         config = get_operation_config()
         if not config.should_use_api():
-            return [
-                {
-                    "id": 1,
-                    "titulo": "Ajuda com agendamento",
-                    "descricao": "Você tem 5 agendamentos pendentes de confirmação",
-                    "data": "2026-02-11",
-                    "lida": False,
-                },
-                {
-                    "id": 2,
-                    "titulo": "Orientação sobre relatórios",
-                    "descricao": "Novo template de relatório disponível",
-                    "data": "2026-02-10",
-                    "lida": True,
-                },
-            ]
+            return []
 
         try:
             from ser_pleno.infrastructure.api.api import api
@@ -43,22 +28,7 @@ class ServicoDashboard:
                 return response.get("data", [])
         except Exception as e:
             print(f"Erro ao obter notificações de ajuda: {e}")
-        return [
-            {
-                "id": 1,
-                "titulo": "Ajuda com agendamento",
-                "descricao": "Você tem 5 agendamentos pendentes de confirmação",
-                "data": "2026-02-11",
-                "lida": False,
-            },
-            {
-                "id": 2,
-                "titulo": "Orientação sobre relatórios",
-                "descricao": "Novo template de relatório disponível",
-                "data": "2026-02-10",
-                "lida": True,
-            },
-        ]
+        return []
 
     def obter_notificacoes_alertas(self):
         """Obtém notificações de alertas do sistema."""

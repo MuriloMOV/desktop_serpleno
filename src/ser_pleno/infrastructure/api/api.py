@@ -71,7 +71,7 @@ class ClienteAPI:
         logging.getLogger('apps.desktop.api').debug(f"GET {endpoint} params={params}")
 
         if not requests:
-            return self._get_mock_response(endpoint, params)
+            return {"success": False, "message": "Biblioteca requests não disponível"}
 
         last_exception = None
         for attempt in range(1, retries + 1):
@@ -138,30 +138,11 @@ class ClienteAPI:
         logging.getLogger('apps.desktop.api').exception("Erro POST após retries")
         return {"success": False, "message": f"Erro de conexão: {str(last_exception)}"}
 
-    # ================= MOCK =================
-
-    def _get_mock_response(self, endpoint, params=None):
-        if isinstance(endpoint, str) and endpoint.rstrip('/').endswith("help/notifications"):
-            return {
-                "success": True,
-                "data": [
-                    {
-                        "id": 1,
-                        "titulo": "Ajuda com agendamento",
-                        "descricao": "Você tem 5 agendamentos pendentes",
-                        "data": "2026-02-11",
-                        "lida": False
-                    }
-                ]
-            }
-
-        return {"success": False, "message": "Endpoint não implementado (mock)"}
-
     # ================= PUT =================
 
     def put(self, endpoint, json=None):
         if not requests:
-            return {"success": True, "message": "Dados atualizados com sucesso (mock)"}
+            return {"success": False, "message": "Biblioteca requests não disponível"}
         try:
             url = self._build_url(endpoint)
             session = self._get_session()
@@ -178,7 +159,7 @@ class ClienteAPI:
 
     def delete(self, endpoint):
         if not requests:
-            return {"success": True, "message": "Dados deletados com sucesso (mock)"}
+            return {"success": False, "message": "Biblioteca requests não disponível"}
         try:
             url = self._build_url(endpoint)
             session = self._get_session()

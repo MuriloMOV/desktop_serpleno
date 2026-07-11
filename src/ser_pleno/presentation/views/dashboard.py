@@ -204,7 +204,7 @@ class NotificationPanel(BaseModal):
             corner_radius=RADIUS["lg"],
         )
         row.pack(fill="x", pady=spacing("xs"))
-        row.pack_propagate(False)
+        row.pack_propagate(True)
 
         inner = ctk.CTkFrame(row, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=spacing("md"), pady=spacing("sm"))
@@ -240,8 +240,10 @@ class NotificationPanel(BaseModal):
             text_color=THEME["text_muted"], anchor="e",
         ).grid(row=0, column=2, sticky="ne", padx=(spacing("sm"), 0))
 
-        row.bind("<Button-1>",
-                 lambda e, nid=notif["id"], t=self.tipo: self._on_click(nid, t))
+        bind_clickable(
+            row,
+            lambda nid=notif["id"], t=self.tipo: self._on_click(nid, t),
+        )
 
     def _on_click(self, notif_id, tipo):
         if self.on_mark_read:
@@ -378,7 +380,6 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         def on_success(data):
             self._atualizar_dashboard(data)
-            self._atualizar_badge_notificacoes()
 
         def on_error(exc):
             import tkinter.messagebox as mb
@@ -397,6 +398,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._atualizar_secao_alertas(data)
         self._atualizar_secao_bem_estar(data)
         self._atualizar_secao_humor(data)
+        # Atualiza badges de forma não-bloqueante
+        self.after(0, self._atualizar_badge_notificacoes)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Toolbar de ações
@@ -465,9 +468,11 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     def _criar_kpi_container(self):
         self.kpi_frame = ctk.CTkFrame(self, fg_color="transparent")
         self.kpi_frame.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        self._kpi_cards = []
 
     def _mostrar_skeletons(self):
         self._limpar(self.kpi_frame)
+        self._kpi_cards = []
         for i in range(5):
             self.kpi_frame.grid_columnconfigure(i, weight=1)
             EmptyState(
@@ -475,7 +480,6 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             ).grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
 
     def _render_kpis(self, data):
-        self._limpar(self.kpi_frame)
         media_humor = data.get("media_humor")
         humor_emoji = self._humor_emoji(media_humor)
 
@@ -493,12 +497,19 @@ class DashboardFrame(ctk.CTkScrollableFrame):
              humor_emoji, THEME["kpi_amber"], THEME["kpi_amber_soft"], "Média dos últimos 30 dias"),
         ]
 
-        for i, (title, value, icon, accent, soft, sub) in enumerate(kpis):
-            self.kpi_frame.grid_columnconfigure(i, weight=1)
-            KPICard(
-                self.kpi_frame, title=title, value=value, icon=icon,
-                accent=accent, trend="", unit="", size=DASH_TOKENS.get("kpi_size", "wide"),
-            ).grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
+        if not getattr(self, "_kpi_cards", None):
+            self._kpi_cards = []
+            for i, (title, value, icon, accent, soft, sub) in enumerate(kpis):
+                self.kpi_frame.grid_columnconfigure(i, weight=1)
+                card = KPICard(
+                    self.kpi_frame, title=title, value=value, icon=icon,
+                    accent=accent, trend="", unit="", size=DASH_TOKENS.get("kpi_size", "wide"),
+                )
+                card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
+                self._kpi_cards.append(card)
+        else:
+            for card, (title, value, icon, accent, soft, sub) in zip(self._kpi_cards, kpis):
+                card.set_value(value)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Grid principal
@@ -506,14 +517,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     def _criar_grid_principal(self):
         grid = ctk.CTkFrame(self, fg_color="transparent")
         grid.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=SPACING["section_gap"])
-        grid.grid_columnconfigure(0, weight=3)
-        grid.grid_columnconfigure(1, weight=2)
 
         self.left_col = ctk.CTkFrame(grid, fg_color="transparent")
-        self.left_col.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING["grid_gap"]))
+        self.left_col.pack(side="left", fill="both", expand=True, padx=(0, SPACING["grid_gap"] // 2))
 
         self.right_col = ctk.CTkFrame(grid, fg_color="transparent")
-        self.right_col.grid(row=0, column=1, sticky="nsew", padx=(SPACING["grid_gap"], 0))
+        self.right_col.pack(side="right", fill="both", padx=(SPACING["grid_gap"] // 2, 0))
 
         # Card do gráfico (na esquerda)
         self._criar_card_chart()
@@ -530,25 +539,27 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         )
         self.canvas.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
         self._chart_after_id = None
+        self._pending_humor_history = None
         self.chart_card.body.bind("<Configure>", self._schedule_draw_chart)
 
     def _schedule_draw_chart(self, event=None):
         if self._chart_after_id:
             self.after_cancel(self._chart_after_id)
-        self._chart_after_id = self.after(80, lambda: self._draw_chart())
+        self._chart_after_id = self.after(80, lambda: self._draw_chart(self._pending_humor_history))
 
     # ——————————————————————————————————————————————————————————————————————
     #  Seções
     # ——————————————————————————————————————————————————————————————————————
     def _atualizar_secao_agenda(self, data):
-        self._limpar(self.left_col)
-        # Recria o card do gráfico (que foi limpo)
-        self._criar_card_chart()
-
-        card = Card(
-            self.left_col, title=f"{ICONS['calendar']}  Próximos Atendimentos",
-        )
-        card.pack(fill="x", pady=(0, 14))
+        card = getattr(self, "_agenda_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(
+                self.left_col, title=f"{ICONS['calendar']}  Próximos Atendimentos",
+            )
+            card.pack(fill="x", pady=(0, 14))
+            self._agenda_card = card
+        else:
+            self._limpar(card.body)
 
         appointments = data.get("upcoming_appointments", [])
         if appointments:
@@ -562,11 +573,15 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             ).pack(pady=10)
 
     def _atualizar_secao_alertas(self, data):
-        n_alerts = len(data.get("attention_students", []))
-        card = Card(
-            self.right_col, title=f"{ICONS['danger']}  Estudantes em Alerta",
-        )
-        card.pack(fill="x", pady=(0, 14))
+        card = getattr(self, "_alert_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(
+                self.right_col, title=f"{ICONS['danger']}  Estudantes em Alerta",
+            )
+            card.pack(fill="x", pady=(0, 14))
+            self._alert_card = card
+        else:
+            self._limpar(card.body)
 
         students = data.get("attention_students", [])
         if students:
@@ -580,8 +595,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             ).pack(pady=10)
 
     def _atualizar_secao_bem_estar(self, data):
-        card = Card(self.left_col, title=f"{ICONS['heart']}  Bem-Estar por Dimensão")
-        card.pack(fill="x", pady=(0, 14))
+        card = getattr(self, "_bem_estar_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(self.left_col, title=f"{ICONS['heart']}  Bem-Estar por Dimensão")
+            card.pack(fill="x", pady=(0, 14))
+            self._bem_estar_card = card
+        else:
+            self._limpar(card.body)
 
         be = data.get("bem_estar_dimensions", {})
         dims = [
@@ -596,7 +616,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
     def _atualizar_secao_humor(self, data):
         humor_history = data.get("humor_history", [])
-        self._draw_chart(humor_history if humor_history else None)
+        self._pending_humor_history = humor_history if humor_history else None
+        self._schedule_draw_chart()
 
     # ——————————————————————————————————————————————————————————————————————
     #  Gráfico canvas
@@ -609,20 +630,31 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             return
 
         if not humor_history:
-            pts   = [2.8, 3.1, 2.9, 3.2, 2.7, 3.5, 3.2, 2.9, 3.0, 3.8, 3.4, 3.6, 3.2, 3.1, 3.9]
-            dates = ["05/01", "07/01", "09/01", "11/01", "13/01", "15/01",
-                     "17/01", "19/01", "21/01", "23/01", "25/01", "27/01",
-                     "28/01", "29/01", "30/01"]
+            pts = []
+            dates = []
         else:
-            pts   = [item["media_humor"] for item in humor_history]
-            dates = [item.get("data", "") for item in humor_history]
-            if len(pts) < 2:
-                if not pts:
-                    pts   = [0.0, 0.0]
-                    dates = ["—", "—"]
-                else:
-                    pts   = [pts[0], pts[0]]
-                    dates = [dates[0], dates[0]]
+            pts = [item.get("media_humor", 0) or 0 for item in humor_history]
+            dates = [item.get("data") or item.get("date") or "" for item in humor_history]
+
+        if len(pts) < 2:
+            if len(pts) == 1:
+                pts = [pts[0], pts[0]]
+                dates = [dates[0], dates[0]] if dates else dates
+            else:
+                pts = []
+                dates = []
+
+        if not pts:
+            for child in self.chart_card.body.winfo_children():
+                if child.winfo_exists():
+                    child.destroy()
+            EmptyState(
+                self.chart_card.body,
+                icon=ICONS["chart"],
+                title="Sem dados de humor",
+                subtitle="Os registros aparecerão aqui quando houver entradas",
+            ).pack(expand=True, fill="both", padx=24, pady=24)
+            return
 
         mx, my = 44, 24
         cw2 = cw - 2 * mx
@@ -811,12 +843,16 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._atualizar_badge_notificacoes()
 
     def _marcar_todas_lidas(self, tipo):
-        notifs = (self.controller_dashboard.obter_notificacoes_ajuda()
-                  if tipo == "ajuda"
-                  else self.controller_dashboard.obter_notificacoes_alertas())
-        for n in notifs:
-            self.controller_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
-        self._atualizar_badge_notificacoes()
+        try:
+            notifs = (self.controller_dashboard.obter_notificacoes_ajuda()
+                      if tipo == "ajuda"
+                      else self.controller_dashboard.obter_notificacoes_alertas())
+            for n in notifs:
+                self.controller_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
+            self._atualizar_badge_notificacoes()
+        except Exception as e:
+            print(f"Erro ao marcar todas como lidas: {e}")
+            messagebox.showerror("Erro", f"Erro ao marcar notificações como lidas:\n{e}", parent=self.winfo_toplevel())
 
     # ——————————————————————————————————————————————————————————————————————
     #  Utilitários

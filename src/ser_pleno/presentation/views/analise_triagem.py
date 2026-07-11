@@ -366,11 +366,14 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Ações de linha
     # ••••••••••••••••••••••••••••••••••••••••••
-    def _ver_detalhe(self, item: dict):
-        self._modal_detalhe(item)
-
-    def _editar(self, item: dict):
-        self._modal_editar_triagem(item)
+    def _excluir_triagem(self, item: dict):
+        def _task():
+            return self.controller_triagem.deletar_triagem(item.get("id"))
+        def _on_ok(_):
+            self._carregar_triagens()
+        def _on_err(e):
+            messagebox.showerror("Erro", f"Falha ao excluir triagem.\n{e}")
+        AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  MODAL: Nova Triagem
@@ -486,14 +489,19 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             if not nome:
                 return
             novo = {
-                "student":  nome,
-                "date":     data or "—”",
+                "student_name": nome,
+                "scheduled_date": data or "—",
                 "priority": om_prioridade.get(),
-                "status":   om_status.get(),
+                "status": om_status.get(),
             }
-            self.data_master.append(novo)
-            modal.destroy()
-            self.renderizar_tabela(self.data_master)
+            def _task():
+                return self.controller_triagem.criar_triagem(novo)
+            def _on_ok(_):
+                modal.destroy()
+                self._carregar_triagens()
+            def _on_err(e):
+                messagebox.showerror("Erro", f"Falha ao salvar triagem.\n{e}")
+            AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
 
         PrimaryButton(
             footer, text=f"{ICONS['save']}  Salvar", command=salvar,

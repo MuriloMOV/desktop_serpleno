@@ -1135,6 +1135,27 @@ class BaseModal(ctk.CTkToplevel):
         self.grab_set()
 
 
+# Widgets interativos que já possuem tratamento próprio de clique/teclado.
+# Eles não devem ser interceptados pelo binding recursivo, senão o clique
+# de um botão/filho acionaria também o handler do container.
+_CLICKABLE_EXCLUDE = (
+    ctk.CTkButton, ctk.CTkEntry, ctk.CTkTextbox,
+    ctk.CTkOptionMenu, ctk.CTkSwitch, ctk.CTkCheckBox,
+    ctk.CTkRadioButton, ctk.CTkComboBox,
+)
+
+
+def _bind_clickable_recursive(widget, on_click):
+    """Bind mouse/keyboard events em widget e todos os descendentes não-interativos."""
+    if isinstance(widget, _CLICKABLE_EXCLUDE):
+        return
+    widget.bind("<Button-1>", lambda e: on_click())
+    widget.bind("<Return>", lambda e: on_click())
+    widget.bind("<space>", lambda e: on_click())
+    for child in widget.winfo_children():
+        _bind_clickable_recursive(child, on_click)
+
+
 class ClickableFrame(ctk.CTkFrame):
     """Frame clicável com suporte a mouse e teclado (<Return>, <space>)."""
 
@@ -1142,15 +1163,11 @@ class ClickableFrame(ctk.CTkFrame):
         super().__init__(parent, **kwargs)
         self._on_click = on_click
         self.configure(cursor="hand2")
-        self.bind("<Button-1>", lambda e: self._on_click())
-        self.bind("<Return>", lambda e: self._on_click())
-        self.bind("<space>", lambda e: self._on_click())
+        _bind_clickable_recursive(self, self._on_click)
 
 
 def bind_clickable(widget, on_click):
     """Aplica comportamento clicável (mouse + teclado) a qualquer widget."""
     widget.configure(cursor="hand2")
-    widget.bind("<Button-1>", lambda e: on_click())
-    widget.bind("<Return>", lambda e: on_click())
-    widget.bind("<space>", lambda e: on_click())
+    _bind_clickable_recursive(widget, on_click)
 

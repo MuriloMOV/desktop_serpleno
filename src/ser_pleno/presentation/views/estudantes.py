@@ -131,6 +131,7 @@ class EstudantesFrame(ctk.CTkFrame):
         self._todos_estudantes: list = []
         self._selecionado: dict | None = None
         self._item_widgets: dict = {}   # id → frame widget
+        self._filter_after_id = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -570,7 +571,9 @@ class EstudantesFrame(ctk.CTkFrame):
     #  Filtros
     # ••••••••••••••••••••••••••••••••••••••
     def _filtrar(self, _=None):
-        self._aplicar_filtros()
+        if self._filter_after_id:
+            self.after_cancel(self._filter_after_id)
+        self._filter_after_id = self.after(180, self._aplicar_filtros)
 
     def _aplicar_filtros(self):
         termo  = self.entry_busca.get().lower() if hasattr(self, "entry_busca") else ""

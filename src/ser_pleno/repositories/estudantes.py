@@ -1,20 +1,69 @@
 # -*- coding: utf-8 -*-
-"""Repositório de estudantes."""
+"""Repositorio de estudantes."""
 
-from ser_pleno.repositories.base import fetch_all, fetch_one, execute_non_query
+import json
+from typing import Any
+
+from ser_pleno.repositories.base import (
+    fetch_all,
+    fetch_one,
+    execute_non_query,
+    with_local_fallback,
+    local_cache,
+    write_with_fallback,
+    generate_local_id,
+)
+from ser_pleno.infrastructure.api.sync_service import queue_sync
 
 
 # Whitelist de colunas que podem ser atualizadas via DML.
-# Qualquer campo fora desta lista é rejeitado antes de atingir o banco.
+# Qualquer campo fora desta lista e rejeitado antes de atingir o banco.
 _CAMPOS_ATUALIZAVEIS = {
     "nome",
-    "email",
+    "professor_responsavel",
     "has_medical_report",
     "requires_attention",
+    "status",
+    "priority_level",
+    "tags",
+    "avatar",
+    "dark_mode",
+    "notifications_enabled",
 }
 
 
+def _shorten_avatar(value: Any) -> str:
+    if not value:
+        return "a"
+    text = str(value)
+    if "/" in text or "\\" in text:
+        text = text.replace("\\", "/").split("/")[-1]
+    if not text:
+        text = "avatar"
+    if "." in text:
+        text = text.split(".")[0]
+    return text[:1]
+
+
+def _student_data(nome, email, has_medical_report, requires_attention, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1):
+    data = {
+        "nome": nome,
+        "email": email,
+        "has_medical_report": int(has_medical_report),
+        "requires_attention": int(requires_attention),
+        "professor_responsavel": professor_responsavel,
+        "status": status,
+        "priority_level": int(priority_level),
+        "tags": json.dumps(tags) if tags else "[]",
+        "avatar": _shorten_avatar(avatar),
+        "dark_mode": int(dark_mode),
+        "notifications_enabled": int(notifications_enabled),
+    }
+    return data
+
+
 class EstudanteRepository:
+    @with_local_fallback("_local_listar")
     def listar(self, busca=None, possui_laudo=None, requer_atencao=None):
         query = (
             "SELECT a.*, u.email AS contact "
@@ -35,6 +84,28 @@ class EstudanteRepository:
         query += " ORDER BY a.nome ASC"
         return fetch_all(query, params)
 
+    def _local_listar(self, busca=None, possui_laudo=None, requer_atencao=None):
+        rows = local_cache.list_students(busca=busca)
+        resultado = []
+        for r in rows:
+            item = {
+                "id_aluno": r.get("id"),
+                "nome": r.get("nome"),
+                "email": r.get("email"),
+                "has_medical_report": r.get("has_medical_report", 0),
+                "requires_attention": r.get("requires_attention", 0),
+                "contact": r.get("email"),
+            }
+            if possui_laudo is not None:
+                if item["has_medical_report"] != int(possui_laudo):
+                    continue
+            if requer_atencao is not None:
+                if item["requires_attention"] != int(requer_atencao):
+                    continue
+            resultado.append(item)
+        return resultado
+
+    @with_local_fallback("_local_obter")
     def obter(self, id_estudante):
         query = (
             "SELECT a.*, u.email AS contact "
@@ -44,33 +115,120 @@ class EstudanteRepository:
         )
         return fetch_one(query, (id_estudante,))
 
-    def criar(self, nome, email, has_medical_report=False, requires_attention=False):
+    def _local_obter(self, id_estudante):
+        rows = local_cache.list_all("students", where_clause="id=?", params=(id_estudante,))
+        if not rows:
+            return None
+        r = rows[0]
+        return {
+            "id_aluno": r.get("id"),
+            "nome": r.get("nome"),
+            "email": r.get("email"),
+            "has_medical_report": r.get("has_medical_report", 0),
+            "requires_attention": r.get("requires_attention", 0),
+            "contact": r.get("email"),
+        }
+
+    def criar(self, nome, email, has_medical_report=False, requires_attention=False, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1):
         query = (
             "INSERT INTO aluno "
-            "(nome, email, has_medical_report, requires_attention) "
-            "VALUES (%s, %s, %s, %s)"
+            "(nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
-        return execute_non_query(
-            query,
-            (nome, email, has_medical_report, requires_attention),
+        avatar_value = _shorten_avatar(avatar)
+        params = (nome, professor_responsavel, status, int(priority_level), json.dumps(tags) if tags else "[]", avatar_value, int(dark_mode), int(notifications_enabled), int(has_medical_report), int(requires_attention))
+        student_data = _student_data(
+            nome, email, has_medical_report, requires_attention,
+            professor_responsavel=professor_responsavel,
+            status=status,
+            priority_level=priority_level,
+            tags=tags,
+            avatar=avatar_value,
+            dark_mode=dark_mode,
+            notifications_enabled=notifications_enabled,
         )
+
+        def _mysql():
+            return execute_non_query(query, params)
+
+        def _local(mysql_result):
+            lid = generate_local_id(mysql_result)
+            student_data["id"] = lid
+            local_cache.upsert_student(student_data)
+            return lid
+
+        def _queue_data(mysql_result, entity_id):
+            lid = generate_local_id(mysql_result)
+            student_data["id"] = lid
+            return student_data
+
+        last_id = write_with_fallback(
+            _mysql, _local,
+            operation="create", entity="students", entity_id="novo",
+            queue_data_fn=_queue_data,
+        )
+        return last_id
 
     def atualizar(self, id_estudante, **dados):
         invalidos = set(dados) - _CAMPOS_ATUALIZAVEIS
         if invalidos:
             raise ValueError(
-                f"Campos não permitidos para atualização: {sorted(invalidos)}"
+                f"Campos nao permitidos para atualizacao: {sorted(invalidos)}"
             )
 
         if not dados:
             return 0
 
-        set_clause = ", ".join(f"{k} = %s" for k in dados)
-        params = list(dados.values()) + [id_estudante]
+        # aluno não possui coluna email; email reside em auth_user via user_id
+        mysql_dados = {k: v for k, v in dados.items() if k != "email"}
+        set_clause = ", ".join(f"{k} = %s" for k in mysql_dados)
+        params = list(mysql_dados.values()) + [id_estudante]
         query = f"UPDATE aluno SET {set_clause} WHERE id_aluno = %s"
-        return execute_non_query(query, params)
+        student_data = _student_data(
+            dados.get("nome", ""),
+            dados.get("email", ""),
+            dados.get("has_medical_report", 0),
+            dados.get("requires_attention", 0),
+            professor_responsavel=dados.get("professor_responsavel", "Não informado"),
+            status=dados.get("status", "ativo"),
+            priority_level=dados.get("priority_level", 0),
+            tags=dados.get("tags"),
+            avatar=dados.get("avatar", "/default_avatar.png"),
+            dark_mode=dados.get("dark_mode", 0),
+            notifications_enabled=dados.get("notifications_enabled", 1),
+        )
+        student_data["id"] = id_estudante
+
+        def _mysql():
+            execute_non_query(query, params)
+            return 1
+
+        def _local(mysql_result):
+            local_cache.upsert_student(student_data)
+            return 1
+
+        def _queue_data(mysql_result, entity_id):
+            return student_data
+
+        return write_with_fallback(
+            _mysql, _local,
+            operation="update", entity="students", entity_id=id_estudante,
+            queue_data_fn=_queue_data,
+        )
 
     def deletar(self, id_estudante):
         query = "DELETE FROM aluno WHERE id_aluno = %s"
-        return execute_non_query(query, (id_estudante,))
 
+        def _mysql():
+            execute_non_query(query, (id_estudante,))
+            return 1
+
+        def _local(mysql_result):
+            local_cache.delete("students", "id", id_estudante)
+            return 1
+
+        return write_with_fallback(
+            _mysql, _local,
+            operation="delete", entity="students", entity_id=id_estudante,
+            queue_data_fn=lambda r, eid: {"id": id_estudante},
+        )

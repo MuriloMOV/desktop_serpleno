@@ -9,6 +9,7 @@ from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
+from ser_pleno.presentation.components.ui_components import bind_clickable
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 logger = logging.getLogger("apps.desktop")
@@ -232,9 +233,7 @@ class StudentCard(ctk.CTkFrame):
                                 if not self._selected else None)
         self.bind("<Leave>",    lambda e: self.configure(
             fg_color=O["student_active"] if self._selected else O["student_bg"]))
-        self.bind("<Button-1>", lambda _: self._on_select(self._student, self))
-        for child in inner.winfo_children():
-            child.bind("<Button-1>", lambda _: self._on_select(self._student, self))
+        bind_clickable(self, lambda: self._on_select(self._student, self))
 
     def set_selected(self, selected: bool):
         self._selected = selected
@@ -655,8 +654,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         ctk.CTkLabel(todos_row, text=f"{ICONS['group']}  Todos os estudantes",
                      font=font(size=12, weight="bold"),
                       text_color=O["accent"]).pack(padx=spacing("md"), pady=spacing("sm"))
-        todos_row.bind("<Button-1>",
-                       lambda _: self._mostrar_orientacoes(self._todas_orientacoes))
+        bind_clickable(todos_row, lambda: self._mostrar_orientacoes(self._todas_orientacoes))
 
         for st in estudantes:
             card = StudentCard(self._scroll_students, st,

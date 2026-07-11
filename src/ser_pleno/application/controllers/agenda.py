@@ -18,6 +18,14 @@ class AgendaController(BaseController):
         """Lista agendamentos com filtro opcional por data."""
         return self._service.listar_agendamentos(data)
 
+    def listar_estudantes(self):
+        """Lista estudantes para composição dos selects da agenda."""
+        return self._service.listar_estudantes()
+
+    def listar_horarios_base(self):
+        """Lista horários ativos da grade."""
+        return self._service.listar_horarios_base()
+
     def criar_agendamento(self, dados):
         """Cria um novo agendamento."""
         return self._service.criar_agendamento(dados)

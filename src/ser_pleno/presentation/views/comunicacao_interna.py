@@ -8,6 +8,7 @@ from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
+from ser_pleno.presentation.components.ui_components import bind_clickable
 
 logger = logging.getLogger(__name__)
 
@@ -150,11 +151,11 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
 
         # Botão nova conversa
         IconButton(
-            hdr, icon=ICONS["close"], size=34,
+            hdr, icon=ICONS["add"], size=34,
             fg_color=THEME["primary_soft"],
             hover_color=THEME["primary_hover"],
             text_color=THEME["primary"],
-            command=lambda: None,
+            command=self._nova_conversa,
         ).pack(side="right")
 
         # —— Campo de busca ——————————————————————————————————————————
@@ -289,9 +290,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             if self.conversa_ativa and self.conversa_ativa.get("id") == cid2
             else "transparent"
         ))
-        row.bind("<Button-1>", lambda e, c=contato, r=row: self.selecionar_conversa(c, r))
-        for child in row.winfo_children():
-            child.bind("<Button-1>", lambda e, c=contato, r=row: self.selecionar_conversa(c, r))
+        bind_clickable(row, lambda c=contato, r=row: self.selecionar_conversa(c, r))
 
         self._contact_widgets[cid] = row
 
@@ -314,6 +313,22 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Selecionar conversa
     # ••••••••••••••••••••••••••••••••••••••••••
+    def _nova_conversa(self):
+        """Reseta o estado da conversa atual para iniciar uma nova."""
+        self.conversa_ativa = None
+        self.conversa_atual = None
+        self.mensagens = []
+
+        self.lbl_chat_nome.configure(text="Selecione uma conversa")
+        self.lbl_chat_status.configure(text="Online")
+
+        for w in self._header_av_slot.winfo_children():
+            w.destroy()
+        _make_avatar(self._header_av_slot, "AN", THEME["primary"], 42).pack()
+
+        for w in self.msg_area.winfo_children():
+            w.destroy()
+
     def selecionar_conversa(self, contato: dict, item_widget=None):
         # Limpa seleção anterior
         for w in self.scroll_contacts.winfo_children():

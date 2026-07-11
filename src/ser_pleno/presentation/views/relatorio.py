@@ -292,16 +292,15 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         if cw < 60 or ch < 60:
             return
 
-        # Dados de exemplo se vazio
-        samples = self._chart_data or [
-            {"label": "Jan", "appointments": 12, "interventions": 5, "screenings": 8},
-            {"label": "Fev", "appointments": 18, "interventions": 7, "screenings": 11},
-            {"label": "Mar", "appointments": 14, "interventions": 9, "screenings": 6},
-            {"label": "Abr", "appointments": 22, "interventions": 6, "screenings": 14},
-            {"label": "Mai", "appointments": 16, "interventions": 11, "screenings": 9},
-            {"label": "Jun", "appointments": 25, "interventions": 8, "screenings": 17},
-            {"label": "Jul", "appointments": 19, "interventions": 12, "screenings": 10},
-        ]
+        samples = self._chart_data or []
+        if not samples:
+            EmptyState(
+                self.canvas_chart.master,
+                icon=ICONS["chart"],
+                title="Sem dados para o gráfico",
+                subtitle="Os registros aparecerão aqui quando houver movimentação",
+            ).pack(expand=True, fill="both", padx=24, pady=24)
+            return
 
         mx, my = 40, 20
         bw = (cw - 2 * mx) / max(1, len(samples))

@@ -67,11 +67,7 @@ class ScheduleCell(ctk.CTkFrame):
         self._build()
 
     def _build(self):
-        self.bind("<Button-1>", lambda e: self._open())
-        self.bind("<Return>", lambda e: self._open())
-        self.bind("<space>", lambda e: self._open())
-        if hasattr(self, "configure"):
-            self.configure(cursor="hand2")
+        bind_clickable(self, self._open)
 
         header = ctk.CTkFrame(self, fg_color="transparent")
         header.pack(fill="x", padx=spacing("md"), pady=(spacing("md"), 0))
@@ -112,7 +108,7 @@ class AppointmentModal(BaseModal):
     """Modal de criação/edição de agendamento."""
     def __init__(self, parent, hora: str, info: dict | None,
                  horarios_base: list[str], mapa_estudantes: dict[str, int],
-                 on_save, on_delete=None):
+                 on_save, on_delete=None, on_success=None):
         self._parent_window = parent.winfo_toplevel()
         self.hora = hora
         self.info = info
@@ -120,6 +116,7 @@ class AppointmentModal(BaseModal):
         self.mapa_estudantes = mapa_estudantes
         self.on_save = on_save
         self.on_delete = on_delete
+        self.on_success = on_success
         super().__init__(parent, title="Editar Agendamento" if info else "Novo Agendamento", width=520, height=760)
         self._build()
 
@@ -240,8 +237,13 @@ class AppointmentModal(BaseModal):
             id_antigo = self.info.get("id_agendamento") if self.info else None
             res = self.on_save(id_antigo, dados)
             if res.get("success"):
+                if callable(getattr(self, "on_success", None)):
+                    try:
+                        self.on_success()
+                    except Exception:
+                        pass
+                Toast(self._parent_window, "Agendamento salvo com sucesso", status="success", duration=2500)
                 self.destroy()
-                Toast(self, "Agendamento salvo com sucesso", status="success", duration=2500)
             else:
                 messagebox.showerror("Erro", str(res.get("message", "Erro ao salvar")))
         except Exception as e:
@@ -254,8 +256,13 @@ class AppointmentModal(BaseModal):
             try:
                 res = self.on_delete(self.info["id_agendamento"])
                 if res.get("success"):
+                    if callable(getattr(self, "on_success", None)):
+                        try:
+                            self.on_success()
+                        except Exception:
+                            pass
+                    Toast(self._parent_window, "Agendamento removido", status="success", duration=2500)
                     self.destroy()
-                    Toast(self, "Agendamento removido", status="success", duration=2500)
                 else:
                     messagebox.showerror("Erro", str(res.get("message", "Erro ao remover")))
             except Exception as e:
@@ -315,7 +322,7 @@ class GradeManagementModal(BaseModal):
         for child in self.lista_frame.winfo_children():
             child.destroy()
 
-        self.on_refresh()
+        self.horarios_base = self.controller_agenda.listar_horarios_base()
         for h in self.horarios_base:
             row = ctk.CTkFrame(
                 self.lista_frame, fg_color=THEME["surface"],
@@ -343,6 +350,11 @@ class GradeManagementModal(BaseModal):
             if res.get("success"):
                 self.entry_novo.delete(0, "end")
                 self._render_lista()
+                if callable(getattr(self, "on_refresh", None)):
+                    try:
+                        self.on_refresh()
+                    except Exception:
+                        pass
             else:
                 messagebox.showerror("Erro", str(res.get("message", "Erro ao adicionar horário")))
         except Exception as e:
@@ -354,6 +366,11 @@ class GradeManagementModal(BaseModal):
                 res = self.controller_agenda.remover_horario_disponibilidade(horario)
                 if res.get("success"):
                     self._render_lista()
+                    if callable(getattr(self, "on_refresh", None)):
+                        try:
+                            self.on_refresh()
+                        except Exception:
+                            pass
                 else:
                     messagebox.showerror("Erro", str(res.get("message", "Erro ao remover horário")))
             except Exception as e:
@@ -387,39 +404,23 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     # ——————————————————————————————————————————————————————————————————————
 
     def refresh_all(self):
-        self.fetch_horarios_base()
-        self.fetch_estudantes()
+        self._carregar_horarios_base()
+        self._carregar_estudantes()
         self._atualizar_label_data()
         self.load_grid_data()
 
-    def fetch_estudantes(self):
+    def _carregar_estudantes(self):
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id_aluno, nome FROM aluno ORDER BY nome ASC")
-            rows = cursor.fetchall()
-            self.mapa_estudantes = {str(r["nome"]): int(r["id_aluno"]) for r in rows}
-            cursor.close()
-            conn.close()
+            rows = self.controller_agenda.listar_estudantes()
+            self.mapa_estudantes = {str(r.get("nome") or r.get("student_name") or ""): int(r.get("id_aluno") or r.get("student_id") or 0) for r in rows}
+            self.mapa_estudantes = {k: v for k, v in self.mapa_estudantes.items() if k and v}
         except Exception as e:
             print(f"Erro ao buscar estudantes: {e}")
+            self.mapa_estudantes = {}
 
-    def fetch_horarios_base(self):
+    def _carregar_horarios_base(self):
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute("SELECT Horario FROM disponibilidade WHERE is_active = 1 ORDER BY Horario")
-            results = cursor.fetchall()
-            self.horarios_base = []
-            for row in results:
-                horario = row[0]
-                if hasattr(horario, "strftime"):
-                    self.horarios_base.append(horario.strftime("%H:%M"))
-                else:
-                    horario_str = str(horario)
-                    self.horarios_base.append(horario_str[:5] if len(horario_str) > 5 else horario_str)
-            cursor.close()
-            conn.close()
+            self.horarios_base = self.controller_agenda.listar_horarios_base()
         except Exception as e:
             print(f"Erro ao buscar horários base: {e}")
             self.horarios_base = []
@@ -559,7 +560,8 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             horarios_base=self.horarios_base,
             mapa_estudantes=self.mapa_estudantes,
             on_save=self._salvar_agendamento,
-            on_delete=self.remover_agendamento
+            on_delete=self.remover_agendamento,
+            on_success=self.refresh_all,
         )
         # Injeta data selecionada no modal estático
         modal._get_data_selecionada = lambda: self.data_selecionada.strftime("%Y-%m-%d")
@@ -567,7 +569,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     def _abrir_modal_gestao(self):
         GradeManagementModal(
             self, self.horarios_base, self.controller_agenda,
-            on_refresh=self.fetch_horarios_base
+            on_refresh=self.refresh_all
         )
 
     # ——————————————————————————————————————————————————————————————————————

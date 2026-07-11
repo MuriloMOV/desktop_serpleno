@@ -200,21 +200,20 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
     def update_metrics(self, data):
         summary = data.get("summary", {})
-        humor   = summary.get("avg_mood")
-        if humor and hasattr(self, "_kpi_humor"):
+        humor = summary.get("average_mood")
+        if humor is not None and hasattr(self, "_kpi_humor"):
             emoji = mood_emoji_from_score(round(humor))
             self._kpi_humor.set_value(f"{emoji}  {humor:.1f}")
-        part = summary.get("participation_rate")
-        if part and hasattr(self, "_kpi_part"):
-            self._kpi_part.set_value(f"{part:.0f}%")
-        crit = summary.get("critical_count")
-        if crit is not None and hasattr(self, "_kpi_crit"):
-            self._kpi_crit.set_value(str(crit))
 
-        history = data.get("history") or data.get("mood_history") or []
-        if history:
-            self._chart_data = history
+        moods = data.get("moods", []) or []
+        if moods:
+            self._chart_data = moods
             self._draw_chart()
+            self._update_distribution(moods)
+        else:
+            self._chart_data = []
+            self._draw_chart()
+            self._update_distribution([])
 
     # ••••••••••••••••••••••••••••••••••••••
     #  CABEÇALHO
@@ -255,14 +254,28 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
         self._secao_grafico_outer = outer
 
+        chart_wrap = ctk.CTkFrame(outer.body, fg_color="transparent")
+        chart_wrap.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
+        chart_wrap.grid_rowconfigure(0, weight=1)
+        chart_wrap.grid_columnconfigure(0, weight=1)
+
         # Canvas
         self.canvas_30d = ctk.CTkCanvas(
-            outer.body, bg=THEME["surface"],
+            chart_wrap, bg=THEME["surface"],
             height=200, highlightthickness=0,
         )
-        self.canvas_30d.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
+        self.canvas_30d.grid(row=0, column=0, sticky="nsew")
         self._chart_after_id = None
-        outer.body.bind("<Configure>", self._schedule_draw_chart)
+        chart_wrap.bind("<Configure>", self._schedule_draw_chart)
+
+        # Empty state overlay
+        self._chart_empty = EmptyState(
+            chart_wrap, icon=ICONS["chart"],
+            title="Sem dados de humor",
+            subtitle="Os registros aparecerão aqui quando houver entradas",
+        )
+        self._chart_empty.grid(row=0, column=0, sticky="nsew")
+        self._chart_empty.lower()
 
         # Barras de distribuição de humor
         dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
@@ -313,16 +326,25 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         if cw < 80 or ch < 60:
             return
 
-        pts  = ([d.get("avg_mood") or d.get("media_humor", 3.0)
-                  for d in self._chart_data]
-                if self._chart_data
-                else [3.5, 3.2, 3.8, 3.4, 3.1, 3.0, 3.6, 3.9,
-                      4.2, 4.0, 3.8, 4.1, 4.3, 4.2, 4.5])
+        pts = (
+            [d.get("mood_level") or d.get("avg_mood") or d.get("media_humor") or 3.0
+             for d in self._chart_data]
+            if self._chart_data else []
+        )
+
+        if not pts:
+            self.canvas_30d.delete("all")
+            if hasattr(self, "_chart_empty") and self._chart_empty.winfo_exists():
+                self._chart_empty.lift()
+            return
+
+        if hasattr(self, "_chart_empty") and self._chart_empty.winfo_exists():
+            self._chart_empty.lower()
 
         mx, my = 40, 20
-        cw2    = cw - 2 * mx
-        ch2    = ch - 2 * my
-        n      = len(pts)
+        cw2 = cw - 2 * mx
+        ch2 = ch - 2 * my
+        n = len(pts)
 
         # Grades + labels Y
         for i in range(6):
@@ -373,7 +395,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         for i, (x, _) in enumerate(coords):
             if i % step == 0 and self._chart_data:
                 raw = self._chart_data[i]
-                lbl = raw.get("data") or raw.get("date") or ""
+                lbl = raw.get("entry_date") or raw.get("date") or raw.get("data") or ""
                 if len(lbl) > 5:
                     lbl = lbl[5:]   # só MM-DD
                 self.canvas_30d.create_text(
@@ -381,8 +403,37 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                     font=(FONT_FAMILY, 8), fill=THEME["text_secondary"],
                 )
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  VISAO DE RISCO (kanban 4 colunas)
+    def _update_distribution(self, moods: list[dict]):
+        if not moods:
+            for pct_key in ("bom", "med", "mau"):
+                if pct_key in self._dist_pcts:
+                    self._dist_pcts[pct_key].configure(text="0%")
+                fill = self._dist_bars.get(pct_key)
+                if fill and fill.winfo_exists():
+                    fill.configure(width=1)
+            return
+
+        total = len(moods)
+        bom = sum(1 for m in moods if (m.get("mood_level") or 0) >= 4)
+        mau = sum(1 for m in moods if (m.get("mood_level") or 0) <= 2)
+        med = total - bom - mau
+
+        def _set(pct_key, count):
+            pct = int((count / total) * 100) if total else 0
+            if pct_key in self._dist_pcts:
+                self._dist_pcts[pct_key].configure(text=f"{pct}%")
+            fill = self._dist_bars.get(pct_key)
+            if fill and fill.winfo_exists():
+                parent = fill.master
+                if parent.winfo_exists():
+                    fill.configure(width=max(1, int(parent.winfo_width() * pct / 100)))
+
+        _set("bom", bom)
+        _set("med", med)
+        _set("mau", mau)
+
+    # ••••••••••••••••••••••••••
+    #  VISÃO DE RISCO (kanban 4 colunas)
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_visao_risco(self):
         # Título externo ao card
