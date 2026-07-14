@@ -421,7 +421,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             help_f, icon=ICONS["help"], size=20,
             fg_color="transparent", text_color=THEME["primary"],
         ).place(relx=0.5, rely=0.5, anchor="center")
-        self.help_badge = self._criar_badge(help_f)
+        self.help_badge = self._criar_badge(right)
+        self.help_badge_anchor = help_f
 
         # Ícone alertas
         alert_f = ctk.CTkFrame(right, width=38, height=38, corner_radius=RADIUS["button"],
@@ -433,7 +434,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             alert_f, icon=ICONS["notification"], size=20,
             fg_color="transparent", text_color=THEME["danger"],
         ).place(relx=0.5, rely=0.5, anchor="center")
-        self.alert_badge = self._criar_badge(alert_f)
+        self.alert_badge = self._criar_badge(right)
+        self.alert_badge_anchor = alert_f
 
         # Avatar
         name = ""
@@ -452,14 +454,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(
-            parent, width=18, height=18,
-            corner_radius=9, fg_color=THEME["danger"],
+            parent, corner_radius=9, fg_color=THEME["danger"],
         )
         ctk.CTkLabel(
             badge, text="0",
             font=themed_font("caption", "bold"),
             text_color="white",
-        ).place(relx=0.5, rely=0.5, anchor="center")
+        ).pack(padx=5, pady=1)
         return badge
 
     # ——————————————————————————————————————————————————————————————————————
@@ -825,16 +826,20 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         alertas = self.controller_dashboard.obter_notificacoes_alertas()
         n_ajuda   = sum(1 for n in ajuda   if not n.get("lida", True))
         n_alertas = sum(1 for n in alertas if not n.get("lida", True))
-        self._set_badge(self.help_badge,  n_ajuda)
-        self._set_badge(self.alert_badge, n_alertas)
+        self._set_badge(self.help_badge,  n_ajuda,  getattr(self, "help_badge_anchor", None))
+        self._set_badge(self.alert_badge, n_alertas, getattr(self, "alert_badge_anchor", None))
 
-    def _set_badge(self, badge: ctk.CTkFrame, count: int):
+    def _set_badge(self, badge: ctk.CTkFrame, count: int, anchor=None):
         lbl = next((c for c in badge.winfo_children()
                     if isinstance(c, ctk.CTkLabel)), None)
         if lbl:
             lbl.configure(text=str(count) if count else "")
-        if count > 0:
-            badge.place(relx=0.72, rely=0.05)
+        if count > 0 and anchor and anchor.winfo_exists():
+            self.update_idletasks()
+            anchor_x = anchor.winfo_x()
+            anchor_y = anchor.winfo_y()
+            badge.place(x=anchor_x + anchor.winfo_width() + 3, y=anchor_y - 3)
+            badge.lift()
         else:
             badge.place_forget()
 
