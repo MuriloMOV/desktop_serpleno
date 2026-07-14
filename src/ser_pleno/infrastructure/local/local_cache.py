@@ -34,6 +34,7 @@ class LocalCache:
         except AttributeError:
             conn = None
         if conn is None:
+            os.makedirs(os.path.dirname(self.DB_FILE), exist_ok=True)
             conn = sqlite3.connect(self.DB_FILE)
             conn.row_factory = sqlite3.Row
             conn.execute("PRAGMA journal_mode=WAL")

@@ -16,7 +16,7 @@ from ser_pleno.infrastructure.api.api import set_auth_service as set_auth_servic
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
-    PrimaryButton, GhostButton, InputField, Badge, Divider
+    PrimaryButton, GhostButton, SecondaryButton, InputField, Badge, Divider
 )
 from ser_pleno.presentation.components.icons import ICONS
 
@@ -45,6 +45,7 @@ _LOGIN_PALETTE = {
         "accent":       THEME["primary"],
         "accent_hover": THEME["primary_hover"],
         "accent_soft":  THEME["primary_soft"],
+        "accent_medium":THEME["primary_medium"],
 
         # Texto
         "text_primary": THEME["text"],
@@ -72,7 +73,7 @@ def _lerp_color(c1_hex: str, c2_hex: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-CARD_W, CARD_H = 444, 582
+CARD_W, CARD_H = 444, 640
 
 
 # —————————————————————————————————————————————
@@ -274,14 +275,14 @@ class LoginFrame(ctk.CTkFrame):
             w = self.winfo_width()
             h = self.winfo_height()
             if w > 1 and h > 1:
-                card_w, card_h = 444, 582
+                card_w, card_h = 444, 720
                 card_x = (w - card_w) / 2
                 card_y = (h - card_h) / 2
                 self.canvas.coords(self._card_img_id, card_x, card_y)
 
     def _criar_imagem_card_redimensionada(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Cria imagem do card redimensionada para as dimensões especificadas."""
-        tamanho_original = (444, 582)
+        tamanho_original = (444, 720)
         tamanho_destino = (width, height)
 
         # Cria nova imagem com fundo branco
@@ -305,14 +306,14 @@ class LoginFrame(ctk.CTkFrame):
             w = self.winfo_width()
             h = self.winfo_height()
             if w > 1 and h > 1:
-                card_w, card_h = 444, 582
+                card_w, card_h = 444, 720
                 card_x = (w - card_w) / 2
                 card_y = (h - card_h) / 2
                 self.canvas.coords(self._card_img_id, card_x, card_y)
 
     def _criar_imagem_card_redimensionada(self, width: int, height: int) -> ImageTk.PhotoImage:
         """Cria imagem do card redimensionada para as dimensões especificadas."""
-        tamanho_original = (444, 582)
+        tamanho_original = (444, 720)
         tamanho_destino = (width, height)
 
         # Cria nova imagem com fundo branco
@@ -379,7 +380,7 @@ class LoginFrame(ctk.CTkFrame):
         # Atualiza card redimensionado se necessário
         if hasattr(self, "_card_img_id") and hasattr(self, "_card"):
             card_x = (w - 444) / 2
-            card_y = (h - 582) / 2
+            card_y = (h - 720) / 2
             self.canvas.coords(self._card_img_id, card_x, card_y)
 
         # Garante que os elementos de UI fiquem por cima
@@ -471,16 +472,16 @@ class LoginFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_imagem_card(self):
         """Cria imagem do card com bordas arredondadas usando PIL."""
-        tamanho = (444, 582)
+        tamanho = (444, 720)
         img = Image.new("RGBA", tamanho, (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
-        draw.rounded_rectangle([0, 0, 443, 581], radius=20, fill=(255, 255, 255, 255))
+        draw.rounded_rectangle([0, 0, 443, 719], radius=20, fill=(255, 255, 255, 255))
         return ImageTk.PhotoImage(img)
 
     def _criar_card_login(self):
         # Mantém fundo branco no CTk; o arredondamento visual vem da imagem PIL no canvas
         self.card = ctk.CTkFrame(
-            self, width=444, height=582,
+            self, width=444, height=720,
             corner_radius=0,
             fg_color=_LOGIN_PALETTE["card_bg"],
             bg_color=_LOGIN_PALETTE["card_bg"],
@@ -499,16 +500,15 @@ class LoginFrame(ctk.CTkFrame):
         header.pack(fill="x", pady=(0, 18))
 
         badge = ctk.CTkFrame(
-            header, height=32, corner_radius=RADIUS["pill"],
+            header, corner_radius=RADIUS["pill"],
             fg_color=self.palette["accent_soft"],
         )
         badge.pack(pady=(0, 10))
-        badge.pack_propagate(False)
         ctk.CTkLabel(
             badge, text="Acesso seguro · Plataforma SerPleno",
             font=themed_font("caption", "bold"),
             text_color=self.palette["accent"],
-        ).place(relx=0.5, rely=0.5, anchor="center")
+        ).pack(padx=(16, 16), pady=(6, 6))
 
         icon_bg = ctk.CTkFrame(
             header, width=68, height=68,
@@ -517,7 +517,7 @@ class LoginFrame(ctk.CTkFrame):
         )
         icon_bg.pack(pady=(0, 10))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text=f"{ICONS['group']} ", font=themed_font("h2")).place(relx=0.5, rely=0.5, anchor="center")
+        ctk.CTkLabel(icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color="#7C3AED").place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
             header, text="SerPleno", font=themed_font("h2", "bold"),
@@ -550,9 +550,9 @@ class LoginFrame(ctk.CTkFrame):
 
         self.lbl_erro = ctk.CTkLabel(
             inner, text="", text_color=self.palette["danger"],
-            font=themed_font("body"), anchor="center",
+            font=themed_font("body"), anchor="center", wraplength=340,
         )
-        self.lbl_erro.pack(pady=(8, 0))
+        self.lbl_erro.pack(pady=(12, 0))
 
         self.btn_entrar = PrimaryButton(
             inner, text="Entrar", command=self._fazer_login,
@@ -560,10 +560,20 @@ class LoginFrame(ctk.CTkFrame):
         )
         self.btn_entrar.pack(fill="x", pady=(14, 8))
 
-        GhostButton(
-            inner, text=f"{ICONS['lock']}  Política de Privacidade", command=self._abrir_politica,
-            height=34, corner_radius=RADIUS["button"], text_color=self.palette["text_muted"],
-        ).pack(fill="x")
+        _termos_btn = ctk.CTkButton(
+            inner, text=f"{ICONS['lock']}  Termos de Privacidade",
+            command=self._abrir_termos,
+            fg_color="transparent",
+            hover_color=self.palette["accent_soft"],
+            text_color=self.palette["accent"],
+            border_width=1,
+            border_color=self.palette["accent_medium"],
+            corner_radius=RADIUS["button"],
+            height=36,
+            font=themed_font("caption", "bold"),
+            anchor="center",
+        )
+        _termos_btn.pack(fill="x", pady=(6, 0))
 
         self.entry_user = self.input_user.entry
         self.entry_pass = self.input_pass.entry
@@ -784,6 +794,48 @@ class LoginFrame(ctk.CTkFrame):
                 "conformidade com a LGPD. Esta política garante a proteção\n"
                 "de informações pessoais e acadêmicas durante o uso da\n"
                 "plataforma."
+            ),
+            font=themed_font("body"),
+            text_color=self.palette["text_muted"],
+            justify="center",
+        ).pack(pady=(0, 20))
+
+        PrimaryButton(inner, text="Entendi", command=top.destroy, height=40,
+                      corner_radius=RADIUS["button"], width=160).pack()
+
+    def _abrir_termos(self):
+        top = ctk.CTkToplevel(self)
+        top.title("Termos de Privacidade")
+        top.geometry("480x420")
+        top.configure(fg_color=THEME["surface"])
+        top.resizable(False, False)
+        top.transient(self.winfo_toplevel())
+        top.grab_set()
+        top.after(50, lambda: top.geometry(
+            f"480x420+{self.winfo_screenwidth() // 2 - 240}+{self.winfo_screenheight() // 2 - 210}"
+        ))
+
+        inner = ctk.CTkFrame(top, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=spacing("modal"), pady=spacing("modal"))
+
+        icon_bg = ctk.CTkFrame(inner, width=52, height=52, corner_radius=RADIUS["avatar"],
+                               fg_color=self.palette["accent_soft"])
+        icon_bg.pack(pady=(0, 14))
+        icon_bg.pack_propagate(False)
+        ctk.CTkLabel(icon_bg, text=ICONS["lock"], font=themed_font("h3")).place(relx=0.5, rely=0.5, anchor="center")
+
+        ctk.CTkLabel(
+            inner, text="Termos de Privacidade", font=themed_font("h4", "bold"),
+            text_color=self.palette["text_primary"],
+        ).pack(pady=(0, 12))
+
+        ctk.CTkLabel(
+            inner,
+            text=(
+                "Estes termos regem o uso da plataforma SerPleno e o tratamento\n"
+                "de dados pessoais e acadêmicos. Ao acessar o sistema, você concorda\n"
+                "com as práticas descritas na Política de Privacidade e com o uso\n"
+                "responsável das informações compartilhadas."
             ),
             font=themed_font("body"),
             text_color=self.palette["text_muted"],
