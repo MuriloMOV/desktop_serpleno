@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 class ServicoMural:
     """Serviço para gerenciar mural de avisos via API do SerPleno Web ou banco local"""
     
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.base_url = MURAL_API_URL
         self._operation_config = None
+        self._auth_service = auth_service
     
     def _get_operation_config(self):
         """Obtém configuração de operação (lazy loading)"""
@@ -45,28 +46,20 @@ class ServicoMural:
     
     def _get_session(self):
         """Retorna a sessão HTTP autenticada"""
-        try:
-            from ser_pleno.infrastructure.api.api import get_auth_service
-            auth = get_auth_service()
-            if auth and hasattr(auth, 'get_session'):
-                return auth.get_session()
-        except Exception:
-            pass
+        auth = self._auth_service
+        if auth and hasattr(auth, 'get_session'):
+            return auth.get_session()
         return requests
     
     def _get_headers(self):
         """Retorna headers com CSRF token se disponível"""
         headers: Dict[str, str] = {"Content-Type": "application/json"}
-        try:
-            from ser_pleno.infrastructure.api.api import get_auth_service
-            auth = get_auth_service()
-            if auth:
-                if hasattr(auth, 'get_headers'):
-                    return auth.get_headers()
-                if hasattr(auth, 'csrf_token') and auth.csrf_token:
-                    headers['X-CSRFToken'] = auth.csrf_token
-        except Exception:
-            pass
+        auth = self._auth_service
+        if auth:
+            if hasattr(auth, 'get_headers'):
+                return auth.get_headers()
+            if hasattr(auth, 'csrf_token') and auth.csrf_token:
+                headers['X-CSRFToken'] = auth.csrf_token
         return headers
 
     def listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1) -> Dict[str, Any]:

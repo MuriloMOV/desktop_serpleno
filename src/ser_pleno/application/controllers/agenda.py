@@ -8,8 +8,8 @@ from ser_pleno.application.services.agendamentos import ServicoAgendamento
 class AgendaController(BaseController):
     """Coordena as requisições da View de Agenda."""
 
-    def __init__(self):
-        super().__init__(ServicoAgendamento)
+    def __init__(self, auth_service=None):
+        super().__init__(ServicoAgendamento, auth_service=auth_service)
 
     def get_service(self):
         return self._service

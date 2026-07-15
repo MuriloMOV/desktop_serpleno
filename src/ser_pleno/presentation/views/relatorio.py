@@ -34,16 +34,6 @@ _KPIS = [
 # ——————————————————————————————————————————————————————————————————————————————
 #  Helpers de layout
 # ——————————————————————————————————————————————————————————————————————————————
-def _card(parent, **kwargs) -> ctk.CTkFrame:
-    return ctk.CTkFrame(
-        parent,
-        fg_color=THEME["surface"],
-        corner_radius=RADIUS["card"],
-        border_width=1,
-        border_color=THEME["border"],
-        **kwargs,
-    )
-
 def _section_title(parent, text: str, pady=(16, 12)):
     ctk.CTkLabel(
         parent, text=text,
@@ -245,7 +235,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
 
     # —— Gráfico —————————————————————————————————————————————————————————————
     def _criar_card_grafico(self, parent):
-        card = _card(parent)
+        card = Card(parent)
         card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         # Cabeçalho do card
@@ -355,7 +345,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
 
     # —— Resumo lateral ———————————————————————————————————————————————————————
     def _criar_card_resumo(self, parent):
-        card = _card(parent)
+        card = Card(parent)
         card.grid(row=0, column=1, sticky="nsew", padx=(spacing("sm"), 0))
 
         _section_title(card, "Resumo do Período")
@@ -417,7 +407,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     #  EXPORTAÇAO
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_secao_exportacao(self):
-        card = _card(self)
+        card = Card(self)
         card.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
         hdr = ctk.CTkFrame(card, fg_color="transparent")
@@ -471,7 +461,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     #  LISTA DE RELATÓRIOS
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_lista_relatorios(self):
-        card = _card(self)
+        card = Card(self)
         card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
 
         # Cabeçalho com filtro

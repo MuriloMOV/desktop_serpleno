@@ -15,7 +15,6 @@ except Exception:
 
 from ser_pleno.config.config import DESKTOP_API_URL
 from ser_pleno.repositories.orientacoes import OrientacaoRepository
-from ser_pleno.infrastructure.api.api import api, get_auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +50,11 @@ class ServicoOrientacoes:
         },
     }
 
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.base_url = DESKTOP_API_URL
         self.repo = OrientacaoRepository()
         self._operation_config = None
+        self._auth_service = auth_service
     
     def _get_operation_config(self):
         """Obtém configuração de operação (lazy loading)"""
@@ -75,7 +75,7 @@ class ServicoOrientacoes:
     
     def _get_session(self):
         """Retorna a sessão HTTP autenticada"""
-        auth = get_auth_service()
+        auth = self._auth_service
         if auth and hasattr(auth, "get_session"):
             return auth.get_session()
         return requests
@@ -83,7 +83,7 @@ class ServicoOrientacoes:
     def _get_headers(self):
         """Retorna headers com CSRF token se disponível"""
         headers: Dict[str, str] = {"Content-Type": "application/json"}
-        auth = get_auth_service()
+        auth = self._auth_service
         if auth:
             if hasattr(auth, "get_headers"):
                 return auth.get_headers()

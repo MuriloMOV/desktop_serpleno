@@ -20,7 +20,7 @@ class ServicoAutenticacao:
     # URL base da API (agora usa config oficial)
     API_BASE_URL = API_ROOT_URL
     
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = AutenticacaoRepository()
         # Sessão para manter cookies de autenticação
         self.session = requests.Session() if requests else None

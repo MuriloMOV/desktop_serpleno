@@ -12,24 +12,13 @@ except Exception:
 
 from ser_pleno.infrastructure.api.connectivity import marcar_api_indisponivel
 
-_auth_service = None
-
-
-def set_auth_service(auth_service):
-    global _auth_service
-    _auth_service = auth_service
-
-
-def get_auth_service():
-    return _auth_service
-
-
 class ClienteAPI:
 
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.base_url = DESKTOP_API_URL
         self._operation_config = None
         self._sync_service = None
+        self._auth_service = auth_service
 
     # ================= Helpers =================
 
@@ -50,7 +39,7 @@ class ClienteAPI:
             }
 
     def _get_session(self):
-        auth = get_auth_service()
+        auth = self._auth_service
         if auth and hasattr(auth, 'get_session'):
             return auth.get_session()
         return requests

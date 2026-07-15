@@ -114,7 +114,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                     self._images[key] = img
                     return img
                 except Exception as e:
-                    print(f"Erro ao carregar imagem {name}: {e}")
+                    logger.error("Erro ao carregar imagem %s: %s", name, e)
         return None
 
     def get_avatar_por_papel(self, papel: str) -> str:
@@ -213,7 +213,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 })
                 self._renderizar_lista_contatos(self.contatos, select_first=True)
         except Exception as e:
-            print(f"Erro ao carregar contatos: {e}")
+            logger.error("Erro ao carregar contatos: %s", e)
 
     def _renderizar_lista_contatos(self, lista: list, select_first: bool = False):
         if not hasattr(self, "scroll_contacts") or not self.scroll_contacts.winfo_exists():
@@ -609,7 +609,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                     self.atualizar_area_mensagens()
         except Exception as e:
             if "invalid command name" not in str(e):
-                print(f"Erro ao carregar mensagens: {e}")
+                logger.error("Erro ao carregar mensagens: %s", e)
 
     def marcar_mensagens_lidas(self):
         for msg in self.mensagens:
@@ -617,7 +617,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 try:
                     self.controller_comunicacao.marcar_mensagem_lida(msg.get("id"))
                 except Exception as e:
-                    print(f"Erro ao marcar como lida: {e}")
+                    logger.error("Erro ao marcar como lida: %s", e)
 
     def atualizar_area_mensagens(self):
         if not hasattr(self, "msg_area") or not self.msg_area.winfo_exists():
@@ -801,7 +801,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 self.carregar_contador_nao_lidas()
                 self.atualizar_lista_contatos()
         except Exception as e:
-            print(f"Erro ao enviar mensagem: {e}")
+            logger.error("Erro ao enviar mensagem: %s", e)
 
     def enviar_msg(self):
         self.enviar_mensagem()
@@ -838,14 +838,14 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 self.carregar_mensagens()
             self.modal_arquivos.grid_remove()
         except Exception as e:
-            print(f"Erro ao enviar arquivo: {e}")
+            logger.error("Erro ao enviar arquivo: %s", e)
 
     def visualizar_arquivo(self, caminho: str):
         import webbrowser
         try:
             webbrowser.open(caminho)
         except Exception as e:
-            print(f"Erro ao visualizar: {e}")
+            logger.error("Erro ao visualizar: %s", e)
 
     def download_arquivo(self, caminho: str, nome: str):
         import tkinter.filedialog as fd
@@ -858,7 +858,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 import shutil
                 shutil.copy2(caminho, destino)
         except Exception as e:
-            print(f"Erro ao salvar: {e}")
+            logger.error("Erro ao salvar: %s", e)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Atualização periódica
@@ -890,7 +890,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
                 self.carregar_mensagens()
         except Exception as e:
             if "invalid command name" not in str(e):
-                print(f"Erro na atualização: {e}")
+                logger.error("Erro na atualização: %s", e)
         finally:
             self.atualizando = False
 
@@ -905,7 +905,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
             if data and data.get("success"):
                 self.contador_nao_lidas = data["data"]
         except Exception as e:
-            print(f"Erro ao carregar contador: {e}")
+            logger.error("Erro ao carregar contador: %s", e)
 
     def atualizar_lista_contatos(self):
         """Atualiza badges de não-lidas sem redesenhar a lista inteira."""

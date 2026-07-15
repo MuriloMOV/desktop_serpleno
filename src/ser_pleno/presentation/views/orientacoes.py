@@ -9,7 +9,7 @@ from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
-from ser_pleno.presentation.components.ui_components import bind_clickable
+from ser_pleno.presentation.components.ui_components import bind_clickable, Avatar
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 logger = logging.getLogger("apps.desktop")
@@ -52,39 +52,6 @@ _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")
 # ——————————————————————————————————————————————————————————————————————————————
 #  Helpers
 # ——————————————————————————————————————————————————————————————————————————————
-def _av_color(name: str) -> str:
-    return get_avatar_color(name)
-
-
-def _card(parent, **kw) -> ctk.CTkFrame:
-    return ctk.CTkFrame(parent, fg_color=O["card_bg"],
-                        corner_radius=O["card_radius"],
-                        border_width=1, border_color=O["card_border"], **kw)
-
-
-def _divider(parent):
-    ctk.CTkFrame(parent, height=1, fg_color=O["divider"]).pack(fill="x")
-
-
-def _avatar(parent, initials: str, color: str, size: int = 38) -> ctk.CTkFrame:
-    av = ctk.CTkFrame(parent, width=size, height=size,
-                      corner_radius=size // 2, fg_color=color)
-    av.pack_propagate(False)
-    ctk.CTkLabel(av, text=initials[:2].upper(),
-                 font=font(size=size // 3, weight="bold"),
-                 text_color="#FFFFFF").place(relx=0.5, rely=0.5, anchor="center")
-    return av
-
-
-def _chip(parent, text: str, tema: str = "") -> ctk.CTkFrame:
-    color, soft = O["temas"].get(tema, _TEMA_DEFAULT)
-    f = ctk.CTkFrame(parent, fg_color=soft, corner_radius=7)
-    ctk.CTkLabel(f, text=text,
-                 font=font(size=11, weight="bold"),
-                  text_color=color).pack(padx=spacing("sm"), pady=spacing("xs"))
-    return f
-
-
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  FormField
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -325,7 +292,7 @@ class OrientationHistoryCard(ctk.CTkFrame):
         # —— Prévia do conteúdo ———————————————————————————————————————————————
         content = self._o.get("content", "")
         if content:
-            _divider(body)
+            Divider(body)
             preview = content[:220] + ("..." if len(content) > 220 else "")
             ctk.CTkLabel(body, text=preview,
                          font=font(size=12),
@@ -341,7 +308,7 @@ class OrientacoesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=O["page_bg"])
         self.controller          = controller
-        self.controller_orientacoes = OrientacoesController()
+        self.controller_orientacoes = OrientacoesController(auth_service=getattr(controller, 'auth_service', None))
         self._selected_student: dict | None = None
         self._selected_card: StudentCard | None = None
         self._orientacao_editando_id: int | None = None

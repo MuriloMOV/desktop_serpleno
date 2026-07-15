@@ -7,7 +7,7 @@ from ser_pleno.utils.mappers import safe_str
 
 
 class ServicoBemEstar:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = BemEstarRepository()
         self.repo_estudante = EstudanteRepository()
 

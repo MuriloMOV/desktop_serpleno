@@ -2,7 +2,7 @@ from ser_pleno.repositories.relatorios import RelatorioRepository
 
 
 class ServicoRelatorio:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = RelatorioRepository()
     
     def listar_relatorios(self, tipo=None, data_inicio=None, pagina=1):

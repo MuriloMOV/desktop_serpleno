@@ -5,20 +5,6 @@ import logging
 from datetime import datetime, timedelta
 import requests
 
-# Instância global do serviço de autenticação
-_auth_service = None
-
-
-def set_auth_service(auth_service):
-    """Define o serviço de autenticação global para usar nas requisições API"""
-    global _auth_service
-    _auth_service = auth_service
-
-
-def get_auth_service():
-    """Retorna o serviço de autenticação global"""
-    return _auth_service
-
 
 def _invalidate_dashboard_cache() -> None:
     try:
@@ -35,9 +21,10 @@ class ServicoAgendamento:
     # Token para autenticação na API
     API_TOKEN = DESKTOP_API_TOKEN or "serpleno-desktop-token-2024"
     
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = AgendamentoRepository()
         self.repo_estudante = EstudanteRepository()
+        self._auth_service = auth_service
     
     def listar_estudantes(self):
         """Retorna estudantes disponíveis para agendamento."""
@@ -57,7 +44,7 @@ class ServicoAgendamento:
     
     def _get_session(self):
         """Retorna a sessão HTTP do serviço de autenticação"""
-        auth = get_auth_service()
+        auth = self._auth_service
         if auth and hasattr(auth, 'get_session'):
             session = auth.get_session()
             logging.debug(f"Sessão obtida: cookies = {dict(session.cookies)}")
@@ -71,7 +58,7 @@ class ServicoAgendamento:
             "Content-Type": "application/json",
             "X-Desktop-Token": self.API_TOKEN
         }
-        auth = get_auth_service()
+        auth = self._auth_service
         if auth and hasattr(auth, 'csrf_token') and auth.csrf_token:
             headers["X-CSRFToken"] = auth.csrf_token
         return headers

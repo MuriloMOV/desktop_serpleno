@@ -6,7 +6,7 @@ from ser_pleno.ui.theme import (
 )
 from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.presentation.components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState
+    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState, Avatar
 )
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.avatar_utils import get_avatar_color
@@ -17,10 +17,6 @@ from tkinter import messagebox
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Design tokens —“ mapeamentos semânticos específicos da triagem
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-
-TRI_TOKENS = extend_theme(THEME, {
-    "kpi_size": "md",
-})
 
 _PRIORITY_CFG = {
     "Urgente": (THEME["critico"],       THEME["critico_soft"]),
@@ -50,18 +46,11 @@ def _chip(parent, text: str, color: str, soft: str) -> ctk.CTkFrame:
     return f
 
 
-def _avatar(parent, initials: str, color: str, size: int = 36) -> ctk.CTkFrame:
-    av = ctk.CTkFrame(parent, width=size, height=size,
-                      corner_radius=size // 2, fg_color=color)
-    av.pack_propagate(False)
-    ctk.CTkLabel(av, text=initials[:2].upper(),
-                 font=font(size=max(10, size // 3), weight="bold", family=FONT_FAMILY),
-                 text_color=THEME["text_on_primary"]).place(relx=0.5, rely=0.5, anchor="center")
-    return av
 
 
 
-
+# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+#  Campo de entrada leve
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Campo de entrada leve
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -150,7 +139,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
             row.grid_columnconfigure(i, weight=1)
             card = KPICard(
                 row, title=title, value=val, icon=icon,
-                accent=accent, unit="", size=TRI_TOKENS.get("kpi_size", "md"),
+                accent=accent, unit="", size="md",
             )
             card.grid(row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
             self._kpi_widgets.append(card._value_label if hasattr(card, "_value_label") else None)
@@ -305,7 +294,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         # Col 0 —“ Estudante (avatar + nome)
         name_cell = ctk.CTkFrame(row, fg_color="transparent")
         name_cell.grid(row=0, column=0, sticky="w", padx=(SPACING["icon_gap"], 0), pady=SPACING["item_gap"])
-        av = _avatar(name_cell, nome[:2], av_color, 34)
+        av = Avatar(name_cell, initials=nome[:2], size=34, color=av_color)
         av.pack(side="left", padx=(0, SPACING["icon_gap"]))
         ctk.CTkLabel(name_cell, text=nome,
                      font=themed_font("body", "bold"),
@@ -693,7 +682,7 @@ class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
         bi = ctk.CTkFrame(banner, fg_color="transparent")
         bi.pack(fill="both", expand=True, padx=SPACING["card_pad"])
 
-        av = _avatar(bi, nome[:2], av_color, 46)
+        av = Avatar(bi, initials=nome[:2], size=46, color=av_color)
         av.pack(side="left", padx=(0, SPACING["icon_gap"]))
 
         ts = ctk.CTkFrame(bi, fg_color="transparent")

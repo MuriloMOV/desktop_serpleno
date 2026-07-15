@@ -119,20 +119,21 @@ class Card(ctk.CTkFrame):
     """Cartão com slots de header/body/footer e barra de status opcional."""
 
     def __init__(self, parent, title: str = "", padding: Optional[Tuple[int, int]] = None,
-                 elevated: bool = False, status: Optional[str] = None):
+                 elevated: bool = False, status: Optional[str] = None, auto_body: bool = True, **kwargs):
         super().__init__(
             parent,
             fg_color=THEME["surface_elevated"] if elevated else THEME["surface"],
             corner_radius=RADIUS["card"],
             border_width=1,
             border_color=THEME["border"],
+            **kwargs,
         )
         self._padding = padding or (SPACING["card_pad"], SPACING["card_pad"])
         if status:
             self._build_with_status(title, status)
         elif title:
             self._build_with_title(title)
-        else:
+        elif auto_body:
             self._build_empty()
 
     def _build_with_title(self, title):

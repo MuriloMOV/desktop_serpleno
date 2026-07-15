@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List, Callable
 
 from ser_pleno.repositories.estudantes import EstudanteRepository
 from ser_pleno.repositories.bem_estar import BemEstarRepository
-from ser_pleno.infrastructure.api.api import api
+from ser_pleno.infrastructure.api.api import ClienteAPI
 from ser_pleno.utils.service_helpers import with_api_fallback
 
 logger = logging.getLogger(__name__)
@@ -24,14 +24,16 @@ def _invalidate_dashboard_cache() -> None:
 
 
 class ServicoEstudante:
-    """Serviço para gerenciar estudantes - usa o cliente API central `api` quando disponível
+    """Serviço para gerenciar estudantes - usa o cliente API central quando disponível
     e faz fallback para o repositório local quando necessário.
     """
 
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = EstudanteRepository()
         self.repo_bem_estar = BemEstarRepository()
         self._operation_config = None
+        self._auth_service = auth_service
+        self._api = ClienteAPI(auth_service=auth_service)
 
     def _get_operation_config(self):
         if self._operation_config is None:
@@ -72,7 +74,7 @@ class ServicoEstudante:
             if requer_atencao is not None:
                 params["requires_attention"] = requer_atencao
 
-            resp = api.get("students/", params=params)
+            resp = self._api.get("students/", params=params)
             if (
                 resp
                 and resp.get("success") is not False
@@ -146,7 +148,7 @@ class ServicoEstudante:
     def obter_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Obtém detalhes de um estudante específico via API ou repositório local"""
         def _api_call():
-            resp = api.get(f"students/{id_estudante}/")
+            resp = self._api.get(f"students/{id_estudante}/")
             if (
                 resp
                 and resp.get("success") is not False
@@ -190,7 +192,7 @@ class ServicoEstudante:
     def obter_relatorio_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Obtém relatório completo do estudante via API ou repositório local"""
         def _api_call():
-            resp = api.get(f"students/{id_estudante}/report/")
+            resp = self._api.get(f"students/{id_estudante}/report/")
             if (
                 resp
                 and resp.get("success") is not False
@@ -218,7 +220,7 @@ class ServicoEstudante:
     def criar_estudante(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Cria um novo estudante via API ou repositório local"""
         def _api_call():
-            resp = api.post("students/add/", json=dados)
+            resp = self._api.post("students/add/", json=dados)
             if resp and resp.get("success") is not False:
                 logger.info(f"Estudante criado via API: {resp}")
                 return resp
@@ -252,7 +254,7 @@ class ServicoEstudante:
     ) -> Dict[str, Any]:
         """Atualiza um estudante existente via API ou repositório local"""
         def _api_call():
-            resp = api.put(f"students/{id_estudante}/update/", json=dados)
+            resp = self._api.put(f"students/{id_estudante}/update/", json=dados)
             if resp and resp.get("success") is not False:
                 logger.info(f"Estudante atualizado via API: {resp}")
                 return resp
@@ -288,7 +290,7 @@ class ServicoEstudante:
     def deletar_estudante(self, id_estudante: int) -> Dict[str, Any]:
         """Deleta um estudante via API ou repositório local"""
         def _api_call():
-            resp = api.delete(f"students/{id_estudante}/delete/")
+            resp = self._api.delete(f"students/{id_estudante}/delete/")
             if resp and resp.get("success") is not False:
                 return resp
             return None
@@ -312,4 +314,3 @@ class ServicoEstudante:
 
 # Instância global para fácil acesso
 servico_estudante = ServicoEstudante()
-

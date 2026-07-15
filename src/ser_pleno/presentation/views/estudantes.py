@@ -8,59 +8,18 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, FONT_FAMILY,
     font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
 )
-from ser_pleno.ui.theme_extensions import extend_theme, spacing
-
-EST_TOKENS = extend_theme(THEME, {
-    "sidebar_width": 300,
-    "avatar_hero_size": 60,
-})
+from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
     Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable
 )
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
-
-
-# Avatar cores por inicial (ciclo)
-AV_COLORS = [
-    "#4F46E5", "#7C3AED", "#059669",
-    "#D97706", "#DC2626", "#0891B2",
-]
+from ser_pleno.utils.avatar_utils import get_avatar_color
 
 
 
-
-# ——————————————————————————————————————————————————————————————————————————————
-#  Helpers
-# ——————————————————————————————————————————————————————————————————————————————
-def _av_color(name: str) -> str:
-    idx = sum(ord(c) for c in name) % len(AV_COLORS)
-    return AV_COLORS[idx]
-
-
-def _card(parent, **kw) -> ctk.CTkFrame:
-    return ctk.CTkFrame(
-        parent,
-        fg_color=THEME["surface"],
-        corner_radius=RADIUS["card"],
-        border_width=1,
-        border_color=THEME["border"],
-        **kw,
-    )
-
-
-def _avatar(parent, initials: str, color: str, size: int = 42) -> ctk.CTkFrame:
-    av = ctk.CTkFrame(parent, width=size, height=size,
-                      corner_radius=size // 2, fg_color=color)
-    av.pack_propagate(False)
-    ctk.CTkLabel(
-        av, text=initials[:2].upper(),
-        font=font(size=max(10, size // 3), weight="bold", family=FONT_FAMILY),
-        text_color="#FFFFFF",
-    ).place(relx=0.5, rely=0.5, anchor="center")
-    return av
-
-
+# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+#  Componente: campo de entrada inline
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Componente: campo de entrada inline
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -173,7 +132,7 @@ class EstudantesFrame(ctk.CTkFrame):
     #  SIDEBAR —“ lista de estudantes
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_sidebar(self, parent):
-        sidebar = _card(parent, width=EST_TOKENS.get("sidebar_width", 300))
+        sidebar = Card(parent, width=300)
         sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING["grid_gap"]))
         sidebar.grid_propagate(False)
         sidebar.grid_rowconfigure(2, weight=1)
@@ -256,7 +215,7 @@ class EstudantesFrame(ctk.CTkFrame):
     #  PAINEL DE DETALHES
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_painel_detalhes(self, parent):
-        panel = _card(parent)
+        panel = Card(parent, auto_body=False)
         panel.grid(row=0, column=1, sticky="nsew")
         panel.grid_rowconfigure(2, weight=1)
         panel.grid_columnconfigure(0, weight=1)
@@ -266,10 +225,10 @@ class EstudantesFrame(ctk.CTkFrame):
         hero.grid(row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["page_y"], 0))
 
         # Avatar grande
-        self._av_slot = ctk.CTkFrame(hero, width=EST_TOKENS.get("avatar_hero_size", 60), height=EST_TOKENS.get("avatar_hero_size", 60), fg_color="transparent")
+        self._av_slot = ctk.CTkFrame(hero, width=60, height=60, fg_color="transparent")
         self._av_slot.pack(side="left", padx=(0, 16))
         self._av_slot.pack_propagate(False)
-        _av = _avatar(self._av_slot, "??", THEME["primary"], EST_TOKENS.get("avatar_hero_size", 60))
+        _av = Avatar(self._av_slot, initials="??", size=60, color=THEME["primary"])
         _av.pack(expand=True)
         self._hero_av = _av
 
@@ -530,8 +489,8 @@ class EstudantesFrame(ctk.CTkFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar
-        av_color = _av_color(nome)
-        av = _avatar(inner, nome[:2], av_color, 40)
+        av_color = get_avatar_color(nome)
+        av = Avatar(inner, initials=nome[:2], size=40, color=av_color)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="ns")
 
         # Nome
@@ -615,10 +574,10 @@ class EstudantesFrame(ctk.CTkFrame):
         atenção = st.get("requires_attention", False)
 
         # Atualiza avatar hero
-        av_color = _av_color(nome)
+        av_color = get_avatar_color(nome)
         for w in self._av_slot.winfo_children():
             w.destroy()
-        av = _avatar(self._av_slot, nome[:2], av_color, 60)
+        av = Avatar(self._av_slot, initials=nome[:2], size=60, color=av_color)
         av.pack(expand=True)
 
         self.lbl_nome_det.configure(text=nome)

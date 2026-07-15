@@ -6,26 +6,10 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, FONT_FAMILY,
     themed_font, blend_color,
 )
-from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.presentation.components.ui_components import (
-    GhostButton, EmptyState, Divider, KPICard
-)
-from ser_pleno.presentation.components.icons import IconLabel, ICONS
-from ser_pleno.application.controllers.bem_estar import BemEstarController
-from ser_pleno.utils.avatar_utils import get_avatar_color
-from ser_pleno.utils.mood import mood_emoji_from_score
-
-logger = logging.getLogger(__name__)
-
-BE_TOKENS = extend_theme(THEME, {
-    "kpi_size": "md",
-})
+from ser_pleno.ui.theme_extensions import spacing
 
 
 
-
-# Avatar cores por inicial —” agora via utils.avatar_utils.get_avatar_color.
-# _AV_COLORS e _av_color legados removidos; use utils.avatar_utils.get_avatar_color.
 
 
 # Configuração das colunas de risco
@@ -45,23 +29,10 @@ _MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo
 
 
 # Helpers
-
-
-def _card(parent, **kw) -> ctk.CTkFrame:
-    return ctk.CTkFrame(
-        parent,
-        fg_color=THEME["surface"],
-        corner_radius=RADIUS["card"],
-        border_width=1,
-        border_color=THEME["border"],
-        **kw,
-    )
-
-
 def _section_card(parent, title: str,
                   action_text: str = "", action_cmd=None) -> ctk.CTkFrame:
     """Card de seção com cabeçalho, divider e body."""
-    outer = _card(parent)
+    outer = Card(parent)
 
     hdr = ctk.CTkFrame(outer, fg_color="transparent")
     hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["section_gap"], 0))
@@ -87,16 +58,6 @@ def _section_card(parent, title: str,
     return outer
 
 
-def _avatar(parent, initials: str, color: str, size: int = 36) -> ctk.CTkFrame:
-    av = ctk.CTkFrame(parent, width=size, height=size,
-                      corner_radius=size // 2, fg_color=color)
-    av.pack_propagate(False)
-    ctk.CTkLabel(
-        av, text=initials[:2].upper(),
-        font=themed_font("body", "bold"),
-        text_color="#FFFFFF",
-    ).place(relx=0.5, rely=0.5, anchor="center")
-    return av
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -241,7 +202,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             row.grid_columnconfigure(i, weight=1)
             card = KPICard(
                 row, title=title, value=initial, icon=icon,
-                accent=accent, unit="", size=BE_TOKENS.get("kpi_size", "md"),
+                accent=accent, unit="", size="md",
             )
             card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
             setattr(self, attr, card)
@@ -461,7 +422,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self.colunas_risco = {}
 
         for i, (title, color, soft, key) in enumerate(_RISK_COLS):
-            col_card = _card(cols_wrap)
+            col_card = Card(cols_wrap)
             col_card.grid(row=0, column=i, sticky="nsew", padx=SPACING["grid_gap"] // 2)
 
             # Cabeçalho da coluna
@@ -563,7 +524,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar colorido
-        av = _avatar(inner, nome[:2], get_avatar_color(nome), 34)
+        av = Avatar(inner, initials=nome[:2], size=34, color=get_avatar_color(nome))
         av.grid(row=0, column=0, rowspan=2, padx=(0, 8), sticky="ns")
 
         ctk.CTkLabel(
@@ -649,7 +610,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar
-        av = _avatar(inner, nome[:2], get_avatar_color(nome), 38)
+        av = Avatar(inner, initials=nome[:2], size=38, color=get_avatar_color(nome))
         av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="ns")
 
         # Nome + curso

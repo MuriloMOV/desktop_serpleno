@@ -8,8 +8,8 @@ from ser_pleno.application.services.orientacoes import ServicoOrientacoes
 class OrientacoesController(BaseController):
     """Coordena as requisições da View de Orientações."""
 
-    def __init__(self):
-        super().__init__(ServicoOrientacoes)
+    def __init__(self, auth_service=None):
+        super().__init__(ServicoOrientacoes, auth_service=auth_service)
 
     def get_service(self):
         return self._service

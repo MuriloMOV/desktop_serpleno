@@ -11,8 +11,6 @@ from tkinter import PhotoImage
 from PIL import Image, ImageTk, ImageDraw, ImageFilter
 
 from ser_pleno.application.controllers.autenticacao import AutenticacaoController
-from ser_pleno.application.services.agendamentos import set_auth_service as set_auth_service_agendamentos
-from ser_pleno.infrastructure.api.api import set_auth_service as set_auth_service_api
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
@@ -743,9 +741,7 @@ class LoginFrame(ctk.CTkFrame):
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text="")
-        set_auth_service_agendamentos(self.controller_autenticacao.auth_service)
-        set_auth_service_api(self.controller_autenticacao.auth_service)
-        self.controller.iniciar_sistema(user)
+        self.controller.iniciar_sistema(user, auth_service=self.controller_autenticacao.auth_service)
 
     def _on_login_failure(self, msg):
         self._is_loading = False

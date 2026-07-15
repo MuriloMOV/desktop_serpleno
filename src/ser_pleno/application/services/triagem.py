@@ -6,7 +6,7 @@ from ser_pleno.utils.mappers import safe_str
 
 
 class ServicoTriagem:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = TriagemRepository()
 
     def listar_triagens(self, busca=None, status=None, prioridade=None, id_estudante=None, pagina=1):

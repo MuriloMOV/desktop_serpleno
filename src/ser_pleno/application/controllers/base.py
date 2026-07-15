@@ -15,8 +15,8 @@ class BaseController:
                 super().__init__(ServicoDashboard)
     """
 
-    def __init__(self, service_class):
-        self._service = service_class()
+    def __init__(self, service_class, auth_service=None):
+        self._service = service_class(auth_service=auth_service)
 
     def get_service(self):
         """Retorna a instância do service subjacente."""

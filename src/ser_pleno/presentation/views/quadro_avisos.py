@@ -9,11 +9,11 @@ import threading
 import logging
 from typing import Any
 
-from ser_pleno.infrastructure.api.mural import servico_mural
+from ser_pleno.infrastructure.api.mural import ServicoMural
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
-from ser_pleno.presentation.components.ui_components import BaseModal
+from ser_pleno.presentation.components.ui_components import BaseModal, Card
 
 logger = logging.getLogger("apps.desktop")
 
@@ -60,16 +60,8 @@ def _chip(parent, text: str, cat: str) -> ctk.CTkFrame:
     return f
 
 
-def _divider(parent):
-    ctk.CTkFrame(parent, height=1, fg_color=Q["divider"]).pack(fill="x")
-
-
-def _card(parent, **kw) -> ctk.CTkFrame:
-    return ctk.CTkFrame(parent, fg_color=Q["card_bg"],
-                        corner_radius=Q["card_radius"],
-                        border_width=1, border_color=Q["card_border"], **kw)
-
-
+# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+#  FormField —” campo de formulário redesenhado
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  FormField —“ campo de formulário redesenhado
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -740,6 +732,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
         super().__init__(master, fg_color=Q["page_bg"])
         self.app = app
         self.pack(fill="both", expand=True)
+        self._servico_mural = ServicoMural(auth_service=getattr(app, 'auth_service', None))
 
         self.posts: list[dict[str, Any]] = []
         self.editing_post: dict[str, Any] | None = None
@@ -782,7 +775,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
                      text_color=Q["text_muted"]).pack(pady=20)
 
         self._run_in_thread(
-            servico_mural.listar_mensagens,
+            self._servico_mural.listar_mensagens,
             callback=self._on_load_success,
             err_callback=self._on_load_error,
         )
@@ -837,7 +830,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
     # —— Card de aviso ——————————————————————————————————————————————————————————
     def _criar_card(self, aviso_id, titulo, descricao, autor, data, categoria="informativo"):
-        card = _card(self.lista)
+        card = Card(self.lista)
         card.pack(fill="x", pady=(0, 12))
 
         # Barra lateral colorida
@@ -910,7 +903,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
     # —— Editar / Excluir ———————————————————————————————————————————————————————
     def _on_edit(self, post_id):
-        def _fetch(): return servico_mural.obter_mensagem(post_id)
+        def _fetch(): return self._servico_mural.obter_mensagem(post_id)
         def _on_res(res):
             if isinstance(res, dict) and res.get("success") is False:
                 messagebox.showerror("Erro", str(res.get("message", "")))
@@ -933,7 +926,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
             messagebox.showerror("Erro ao excluir",
                                  f"{e.get('message') if isinstance(e, dict) else e}")
         self._run_in_thread(
-            lambda: servico_mural.deletar_mensagem(post_id),
+            lambda: self._servico_mural.deletar_mensagem(post_id),
             callback=_on_ok, err_callback=_on_fail,
         )
 
@@ -962,8 +955,8 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def _on_modal_publish(self, payload, on_success, on_error):
         def _send():
             if self.editing_post and self.editing_post.get("id"):
-                return servico_mural.atualizar_mensagem(self.editing_post["id"], payload)
-            return servico_mural.criar_mensagem(payload)
+                return self._servico_mural.atualizar_mensagem(self.editing_post["id"], payload)
+            return self._servico_mural.criar_mensagem(payload)
 
         def _cb(res):
             if isinstance(res, dict) and res.get("success") is False:

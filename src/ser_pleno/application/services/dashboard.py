@@ -1,18 +1,23 @@
+import logging
+
 from ser_pleno.repositories.dashboard import DashboardRepository
 from ser_pleno.repositories.comunicacao import ComunicacaoRepository
+from ser_pleno.infrastructure.api.api import ClienteAPI
 
 try:
-    from ser_pleno.infrastructure.api.api import api
+    from ser_pleno.config.operation_mode import get_operation_config
 except Exception:
-    api = None
+    get_operation_config = None  # type: ignore
 
-from ser_pleno.config.operation_mode import get_operation_config
+logger = logging.getLogger(__name__)
 
 
 class ServicoDashboard:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = DashboardRepository()
         self.repo_comunicacao = ComunicacaoRepository()
+        self._auth_service = auth_service
+        self._api = ClienteAPI(auth_service=auth_service)
 
     def obter_notificacoes_ajuda(self):
         """Obtém notificações de ajuda do serpleno_web."""
@@ -21,13 +26,11 @@ class ServicoDashboard:
             return []
 
         try:
-            from ser_pleno.infrastructure.api.api import api
-
-            response = api.get("help/notifications/")
+            response = self._api.get("help/notifications/")
             if response.get("success"):
                 return response.get("data", [])
         except Exception as e:
-            print(f"Erro ao obter notificações de ajuda: {e}")
+            logger.error("Erro ao obter notificações de ajuda: %s", e)
         return []
 
     def obter_notificacoes_alertas(self):
@@ -43,10 +46,9 @@ class ServicoDashboard:
             if not config.should_use_api():
                 return
             try:
-                from ser_pleno.infrastructure.api.api import api
-                api.put(f"help/notifications/{notificacao_id}/read/")
+                self._api.put(f"help/notifications/{notificacao_id}/read/")
             except Exception as e:
-                print(f"Erro ao marcar notificação de ajuda como lida: {e}")
+                logger.error("Erro ao marcar notificação de ajuda como lida: %s", e)
 
     def obter_kpis(self):
         """Obtém estatísticas consolidadas do dashboard via repositório."""

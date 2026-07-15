@@ -1,17 +1,16 @@
+import logging
+import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import (
     Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal
 )
 from ser_pleno.presentation.components.icons import IconLabel, ICONS
 from ser_pleno.utils.async_runner import AsyncRunner
 
-import customtkinter as ctk
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, FONT_FAMILY
-from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.application.controllers.dashboard import DashboardController
+from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, FONT_FAMILY
+from ser_pleno.ui.theme_extensions import spacing
 
-DASH_TOKENS = extend_theme(THEME, {
-    "kpi_size": "wide",
-})
+logger = logging.getLogger(__name__)
 
 
 class _AgendaRow(ctk.CTkFrame):
@@ -504,7 +503,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 self.kpi_frame.grid_columnconfigure(i, weight=1)
                 card = KPICard(
                     self.kpi_frame, title=title, value=value, icon=icon,
-                    accent=accent, trend="", unit="", size=DASH_TOKENS.get("kpi_size", "wide"),
+                     accent=accent, trend="", unit="", size="wide",
                 )
                 card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
                 self._kpi_cards.append(card)
@@ -856,7 +855,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 self.controller_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
             self._atualizar_badge_notificacoes()
         except Exception as e:
-            print(f"Erro ao marcar todas como lidas: {e}")
+            logger.error("Erro ao marcar todas como lidas: %s", e)
             messagebox.showerror("Erro", f"Erro ao marcar notificações como lidas:\n{e}", parent=self.winfo_toplevel())
 
     # ——————————————————————————————————————————————————————————————————————

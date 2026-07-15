@@ -5,7 +5,7 @@ from ser_pleno.repositories.configuracoes import ConfiguracoesRepository
 
 
 class ServicoConfiguracoes:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = ConfiguracoesRepository()
 
     def obter_configuracoes(self):

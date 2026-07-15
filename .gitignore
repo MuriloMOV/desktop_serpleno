@@ -15,6 +15,8 @@ htmlcov/
 # Virtualenvs
 .env
 .env.*
+.env.local
+.env.*.local
 .venv/
 venv/
 ENV/
@@ -37,6 +39,17 @@ debug.log
 config/ser_pleno_local.db
 config/ser_pleno_local.db-wal
 config/ser_pleno_local.db-shm
+src/ser_pleno/config/ser_pleno_local.db
+src/ser_pleno/config/ser_pleno_local.db-wal
+src/ser_pleno/config/ser_pleno_local.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# Local runtime data (não versionar)
+src/ser_pleno/sync_queue.json
+src/ser_pleno/user_profile.json
+src/ser_pleno/logs/
 
 # Secrets (não versionar)
 *.pem
@@ -45,9 +58,21 @@ config/ser_pleno_local.db-shm
 *.pfx
 
 # Node / Kilocode (quando aplicável)
+.kilocode/
 .kilocode/node_modules/
 
 # Docker (se aplicável)
 docker-compose.override.yml
 
+# Temporary / debug artifacts
+*.bak
+*.tmp
+*.temp
+screenshot*.ps1
+screenshot*.png
+screenshot*.jpg
+serpleno_smoke_test.*
+
+# Source cache
 src/ser_pleno/__pycache__/
+

@@ -13,7 +13,7 @@ from typing import Optional
 
 
 class ServicoComunicacao:
-    def __init__(self):
+    def __init__(self, auth_service=None):
         self.repo = ComunicacaoRepository()
 
     def listar_alertas(self):

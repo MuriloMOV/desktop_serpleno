@@ -1,3 +1,4 @@
+import logging
 import customtkinter as ctk
 from datetime import datetime, timedelta
 from tkinter import messagebox
@@ -10,6 +11,8 @@ from ser_pleno.presentation.components.ui_components import (
     InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
 )
 from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
+
+logger = logging.getLogger(__name__)
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -385,7 +388,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.controller_agenda = AgendaController()
+        self.controller_agenda = AgendaController(auth_service=getattr(controller, 'auth_service', None))
         self.repo_agendamento = AgendamentoRepository()
 
         self.data_selecionada = datetime.now()
@@ -415,14 +418,14 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             self.mapa_estudantes = {str(r.get("nome") or r.get("student_name") or ""): int(r.get("id_aluno") or r.get("student_id") or 0) for r in rows}
             self.mapa_estudantes = {k: v for k, v in self.mapa_estudantes.items() if k and v}
         except Exception as e:
-            print(f"Erro ao buscar estudantes: {e}")
+            logger.error("Erro ao buscar estudantes: %s", e)
             self.mapa_estudantes = {}
 
     def _carregar_horarios_base(self):
         try:
             self.horarios_base = self.controller_agenda.listar_horarios_base()
         except Exception as e:
-            print(f"Erro ao buscar horários base: {e}")
+            logger.error("Erro ao buscar horários base: %s", e)
             self.horarios_base = []
 
     def load_grid_data(self):
