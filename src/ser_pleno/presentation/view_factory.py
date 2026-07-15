@@ -19,6 +19,7 @@ from ser_pleno.presentation.views.analise_triagem import AnaliseTriagemFrame
 from ser_pleno.presentation.views.relatorio import RelatorioFrame
 from ser_pleno.presentation.views.comunicacao_interna import ComunicacaoInternaFrame
 from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
+from ser_pleno.application.controllers.quadro_avisos import QuadroAvisosController
 from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
 from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
 
@@ -49,6 +50,7 @@ class ViewFactory:
             "relatorios": RelatorioController,
             "comunicacao": ComunicacaoController,
             "orientacoes": OrientacoesController,
+            "avisos": QuadroAvisosController,
             "configuracoes": ConfiguracoesController,
         }
 
@@ -74,9 +76,6 @@ class ViewFactory:
         if not frame_cls:
             return None
 
-        if frame_cls is QuadroAvisosFrame:
-            return frame_cls(parent, app=self.app)
-
         if controller is not None:
             return frame_cls(parent, controller)
 
@@ -84,7 +83,7 @@ class ViewFactory:
         if controller is not None:
             return frame_cls(parent, controller)
 
-        return frame_cls(parent, self.app)
+        return None
 
     @property
     def keys(self):

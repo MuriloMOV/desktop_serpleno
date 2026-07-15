@@ -112,7 +112,7 @@ class TestViews:
         # We can test that it renders correctly
         assert view is not None
 
-    @patch('ser_pleno.presentation.views.quadro_avisos.ServicoMural')
+    @patch('ser_pleno.application.controllers.quadro_avisos.ServicoMural')
     def test_quadro_avisos_view(self, MockServicoMural, app, controller):
         view = QuadroAvisosFrame(app, controller)
         

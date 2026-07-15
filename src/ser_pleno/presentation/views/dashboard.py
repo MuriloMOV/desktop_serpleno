@@ -3,8 +3,7 @@ import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import (
     Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal
 )
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.presentation.components.icons import IconLabel
+from ser_pleno.ui.components.icons import IconLabel, ICONS
 from ser_pleno.utils.async_runner import AsyncRunner
 
 from ser_pleno.application.controllers.dashboard import DashboardController

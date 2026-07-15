@@ -8,8 +8,7 @@ from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.presentation.components.icons import IconLabel
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.presentation.components.ui_components import bind_clickable, Avatar
 from ser_pleno.utils.avatar_utils import get_avatar_color
 

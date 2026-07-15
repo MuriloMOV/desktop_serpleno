@@ -13,8 +13,7 @@ from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
     Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable
 )
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.presentation.components.icons import IconLabel
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 

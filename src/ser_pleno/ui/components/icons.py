@@ -257,3 +257,39 @@ class IconButton(ctk.CTkButton):
     def destroy(self) -> None:
         self._hide_tooltip()
         super().destroy()
+
+
+class IconLabel(ctk.CTkFrame):
+    """Icon rendered inside a rounded/circular background frame (legacy API).
+
+    Prefer ``IconBadge`` for new code when a filled background is desired.
+    This widget is kept for backward compatibility with existing views that
+    need a transparent-background icon container.
+    """
+
+    def __init__(
+        self,
+        parent,
+        icon: str = "",
+        size: int = 28,
+        fg_color: str | None = None,
+        text_color: str = "white",
+        corner_radius: int | None = None,
+    ):
+        super().__init__(parent, fg_color="transparent")
+        cr = corner_radius if corner_radius is not None else size // 2
+        bg = ctk.CTkFrame(
+            self,
+            width=size,
+            height=size,
+            corner_radius=cr,
+            fg_color=fg_color or "#E5E7EB",
+        )
+        bg.pack_propagate(False)
+        bg.pack()
+        ctk.CTkLabel(
+            bg,
+            text=icon,
+            font=font(size=max(12, size // 2)),
+            text_color=text_color,
+        ).place(relx=0.5, rely=0.5, anchor="center")

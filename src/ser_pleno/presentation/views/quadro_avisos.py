@@ -9,11 +9,9 @@ import threading
 import logging
 from typing import Any
 
-from ser_pleno.infrastructure.api.mural import ServicoMural
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.presentation.components.icons import IconLabel
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.presentation.components.ui_components import BaseModal, Card
 
 logger = logging.getLogger("apps.desktop")
@@ -729,11 +727,11 @@ class PublicacaoModal(BaseModal):
 #  QuadroAvisosFrame —“ frame principal
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class QuadroAvisosFrame(ctk.CTkFrame):
-    def __init__(self, master, app):
+    def __init__(self, master, controller):
         super().__init__(master, fg_color=Q["page_bg"])
-        self.app = app
+        self.controller = controller
+        self.app = getattr(controller, 'app', None)
         self.pack(fill="both", expand=True)
-        self._servico_mural = ServicoMural(auth_service=getattr(app, 'auth_service', None))
 
         self.posts: list[dict[str, Any]] = []
         self.editing_post: dict[str, Any] | None = None
@@ -776,7 +774,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
                      text_color=Q["text_muted"]).pack(pady=20)
 
         self._run_in_thread(
-            self._servico_mural.listar_mensagens,
+            self.controller.get_service().listar_mensagens,
             callback=self._on_load_success,
             err_callback=self._on_load_error,
         )
@@ -904,7 +902,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
 
     # —— Editar / Excluir ———————————————————————————————————————————————————————
     def _on_edit(self, post_id):
-        def _fetch(): return self._servico_mural.obter_mensagem(post_id)
+        def _fetch(): return self.controller.get_service().obter_mensagem(post_id)
         def _on_res(res):
             if isinstance(res, dict) and res.get("success") is False:
                 messagebox.showerror("Erro", str(res.get("message", "")))
@@ -927,7 +925,7 @@ class QuadroAvisosFrame(ctk.CTkFrame):
             messagebox.showerror("Erro ao excluir",
                                  f"{e.get('message') if isinstance(e, dict) else e}")
         self._run_in_thread(
-            lambda: self._servico_mural.deletar_mensagem(post_id),
+            lambda: self.controller.get_service().deletar_mensagem(post_id),
             callback=_on_ok, err_callback=_on_fail,
         )
 
@@ -956,8 +954,8 @@ class QuadroAvisosFrame(ctk.CTkFrame):
     def _on_modal_publish(self, payload, on_success, on_error):
         def _send():
             if self.editing_post and self.editing_post.get("id"):
-                return self._servico_mural.atualizar_mensagem(self.editing_post["id"], payload)
-            return self._servico_mural.criar_mensagem(payload)
+                return self.controller.get_service().atualizar_mensagem(self.editing_post["id"], payload)
+            return self.controller.get_service().criar_mensagem(payload)
 
         def _cb(res):
             if isinstance(res, dict) and res.get("success") is False:

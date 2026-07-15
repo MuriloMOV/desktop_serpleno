@@ -8,8 +8,7 @@ from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState, Avatar
 )
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.presentation.components.icons import IconLabel
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.application.controllers.analise_triagem import AnaliseTriagemController
 from ser_pleno.utils.async_runner import AsyncRunner
