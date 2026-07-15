@@ -39,6 +39,7 @@ from ser_pleno.presentation.components.ui_components import (
 from ser_pleno.presentation.views.login import LoginFrame
 from ser_pleno.presentation.navigation import NavigationManager
 from ser_pleno.presentation.theme_manager import ThemeManager
+from ser_pleno.application.services.bootstrap import BootstrapService
 
 
 def _global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -74,6 +75,7 @@ class App(ctk.CTk):
 
         self.navigation = NavigationManager(self, auth_service=self.auth_service)
         self.theme_manager = ThemeManager(self)
+        self._bootstrap = BootstrapService()
 
         try:
             atualizar_disponibilidade_api_async()
@@ -142,21 +144,7 @@ class App(ctk.CTk):
         except Exception:
             pass
 
-        self._run_post_login_seed()
-
-    def _run_post_login_seed(self) -> None:
-        def _seed_thread():
-            try:
-                from ser_pleno.infrastructure.local.seed_service import sync_critical_entities
-                result = sync_critical_entities()
-                if result.get("failed"):
-                    logger.warning("Seed pos-login parcial: %s", result)
-                else:
-                    logger.info("Seed pos-login concluido: %s", result)
-            except Exception as exc:
-                logger.warning("Seed pos-login falhou (nao-bloqueante): %s", exc)
-
-        threading.Thread(target=_seed_thread, daemon=True).start()
+        self._bootstrap.run_post_login_seed()
 
     def _tela_login_ativa(self) -> bool:
         return not hasattr(self.navigation, "sidebar") or not self.navigation.sidebar.winfo_exists()
