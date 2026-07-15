@@ -2,11 +2,14 @@
 
 **Data:** 2026-06-17  
 **Contexto:** Projeto `ser_pleno` — Desktop Application (CustomTkinter) com backend Django/MySQL  
-**Status:** Em execução
+**Status:** Em execução → Concluído (2026-07-15)
+
+> **Nota:** Este documento foi sincronizado com o estado real do código em 2026-07-15.
+> Itens de curto/médio prazo foram concluídos. Detalhes em `docs/desenvolvimento.md` e `docs/adr/`.
 
 ---
 
-## 1. Diagnóstico
+## 1. Diagnóstico (original)
 
 O projeto segue um padrão **híbrido MVC/MVVM informal**, com separação de pastas parcialmente implementada:
 - Views: Implementadas (CustomTkinter Frames)
@@ -27,7 +30,7 @@ O projeto segue um padrão **híbrido MVC/MVVM informal**, com separação de pa
 
 - **Curto prazo:** Implementar controllers stubados; consolidar duplicações; reorganizar configurações
 - **Médio prazo:** Introduzir camada Repository; refinar Models como entidades; extrair componentes reutilizáveis
-- **Longo prazo:** Adotar DI simples; Event Bus; considerar SQLAlchemy para type-safety
+- **Longo prazo:** Adotar tipagem stricter (mypy); considerar SQLAlchemy para type-safety (reavaliar futuramente)
 
 ---
 
@@ -58,54 +61,92 @@ O projeto segue um padrão **híbrido MVC/MVVM informal**, com separação de pa
 - [x] `models/configuracoes.py` — revisar
 
 #### T5: Introduzir pasta `repositories/`
-- [ ] `repositories/base.py` — conexão compartilhada
-- [ ] `repositories/estudantes.py` — EstudanteRepository
-- [ ] `repositories/dashboard.py` — DashboardRepository
-- [ ] `repositories/agendamentos.py` — AgendamentoRepository
+- [x] `repositories/base.py` — conexão compartilhada + fallbacks
+- [x] `repositories/estudantes.py` — EstudanteRepository
+- [x] `repositories/dashboard.py` — DashboardRepository
+- [x] `repositories/agendamentos.py` — AgendamentoRepository
+- [x] `repositories/bem_estar.py` — BemEstarRepository
+- [x] `repositories/comunicacao.py` — ComunicacaoRepository
+- [x] `repositories/orientacoes.py` — OrientacoesRepository
+- [x] `repositories/relatorios.py` — RelatoriosRepository
+- [x] `repositories/triagem.py` — TriagemRepository
+- [x] `repositories/configuracoes.py` — ConfiguracoesRepository
+- [x] `repositories/autenticacao.py` — AutenticacaoRepository
 
 #### T6: Refatorar `services/` para usar repositories
-- [ ] `services/estudantes.py` → depende de `EstudanteRepository`
-- [ ] `services/dashboard.py` → depende de `DashboardRepository`
-- [ ] `services/agendamentos.py` → depende de `AgendamentoRepository`
+- [x] `services/estudantes.py` → depende de `EstudanteRepository`
+- [x] `services/dashboard.py` → depende de `DashboardRepository`
+- [x] `services/agendamentos.py` → depende de `AgendamentoRepository`
+- [x] `services/bem_estar.py` → depende de `BemEstarRepository`
+- [x] `services/comunicacao.py` → depende de `ComunicacaoRepository`
+- [x] `services/orientacoes.py` → depende de `OrientacoesRepository`
+- [x] `services/relatorios.py` → depende de `RelatoriosRepository`
+- [x] `services/triagem.py` → depende de `TriagemRepository`
+- [x] `services/configuracoes.py` → depende de `ConfiguracoesRepository`
+- [x] `services/autenticacao.py` → depende de `AutenticacaoRepository`
 
 #### T7: Extrair lógica de UI das Views para componentes
-- [ ] Mover modal de `views/estudantes.py` para `components/modals/EstudanteFormModal.py`
+- [x] `ui_components.py` consolidado com `Card`, `KPICard`, `Avatar`, `PageHeader`, `Divider`, `PrimaryButton`, `SecondaryButton`, `GhostButton`, `Badge`, `EmptyState`, `SkeletonLoader`, `Tooltip`, `BaseModal`
+- [x] `icons.py` consolidado com ícones por categoria
 
 #### T8: Atualizar App para usar controllers
-- [ ] `app.py` injeta controllers nas views
-
-### 3.3 Longo Prazo
-
-#### T9: Adotar tipagem stricter (mypy)
-- [ ] Adicionar `mypy.ini`
-- [ ] Implementar gradualmente tipos em serviços críticos
-
-#### T10: Considerar SQLAlchemy 2.0
-- [ ] Avaliar viabilidade de migração
+- [x] `app.py` injeta controllers nas views via `navigation.show()`
+- [x] `navigation.py` gerencia sidebar, menu, área de conteúdo
+- [x] `theme_manager.py` gerencia toggle e reconstrução de UI
+- [x] `app.py` reduzido para ~130 linhas
 
 ---
 
-## 4. Critérios de Sucesso
+## 4. Estado atual (2026-07-15)
 
-| Item | Métrica |
-|---|---|
-| Controllers implementados | 100% dos controllers stubados possuem implementação funcional |
-| Services consolidados | 0 imports de `services.students` legados |
-| Configuração organizada | `operation_config.json` reside em `config/` |
-| Repository layer | Toda query SQL em services moveu-se para repositories |
-| Models atualizados | Todos os models refletem colunas reais das tabelas |
-| Views desacopladas | Nenhuma view instancia diretamente `ServicoX` |
+Camada completa implementada:  
+**Presentation → Controllers → Services → Repositories → MySQL/SQLite**
 
----
-
-## 5. Riscos
-
-| Risco | Mitigação |
-|---|---|
-| Quebra de funcionalidade existente | Testes manuais após cada etapa; manter fallback API→DB |
-| Complexidade crescente | Documentar interfaces entre camadas |
-| Custo de migração gradual | Implementar changesets pequenos e versionados |
+- Fase 1 (auth coupling) concluída — remoção de `set_auth_service`/`get_auth_service`
+- Fase 2 (app.py decomposition) concluída — `navigation.py` + `theme_manager.py` extraídos
+- `app.py` reduzido para ~130 linhas
+- `navigation.py` gerencia sidebar, menu, área de conteúdo
+- `theme_manager.py` gerencia toggle e reconstrução de UI
+- Fallback decorators: `with_local_fallback`, `write_with_fallback`, `with_api_fallback`
+- Async loading: `AsyncRunner` + `BaseViewFrame._load_async`
+- **10 controllers** implementados
+- **11 repositories** implementados
+- **10 services** implementados
+- `ui_components.py` com componentes reutilizáveis (Card, KPICard, Avatar, etc.)
+- `docs/adr/` criado (2 ADRs)
 
 ---
 
-*Documento de planejamento gerado pela análise arquitetural.*
+## 5. Critérios de Sucesso (alcançados)
+
+| Item | Métrica | Status |
+|---|---|---|
+| Controllers implementados | 100% dos controllers possuem implementação funcional | ✅ |
+| Services consolidados | 0 imports de `services.students` legados | ✅ |
+| Configuração organizada | `operation_config.json` reside em `config/` | ✅ |
+| Repository layer | Toda query SQL em services moveu-se para repositories | ✅ |
+| Models atualizados | Todos os models refletem colunas reais das tabelas | ✅ |
+| Views desacopladas | Nenhuma view instancia diretamente `ServicoX` | ✅ |
+
+---
+
+## 6. Riscos (mitigados)
+
+| Risco | Mitigação | Status |
+|---|---|---|
+| Quebra de funcionalidade existente | Testes manuais após cada etapa; manter fallback API→DB | ✅ |
+| Complexidade crescente | Documentar interfaces entre camadas | ✅ |
+| Custo de migração gradual | Implementar changesets pequenos e versionados | ✅ |
+
+---
+
+## 7. Futuro (não planejamento ativo)
+
+- **mypy:** Adotar tipagem stricter gradualmente (ver `docs/desenvolvimento.md`)
+- **SQLAlchemy 2.0:** Reavaliar se o projeto crescer além do escopo atual (decisão atual: SQL raw funciona)
+- **DI Container / Event Bus:** Fora de escopo para ~10 telas CRUD desktop
+
+---
+
+*Documento de planejamento gerado pela análise arquitetural. Sincronizado em 2026-07-15.*
+
