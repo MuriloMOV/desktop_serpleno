@@ -1,20 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""Smoke test automatizado do SerPleno Desktop.
+"""Testes de performance e theme extensions do SerPleno Desktop.
 
-Valida:
-- Inicialização sem exceção
-- Login frame é criado
-- Navegação entre views
-- Métricas dePerformance são registradas
+Consolida:
+- Testes de tema e espaçamento
+- Benchmark de login (latência do serviço de autenticação)
 """
 
 import sys
 import time
 import unittest
-from unittest.mock import patch
 
-# Garante que o src está no path
 sys.path.insert(0, "src")
 
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS
@@ -36,14 +32,17 @@ class TestThemeExtensions(unittest.TestCase):
         self.assertEqual(base["b"], 2)
 
 
-class TestAutenticacaoPerformance(unittest.TestCase):
-    def test_login_paralelo_nao_bloqueia(self):
-        svc = ServicoAutenticacao()
-        # Garante que não há sessão ativa
-        svc.user = None
-        # login() deve retornar dict com 'success' sem levantar exceção
-        result = svc.login("inexistente", "senha_errada")
+class TestLoginPerformance(unittest.TestCase):
+    def setUp(self):
+        self.svc = ServicoAutenticacao()
+
+    def test_login_fallback_db_tempo(self):
+        """Login com usuário inexistente deve retornar em < 2.5s."""
+        t0 = time.perf_counter()
+        result = self.svc.login("user_inexistente", "senha_qualquer")
+        dt = (time.perf_counter() - t0) * 1000
         self.assertIn("success", result)
+        self.assertLess(dt, 2500, f"Login demorou {dt:.1f}ms (teto: 2500ms)")
 
 
 if __name__ == "__main__":
