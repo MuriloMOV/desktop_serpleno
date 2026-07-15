@@ -39,8 +39,8 @@ class TestServices:
         assert resp["user"]["username"] == "user"
         mock_repo_instance.obter_usuario_por_username.assert_called_with("user")
 
-    @patch("ser_pleno.infrastructure.api.api.api")
-    def test_student_service(self, mock_api):
+    @patch("ser_pleno.application.services.estudantes.ClienteAPI")
+    def test_student_service(self, MockClienteAPI):
         service = ServicoEstudante()
         assert service is not None
 

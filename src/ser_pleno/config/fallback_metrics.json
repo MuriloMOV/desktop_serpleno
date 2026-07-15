@@ -1,96 +1,96 @@
 {
-  "read_fallback_total": 366,
-  "write_fallback_total": 925,
+  "read_fallback_total": 390,
+  "write_fallback_total": 966,
   "by_repository": {
     "EstudanteRepository": {
-      "total": 169,
-      "read": 169,
+      "total": 181,
+      "read": 181,
       "write": 0,
       "methods": {
-        "listar": 169
+        "listar": 181
       }
     },
     "AgendamentoRepository": {
-      "total": 85,
-      "read": 85,
+      "total": 91,
+      "read": 91,
       "write": 0,
       "methods": {
-        "listar_proximos": 85
+        "listar_proximos": 91
       }
     },
     "TriagemRepository": {
-      "total": 89,
-      "read": 89,
+      "total": 95,
+      "read": 95,
       "write": 0,
       "methods": {
-        "listar": 89
+        "listar": 95
       }
     },
     "students": {
-      "total": 85,
+      "total": 88,
       "read": 0,
-      "write": 85,
+      "write": 88,
       "methods": {
-        "create": 85
+        "create": 88
       }
     },
     "appointments": {
-      "total": 252,
+      "total": 261,
       "read": 0,
-      "write": 252,
+      "write": 261,
       "methods": {
-        "create": 84,
-        "update": 84,
-        "delete": 84
+        "create": 87,
+        "update": 87,
+        "delete": 87
       }
     },
     "messages": {
-      "total": 168,
+      "total": 174,
       "read": 0,
-      "write": 168,
+      "write": 174,
       "methods": {
-        "create": 84,
-        "update": 84
+        "create": 87,
+        "update": 87
       }
     },
     "orientations": {
-      "total": 84,
+      "total": 91,
       "read": 0,
-      "write": 84,
+      "write": 91,
       "methods": {
-        "create": 84
+        "create": 91
       }
     },
     "screenings": {
-      "total": 84,
+      "total": 87,
       "read": 0,
-      "write": 84,
+      "write": 87,
       "methods": {
-        "create": 84
+        "create": 87
       }
     },
     "reports": {
-      "total": 84,
+      "total": 87,
       "read": 0,
-      "write": 84,
+      "write": 87,
       "methods": {
-        "delete": 84
+        "delete": 87
       }
     },
     "user_preferences": {
-      "total": 84,
+      "total": 91,
       "read": 0,
-      "write": 84,
+      "write": 91,
       "methods": {
-        "update": 84
+        "update": 91
       }
     },
     "alerts": {
-      "total": 84,
+      "total": 87,
       "read": 0,
-      "write": 84,
+      "write": 87,
       "methods": {
-        "update": 84
+        "update": 87
       }
     },
     "DashboardRepository": {
@@ -103,7 +103,7 @@
       }
     }
   },
-  "last_read_fallback": "2026-07-15T14:00:56.756718",
-  "last_write_fallback": "2026-07-15T14:00:56.736780",
+  "last_read_fallback": "2026-07-15T16:30:11.582935",
+  "last_write_fallback": "2026-07-15T16:30:11.555482",
   "started_at": "2026-07-10T00:41:45.736401"
 }

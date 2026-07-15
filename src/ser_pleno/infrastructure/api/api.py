@@ -166,6 +166,4 @@ class ClienteAPI:
             return {"success": False, "message": f"Erro de conexão: {str(e)}"}
 
 
-# Instância única
-api = ClienteAPI()
 

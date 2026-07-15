@@ -82,7 +82,7 @@ class TestReadFallback:
         from ser_pleno.repositories.estudantes import EstudanteRepository
         repo = EstudanteRepository()
 
-        with patch("ser_pleno.repositories.base.execute_query", side_effect=mysql_error):
+        with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
             with patch("ser_pleno.repositories.estudantes.local_cache", mock_local_cache):
                 resultado = repo.listar()
 
@@ -93,7 +93,7 @@ class TestReadFallback:
         from ser_pleno.repositories.agendamentos import AgendamentoRepository
         repo = AgendamentoRepository()
 
-        with patch("ser_pleno.repositories.base.execute_query", side_effect=mysql_error):
+        with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
             with patch("ser_pleno.repositories.agendamentos.local_cache", mock_local_cache):
                 resultado = repo.listar_proximos(limite=5)
 
@@ -104,7 +104,7 @@ class TestReadFallback:
         from ser_pleno.repositories.triagem import TriagemRepository
         repo = TriagemRepository()
 
-        with patch("ser_pleno.repositories.base.execute_query", side_effect=mysql_error):
+        with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
             with patch("ser_pleno.repositories.triagem.local_cache", mock_local_cache):
                 resultado = repo.listar()
 
@@ -368,9 +368,9 @@ class TestReadFallbackDecorator:
         from ser_pleno.repositories.estudantes import EstudanteRepository
         repo = EstudanteRepository()
 
-        with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
+        with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=Exception("MySQL server has gone away")):
             with patch("ser_pleno.repositories.estudantes.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.base.logger") as mock_logger:
+                with patch("ser_pleno.repositories.fallback.logger") as mock_logger:
                     repo.listar()
                     mock_logger.warning.assert_called()
                     call_kwargs = mock_logger.warning.call_args[1]

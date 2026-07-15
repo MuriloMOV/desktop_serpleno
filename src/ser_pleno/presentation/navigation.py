@@ -252,6 +252,10 @@ class NavigationManager:
         for key in self.menu_buttons:
             self._aplicar_estilo_botao_menu(key, key == active_key)
 
+    def get_active_screen(self) -> str:
+        """Retorna a chave da tela atualmente ativa, ou 'dashboard' como fallback."""
+        return self._menu_ativo or "dashboard"
+
     def atualizar_header(self, title: str, subtitle: str) -> None:
         if hasattr(self.app, "header_title") and self.app.header_title.winfo_exists():
             self.app.header_title.configure(text=title)

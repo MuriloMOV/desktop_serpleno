@@ -30,7 +30,7 @@ class ThemeManager:
                 self.app.mostrar_login()
             return
 
-        tela_anterior = self.app.navigation._menu_ativo or "dashboard"
+        tela_anterior = self.app.navigation.get_active_screen()
         self.app.navigation.limpar_tela()
         self.app.navigation.criar_sidebar()
         self.app.navigation.criar_area_conteudo()
