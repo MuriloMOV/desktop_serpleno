@@ -12,7 +12,8 @@ from typing import Any
 from ser_pleno.infrastructure.api.mural import ServicoMural
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.presentation.components.icons import IconLabel, ICONS
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.components.icons import IconLabel
 from ser_pleno.presentation.components.ui_components import BaseModal, Card
 
 logger = logging.getLogger("apps.desktop")

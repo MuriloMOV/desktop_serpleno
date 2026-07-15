@@ -16,7 +16,7 @@ from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
     PrimaryButton, GhostButton, SecondaryButton, InputField, Badge, Divider
 )
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 
 logger = logging.getLogger("apps.desktop")
 
@@ -480,9 +480,10 @@ class LoginFrame(ctk.CTkFrame):
         # Mantém fundo branco no CTk; o arredondamento visual vem da imagem PIL no canvas
         self.card = ctk.CTkFrame(
             self, width=444, height=720,
-            corner_radius=0,
+            corner_radius=20,
             fg_color=_LOGIN_PALETTE["card_bg"],
             bg_color=_LOGIN_PALETTE["card_bg"],
+            border_width=0,
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
@@ -598,20 +599,19 @@ class LoginFrame(ctk.CTkFrame):
         )
         self._music_btn_frame.pack_propagate(False)
 
-        # NOTA: corner_radius=8 e border_width=0 previnem bordas pretas no Windows
-        # Bug conhecido do customtkinter: border_width > 0 + corner_radius > 0 causa
-        # renderização problemática no Windows (subpixel anti-aliasing issues)
+        # Botão circular: corner_radius = metade da largura/altura (48/2 = 24).
+        # border_width=0 evita artefatos de renderização no Windows.
         self._music_btn = ctk.CTkButton(
             self._music_btn_frame,
             text=ICONS["music"],
             width=48,
             height=48,
-            corner_radius=8,  # Reduzido de RADIUS["pill"] (999) para evitar renderização bugada
+            corner_radius=24,
             font=themed_font("h3"),
-            fg_color="white",
+            fg_color=_LOGIN_PALETTE["card_bg"],
             hover_color=_LOGIN_PALETTE["accent_soft"],
             text_color=_LOGIN_PALETTE["text_muted"],
-            border_width=0,  # Removido para evitar bordas pretas no Windows
+            border_width=0,
             command=self._toggle_music,
             cursor="hand2",
         )
@@ -694,7 +694,6 @@ class LoginFrame(ctk.CTkFrame):
             return
 
         self._is_loading = True
-        self.lbl_erro.configure(text="Autenticando...", text_color=self.palette["text_muted"])
         self.btn_entrar.configure(text="Aguarde...", state="disabled")
         self.update_idletasks()
 

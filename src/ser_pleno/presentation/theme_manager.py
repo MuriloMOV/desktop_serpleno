@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ser_pleno.ui.theme import THEME, toggle_mode, on_theme_change, get_mode
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 
 
 class ThemeManager:

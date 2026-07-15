@@ -8,41 +8,32 @@ import time
 import customtkinter as ctk
 
 from ser_pleno.ui.theme import THEME, SPACING, font
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import GhostButton, Avatar, Divider
-from ser_pleno.presentation.views.dashboard import DashboardFrame
-from ser_pleno.presentation.views.estudantes import EstudantesFrame
-from ser_pleno.presentation.views.agenda import AgendaFrame
-from ser_pleno.presentation.views.bem_estar import BemEstarFrame
-from ser_pleno.presentation.views.analise_triagem import AnaliseTriagemFrame
-from ser_pleno.presentation.views.relatorio import RelatorioFrame
-from ser_pleno.presentation.views.comunicacao_interna import ComunicacaoInternaFrame
-from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
-from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
-from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
+from ser_pleno.presentation.view_factory import ViewFactory
 
 logger = logging.getLogger(__name__)
 
 MENU_ITEMS = [
-    {"key": "dashboard",     "label": "Dashboard",         "icon": ICONS["chart"], "frame": DashboardFrame,
+    {"key": "dashboard",     "label": "Dashboard",         "icon": ICONS["chart"],
      "header": ("Dashboard", "Resumo geral do ambiente")},
-    {"key": "estudantes",    "label": "Estudantes",        "icon": ICONS["users"], "frame": EstudantesFrame,
+    {"key": "estudantes",    "label": "Estudantes",        "icon": ICONS["users"],
      "header": ("Estudantes", "Acompanhamento e gestao academica")},
-    {"key": "agenda",        "label": "Agenda",            "icon": ICONS["calendar"], "frame": AgendaFrame,
+    {"key": "agenda",        "label": "Agenda",            "icon": ICONS["calendar"],
      "header": ("Agenda", "Planejamento e compromissos")},
-    {"key": "bem_estar",     "label": "Bem-estar",         "icon": ICONS["heart_blue"], "frame": BemEstarFrame,
+    {"key": "bem_estar",     "label": "Bem-estar",         "icon": ICONS["heart_blue"],
      "header": ("Bem-estar", "Monitoramento e apoio emocional")},
-    {"key": "analise",       "label": "Analise",           "icon": ICONS["search"], "frame": AnaliseTriagemFrame,
+    {"key": "analise",       "label": "Analise",           "icon": ICONS["search"],
      "header": ("Analise", "Triagem e classificacao")},
-    {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["empty"], "frame": RelatorioFrame,
+    {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["empty"],
      "header": ("Relatorios", "Indicadores e exportacoes")},
-    {"key": "comunicacao",   "label": "Comunicacao",       "icon": ICONS["chat"], "frame": ComunicacaoInternaFrame,
+    {"key": "comunicacao",   "label": "Comunicacao",       "icon": ICONS["chat"],
      "header": ("Comunicacao", "Mensagens internas e suporte")},
-    {"key": "orientacoes",   "label": "Orientacoes",       "icon": ICONS["compass"], "frame": OrientacoesFrame,
+    {"key": "orientacoes",   "label": "Orientacoes",       "icon": ICONS["compass"],
      "header": ("Orientacoes", "Fluxo de apoio e encaminhamentos")},
-    {"key": "avisos",        "label": "Quadro de avisos",  "icon": ICONS["megaphone"], "frame": QuadroAvisosFrame,
+    {"key": "avisos",        "label": "Quadro de avisos",  "icon": ICONS["megaphone"],
      "header": ("Avisos", "Quadro de comunicacao institucional")},
-    {"key": "configuracoes", "label": "Configuracoes",     "icon": ICONS["settings"], "frame": ConfiguracoesFrame,
+    {"key": "configuracoes", "label": "Configuracoes",     "icon": ICONS["settings"],
      "header": ("Configuracoes", "Preferencias da aplicacao")},
 ]
 _MENU_BY_KEY = {item["key"]: item for item in MENU_ITEMS}
@@ -54,10 +45,11 @@ PAGE_HEADER_HEIGHT = 86
 class NavigationManager:
     """Gerencia a navegação entre telas da aplicação."""
 
-    def __init__(self, app):
+    def __init__(self, app, auth_service=None):
         self.app = app
         self._menu_ativo = None
         self.menu_buttons = {}
+        self.view_factory = ViewFactory(app)
 
     # ================= SIDEBAR =================
     def criar_sidebar(self):
@@ -274,27 +266,24 @@ class NavigationManager:
         self.atualizar_menu(key)
         titulo, subtitulo = item["header"]
         self.atualizar_header(titulo, subtitulo)
-        self.trocar_frame(item["frame"])
+        parent = getattr(self.app, "content_body", None)
+        if parent is None or not hasattr(parent, "winfo_exists"):
+            self.criar_area_conteudo()
+            parent = self.app.content_body
+        frame = self.view_factory.create(key, parent)
+        if frame is not None:
+            frame.pack(fill="both", expand=True)
         try:
             logger.info("PERF nav_switch_%s_ms=%.1f", key, (time.perf_counter() - t0) * 1000)
         except Exception:
             pass
 
-    def trocar_frame(self, frame_cls, controller=None):
-        if not hasattr(self.app, "content_body") or not self.app.content_body.winfo_exists():
-            self.criar_area_conteudo()
-
-        for widget in self.app.content_body.winfo_children():
-            widget.destroy()
-
-        if frame_cls is QuadroAvisosFrame:
-            frame = frame_cls(self.app.content_body, app=self.app)
-        elif controller is not None:
-            frame = frame_cls(self.app.content_body, controller)
-        else:
-            frame = frame_cls(self.app.content_body, self.app)
-        frame.pack(fill="both", expand=True)
-
     def limpar_tela(self):
         for widget in self.app.container.winfo_children():
             widget.destroy()
+
+
+def get_mode():
+    """Importado de ser_pleno.ui.theme para uso em _criar_rodape_sidebar."""
+    from ser_pleno.ui.theme import get_mode as _get_mode
+    return _get_mode()

@@ -50,6 +50,7 @@ src/ser_pleno/config/ser_pleno_local.db-shm
 src/ser_pleno/sync_queue.json
 src/ser_pleno/user_profile.json
 src/ser_pleno/logs/
+src/ser_pleno/config/fallback_metrics.json
 
 # Secrets (não versionar)
 *.pem

@@ -8,8 +8,11 @@ from ser_pleno.application.services.dashboard import ServicoDashboard
 class DashboardController(BaseController):
     """Coordena as requisições da View de Dashboard."""
 
-    def __init__(self):
-        super().__init__(ServicoDashboard)
+    def __init__(self, app=None, auth_service=None):
+        super().__init__(ServicoDashboard, auth_service=auth_service)
+        self.app = app
+        self.usuario_logado = getattr(app, "usuario_logado", None) if app else None
+        self.usuario_logado_id = getattr(app, "usuario_logado_id", None) if app else None
 
     def get_service(self):
         return self._service
@@ -29,3 +32,8 @@ class DashboardController(BaseController):
     def marcar_notificacao_como_lida(self, notificacao_id, tipo="alerta"):
         """Marca uma notificação como lida."""
         self._service.marcar_notificacao_como_lida(notificacao_id, tipo)
+
+    def mostrar_login(self):
+        """Abre a tela de login."""
+        if self.app:
+            return self.app.mostrar_login()

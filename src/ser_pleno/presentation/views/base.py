@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import PageHeader, Divider, PrimaryButton, GhostButton, BaseModal
 
 

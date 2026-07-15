@@ -32,7 +32,7 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, ELEVATION, TYPO, ANIMATION, STATUS_COLORS, FONT_FAMILY,
     font, themed_font, mono_font, blend_color, darken, lighten, shift_hue,
 )
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••

@@ -1,7 +1,8 @@
 import logging
 import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton
-from ser_pleno.presentation.components.icons import IconLabel, ICONS
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.components.icons import IconLabel
 from ser_pleno.application.controllers.relatorio import RelatorioController
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font

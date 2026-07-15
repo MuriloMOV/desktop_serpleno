@@ -7,7 +7,8 @@ from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.utils.async_runner import AsyncRunner
-from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
+from ser_pleno.ui.components.icons import ICONS, IconButton
+from ser_pleno.presentation.components.icons import IconLabel
 from ser_pleno.presentation.components.ui_components import bind_clickable
 
 logger = logging.getLogger(__name__)

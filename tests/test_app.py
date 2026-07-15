@@ -19,7 +19,7 @@ from ser_pleno.presentation.navigation import NavigationManager
 @patch.object(App, "mostrar_login")
 @patch.object(App, "configure")
 @patch.object(App, "minsize")
-@patch.object(App, "geometry")
+@patch.object(App, "state")
 @patch.object(App, "title")
 @patch.object(ctk, "CTkFrame")
 @patch.object(ctk.CTk, "__init__", return_value=None)
@@ -27,7 +27,7 @@ def test_app_initialization(
     mock_ctk_init,
     mock_frame,
     mock_title,
-    mock_geometry,
+    mock_state,
     mock_minsize,
     mock_configure,
     mock_mostrar_login,
@@ -39,7 +39,7 @@ def test_app_initialization(
 
     mock_ctk_init.assert_called_once_with()
     mock_title.assert_called_once_with("SerPleno")
-    mock_geometry.assert_called_once_with("1280x720")
+    mock_state.assert_called_once_with("zoomed")
     mock_minsize.assert_called_once_with(1000, 600)
     container.pack.assert_called_once_with(fill="both", expand=True)
     mock_mostrar_login.assert_called_once_with()
@@ -53,13 +53,14 @@ def test_navigation_flow():
     app.header_subtitle = MagicMock()
     app.header_title.winfo_exists.return_value = True
     app.header_subtitle.winfo_exists.return_value = True
+    app.content_body = MagicMock()
 
     navigation = NavigationManager(app)
     navigation.atualizar_menu = MagicMock()
-    navigation.trocar_frame = MagicMock()
+    navigation.view_factory = MagicMock()
     app.navigation = navigation
 
     app.navigation.show("agenda")
 
     app.navigation.atualizar_menu.assert_called_once_with("agenda")
-    app.navigation.trocar_frame.assert_called_once_with(AgendaFrame)
+    navigation.view_factory.create.assert_called_once_with("agenda", app.content_body)

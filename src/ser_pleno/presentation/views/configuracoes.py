@@ -18,7 +18,8 @@ from ser_pleno.presentation.components.ui_components import (
     Badge,
     BaseModal,
 )
-from ser_pleno.presentation.components.icons import IconLabel, ICONS
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.components.icons import IconLabel
 
 logger = logging.getLogger("apps.desktop")
 

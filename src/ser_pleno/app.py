@@ -29,7 +29,7 @@ from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, ELEVATION, font, themed_font,
     get_mode, apply_global_style, toggle_mode, on_theme_change,
 )
-from ser_pleno.presentation.components.icons import ICONS
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import (
     PageHeader, SectionHeader, Card, KPICard,
     PrimaryButton, SecondaryButton, GhostButton,
@@ -72,7 +72,7 @@ class App(ctk.CTk):
         self.container.grid_columnconfigure(1, weight=1)
         self.container.grid_rowconfigure(0, weight=1)
 
-        self.navigation = NavigationManager(self)
+        self.navigation = NavigationManager(self, auth_service=self.auth_service)
         self.theme_manager = ThemeManager(self)
 
         try:
@@ -101,9 +101,14 @@ class App(ctk.CTk):
     def _setup_window(self):
         apply_global_style("light")
         self.title("SerPleno")
-        self.geometry("1280x720")
         self.minsize(1000, 600)
         self.configure(fg_color=THEME["bg"])
+        # Aplica estado maximizado sem esconder a janela.
+        # Falhas aqui são ignoradas para não quebrar inicialização.
+        try:
+            self.state("zoomed")
+        except Exception:
+            pass
 
     # ================= LOGIN =================
     def mostrar_login(self):

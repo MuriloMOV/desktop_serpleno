@@ -10,7 +10,8 @@ from ser_pleno.presentation.components.ui_components import (
     PageHeader, Card, PrimaryButton, GhostButton, Divider, EmptyState,
     InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
 )
-from ser_pleno.presentation.components.icons import IconLabel, IconButton, ICONS
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.components.icons import IconLabel
 
 logger = logging.getLogger(__name__)
 

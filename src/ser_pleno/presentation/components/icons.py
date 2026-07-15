@@ -1,55 +1,36 @@
-"""Centralized icon definitions and reusable icon widgets.
+"""Compatibility module for legacy IconLabel import.
 
-All icons used across the application should be referenced from ``ICONS``
-instead of hardcoding emoji strings in view files. This makes it trivial to
-swap emoji → SVG/PNG later without touching every view.
+This module exists only to preserve backward compatibility for views that
+import ``IconLabel`` from ``ser_pleno.presentation.components.icons``.
 
-Esta camada é uma ponte de compatibilidade: o dicionário ``ICONS`` e os
-helpers ``MOOD_*`` são reexportados de ``ser_pleno.ui.components.icons``,
-que é a fonte única da verdade. As classes de widget permanecem aqui para
-não quebrar importações existentes nas views.
+The canonical source for icons and icon widgets is now ``ser_pleno.ui.components.icons``.
+
+.. deprecated::
+    Import ``IconLabel`` from ``ser_pleno.ui.components.icons`` for new code.
+    This module will be removed in a future version after all views migrate.
 """
 
 from __future__ import annotations
 
-from typing import Optional, Literal
-
 import customtkinter as ctk
 
-from ser_pleno.ui.components.icons import (
-    ICONS,
-    MOOD_EMOJIS,
-    MOOD_COLORS,
-    MOOD_LABELS,
-    get_icon,
-    icon_text,
-    IconBadge,
-    IconButton,
-)
-from ser_pleno.ui.theme import themed_font, RADIUS, THEME, blend_color, font
+from ser_pleno.ui.theme import themed_font, font
 
 
-# ---------------------------------------------------------------------------
-# Compatibility: keep IconLabel available for existing imports.
-# Note: previous IconLabel was a CTkFrame with a background; now it is a
-# CTkLabel for true inline behavior. Views can migrate to IconLabel from
-# ui.components.icons when convenient.
-# ---------------------------------------------------------------------------
 class IconLabel(ctk.CTkFrame):
     """Icon rendered inside a rounded/circular background frame (legacy API).
 
-    Prefer ``ser_pleno.ui.components.icons.IconLabel`` for new code — it is a
-    true ``CTkLabel`` for inline icon+text composition.
+    Prefer ``ser_pleno.ui.components.icons.IconLabel`` for new code.
     """
 
     def __init__(
         self,
         parent,
-        icon: str,
+        icon: str = "",
         size: int = 28,
-        fg_color: Optional[str] = None,
+        fg_color: str | None = None,
         text_color: str = "white",
-        corner_radius: Optional[int] = None,
+        corner_radius: int | None = None,
     ):
         super().__init__(parent, fg_color="transparent")
         self._size = size
@@ -71,14 +52,4 @@ class IconLabel(ctk.CTkFrame):
         ).place(relx=0.5, rely=0.5, anchor="center")
 
 
-__all__ = [
-    "ICONS",
-    "MOOD_EMOJIS",
-    "MOOD_COLORS",
-    "MOOD_LABELS",
-    "get_icon",
-    "icon_text",
-    "IconLabel",
-    "IconBadge",
-    "IconButton",
-]
+__all__ = ["IconLabel"]
