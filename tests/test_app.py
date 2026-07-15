@@ -13,6 +13,7 @@ for _p in [_src, _root]:
 
 from ser_pleno.app import App
 from ser_pleno.presentation.views.agenda import AgendaFrame
+from ser_pleno.presentation.navigation import NavigationManager
 
 
 @patch.object(App, "mostrar_login")
@@ -48,15 +49,17 @@ def test_app_initialization(
 
 def test_navigation_flow():
     app = App.__new__(App)
-    app.atualizar_menu = MagicMock()
-    app.trocar_frame = MagicMock()
     app.header_title = MagicMock()
     app.header_subtitle = MagicMock()
     app.header_title.winfo_exists.return_value = True
     app.header_subtitle.winfo_exists.return_value = True
 
-    app.mostrar_agenda()
+    navigation = NavigationManager(app)
+    navigation.atualizar_menu = MagicMock()
+    navigation.trocar_frame = MagicMock()
+    app.navigation = navigation
 
-    app.atualizar_menu.assert_called_once_with("agenda")
-    app.trocar_frame.assert_called_once_with(AgendaFrame)
+    app.navigation.show("agenda")
 
+    app.navigation.atualizar_menu.assert_called_once_with("agenda")
+    app.navigation.trocar_frame.assert_called_once_with(AgendaFrame)
