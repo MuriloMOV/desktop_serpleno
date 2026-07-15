@@ -47,7 +47,7 @@ class NavigationManager:
 
     def __init__(self, app, auth_service=None):
         self.app = app
-        self._menu_ativo = None
+        self._active_menu = None
         self.menu_buttons = {}
         self.view_factory = ViewFactory(app)
 
@@ -186,7 +186,7 @@ class NavigationManager:
         btn.pack(side="left", fill="x", expand=True)
 
         self.menu_buttons[key] = {"frame": item_frame, "indicator": indicator, "btn": btn}
-        self._aplicar_estilo_botao_menu(key, active=(key == self._menu_ativo))
+        self._aplicar_estilo_botao_menu(key, active=(key == self._active_menu))
 
     def _aplicar_estilo_botao_menu(self, key: str, active: bool = False) -> None:
         data = self.menu_buttons.get(key)
@@ -248,13 +248,13 @@ class NavigationManager:
 
     # ================= NAVEGACAO =================
     def atualizar_menu(self, active_key: str) -> None:
-        self._menu_ativo = active_key
+        self._active_menu = active_key
         for key in self.menu_buttons:
             self._aplicar_estilo_botao_menu(key, key == active_key)
 
     def get_active_screen(self) -> str:
         """Retorna a chave da tela atualmente ativa, ou 'dashboard' como fallback."""
-        return self._menu_ativo or "dashboard"
+        return self._active_menu or "dashboard"
 
     def atualizar_header(self, title: str, subtitle: str) -> None:
         if hasattr(self.app, "header_title") and self.app.header_title.winfo_exists():

@@ -26,7 +26,7 @@ class ThemeManager:
             self.app.container.configure(fg_color=THEME["bg"])
 
         if not self.app.usuario_logado:
-            if self.app._tela_login_ativa():
+            if self.app._is_login_active():
                 self.app.mostrar_login()
             return
 

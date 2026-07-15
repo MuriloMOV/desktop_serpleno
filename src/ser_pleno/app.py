@@ -146,7 +146,7 @@ class App(ctk.CTk):
 
         self._bootstrap.run_post_login_seed()
 
-    def _tela_login_ativa(self) -> bool:
+    def _is_login_active(self) -> bool:
         return not hasattr(self.navigation, "sidebar") or not self.navigation.sidebar.winfo_exists()
 
 
