@@ -1,5 +1,5 @@
 {
-  "read_fallback_total": 528,
+  "read_fallback_total": 544,
   "write_fallback_total": 1024,
   "by_repository": {
     "EstudanteRepository": {
@@ -94,16 +94,16 @@
       }
     },
     "DashboardRepository": {
-      "total": 43,
-      "read": 43,
+      "total": 59,
+      "read": 59,
       "write": 0,
       "methods": {
-        "obter_kpis": 42,
+        "obter_kpis": 58,
         "obter_notificacoes_alertas": 1
       }
     }
   },
-  "last_read_fallback": "2026-07-16T13:07:54.192843",
+  "last_read_fallback": "2026-07-16T17:18:58.433793",
   "last_write_fallback": "2026-07-16T12:02:53.810410",
   "started_at": "2026-07-10T00:41:45.736401"
 }

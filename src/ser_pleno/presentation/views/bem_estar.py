@@ -38,10 +38,10 @@ _MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo
 def _section_card(parent, title: str,
                   action_text: str = "", action_cmd=None) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
     """Card de seção com cabeçalho, divider e body."""
-    outer = Card(parent)
+    outer = Card(parent, padding=(SPACING["card_pad"], SPACING["label_gap"]), auto_body=False)
 
     hdr = ctk.CTkFrame(outer, fg_color="transparent")
-    hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["section_gap"], 0))
+    hdr.pack(fill="x")
 
     ctk.CTkLabel(
         hdr, text=title,
@@ -56,10 +56,10 @@ def _section_card(parent, title: str,
             text_color=THEME["primary"],
         ).pack(side="right")
 
-    Divider(outer).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
+    Divider(outer).pack(fill="x")
 
     body = ctk.CTkFrame(outer, fg_color="transparent")
-    body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=(SPACING["label_gap"], SPACING["section_gap"]))
+    body.pack(fill="both", expand=True)
     return outer, body
 
 
@@ -195,7 +195,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_kpis(self):
         row = ctk.CTkFrame(self, fg_color="transparent")
-        row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["label_gap"], 0))
 
         kpis = [
             ("Humor Médio",       f"{ICONS['mood_good']}  —",  ICONS["heart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "_kpi_humor",
@@ -220,7 +220,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_secao_grafico(self):
         outer, body = _section_card(self, f"{ICONS['chart']}  Tendência de Bem-Estar — últimos 30 dias")
-        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["label_gap"], 0))
         self._secao_grafico_outer = outer
 
         chart_wrap = ctk.CTkFrame(body, fg_color="transparent")
@@ -247,7 +247,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._chart_empty.lower()
 
         # Barras de distribuição de humor
-        dist_row = ctk.CTkFrame(outer.body, fg_color="transparent")
+        dist_row = ctk.CTkFrame(body, fg_color="transparent")
         dist_row.pack(fill="x", pady=(4, 4))
 
         self._dist_bars: dict[str, ctk.CTkFrame] = {}
@@ -408,7 +408,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     def _criar_visao_risco(self):
         # Título externo ao card
         title_row = ctk.CTkFrame(self, fg_color="transparent")
-        title_row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 10))
+        title_row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["label_gap"], SPACING["label_gap"]))
 
         ctk.CTkLabel(
             title_row, text=f"{ICONS['mood_good']}  Visão de Risco dos Estudantes",
@@ -424,23 +424,31 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         # Grid de colunas
         cols_wrap = ctk.CTkFrame(self, fg_color="transparent")
-        cols_wrap.pack(fill="x", padx=SPACING["page_x"])
+        cols_wrap.pack(fill="x", padx=SPACING["page_x"], pady=(0, SPACING["label_gap"]))
         for i in range(4):
             cols_wrap.grid_columnconfigure(i, weight=1)
 
         self.colunas_risco = {}
 
         for i, (title, color, soft, key) in enumerate(_RISK_COLS):
-            col_card = Card(cols_wrap)
+            col_card = ctk.CTkFrame(
+                cols_wrap,
+                fg_color=THEME["surface"],
+                corner_radius=RADIUS["card"],
+                border_width=1,
+                border_color=THEME["border"],
+            )
             col_card.grid(row=0, column=i, sticky="nsew", padx=SPACING["grid_gap"] // 2)
+            col_card.grid_rowconfigure(1, weight=1)
+            col_card.grid_columnconfigure(0, weight=1)
 
             # Cabeçalho da coluna
             col_hdr = ctk.CTkFrame(
                 col_card, fg_color=soft,
                 corner_radius=0, height=44,
             )
-            col_hdr.pack(fill="x")
-            col_hdr.pack_propagate(False)
+            col_hdr.grid(row=0, column=0, sticky="ew")
+            col_hdr.grid_propagate(False)
             col_hdr.grid_columnconfigure(1, weight=1)
 
             # Ponto colorido
@@ -469,7 +477,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 scrollbar_button_color=THEME["border_strong"],
                 scrollbar_button_hover_color=THEME["text_muted"],
             )
-            body.pack(fill="both", expand=True, padx=spacing("md"), pady=spacing("md"))
+            body.grid(row=1, column=0, sticky="nsew", padx=spacing("sm"), pady=0)
 
             self.colunas_risco[key] = {
                 "content": body,
@@ -491,7 +499,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 EmptyState(
                     self.colunas_risco[key]["content"], icon=ICONS["mood_bad"],
                     title="Nenhum estudante", subtitle=""
-                ).pack(pady=12)
+                ).pack(pady=4)
             return
 
         batch = WidgetBatchBuilder(parent=self, batch_size=20)
@@ -513,7 +521,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 EmptyState(
                     self.colunas_risco[key]["content"], icon=ICONS["mood_bad"],
                     title="Nenhum estudante", subtitle=""
-                ).pack(pady=12)
+                ).pack(pady=4)
 
     def _criar_card_risco(self, parent, student: dict,
                           color: str, soft: str):
@@ -573,7 +581,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_lista_checkins(self):
         outer, body = _section_card(self, f"{ICONS['chart']} Check-ins Recentes")
-        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
+        outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["label_gap"], SPACING["label_gap"]))
         self._checkins_body = body
 
     def populate_checkins(self, checkins: list):
@@ -590,7 +598,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 self._checkins_body, icon=ICONS["chart"],
                 title="Nenhum check-in registrado",
                 subtitle="Os check-ins aparecerão aqui quando forem realizados",
-            ).pack(pady=20)
+            ).pack(pady=8)
             return
 
         batch = WidgetBatchBuilder(parent=self, batch_size=20)

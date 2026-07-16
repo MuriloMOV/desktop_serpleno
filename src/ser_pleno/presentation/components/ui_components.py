@@ -752,7 +752,7 @@ class EmptyState(ctk.CTkFrame):
         self._build(icon, title, subtitle, action_text, action_command)
 
     def _build(self, icon, title, subtitle, action_text, action_command):
-        ctk.CTkLabel(self, text=icon, font=themed_font("display")).pack(pady=(28, 12))
+        ctk.CTkLabel(self, text=icon, font=themed_font("display")).pack(pady=(12, 8))
         ctk.CTkLabel(self, text=title, font=themed_font("h3", "bold"),
                      text_color=THEME["text"]).pack(pady=(0, 6))
         if subtitle:
