@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, Menu
 import os
 import json
 import logging
@@ -542,29 +542,38 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         row = ctk.CTkFrame(card.body, fg_color="transparent")
         row.pack(fill="x", pady=(0, 10))
 
-        self._theme_select = ctk.CTkOptionMenu(
-            row,
-            values=["Modo Sereno (Claro)", "Modo Foco (Escuro)"],
-            fg_color=THEME["bg_alt"],
-            text_color=THEME["text"],
-            button_color=THEME["border"],
-            button_hover_color=THEME["border_strong"],
-            height=34,
-            command=self._alterar_tema,
-        )
-        self._theme_select.pack(side="left", expand=True, fill="x", padx=(0, 8))
+        self._theme_values = ["Modo Sereno (Claro)", "Modo Foco (Escuro)"]
+        self._font_values = ["Padrão (16px)", "Grande (18px)"]
 
-        self._font_select = ctk.CTkOptionMenu(
+        self._theme_btn = ctk.CTkButton(
             row,
-            values=["Padrão (16px)", "Grande (18px)"],
+            text="Modo Sereno (Claro)",
             fg_color=THEME["bg_alt"],
             text_color=THEME["text"],
-            button_color=THEME["border"],
-            button_hover_color=THEME["border_strong"],
+            hover_color=THEME["bg_alt"],
+            border_width=1,
+            border_color=THEME["border"],
+            anchor="w",
             height=34,
-            command=self._alterar_fonte,
+            command=lambda: self._toggle_menu("theme"),
         )
-        self._font_select.pack(side="left", expand=True, fill="x")
+        self._theme_btn.pack(side="left", expand=True, fill="x", padx=(0, 8))
+
+        self._font_btn = ctk.CTkButton(
+            row,
+            text="Padrão (16px)",
+            fg_color=THEME["bg_alt"],
+            text_color=THEME["text"],
+            hover_color=THEME["bg_alt"],
+            border_width=1,
+            border_color=THEME["border"],
+            anchor="w",
+            height=34,
+            command=lambda: self._toggle_menu("font"),
+        )
+        self._font_btn.pack(side="left", expand=True, fill="x")
+
+        self._select_menu = None
 
         tip = SectionCard(card.body, "", "Dica de Produtividade")
         tip.pack(fill="x")
@@ -576,15 +585,37 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             wraplength=420, justify="left",
         ).pack(anchor="w", padx=spacing("md"), pady=spacing("md"))
 
-    def _alterar_tema(self, valor: str):
-        if valor == "Modo Sereno (Claro)":
-            ctk.set_appearance_mode("light")
-        elif valor == "Modo Foco (Escuro)":
-            ctk.set_appearance_mode("dark")
+    def _toggle_menu(self, kind: str):
+        if self._select_menu is not None:
+            try:
+                self._select_menu.unpost()
+            except Exception:
+                pass
+            self._select_menu = None
+            return
 
-    def _alterar_fonte(self, valor: str):
-        logger.info("Escala de texto alterada: %s", valor)
-        # TODO: implementar escala global via ui_theme
+        btn = self._theme_btn if kind == "theme" else self._font_btn
+        values = self._theme_values if kind == "theme" else self._font_values
+        current = btn.cget("text")
+
+        menu = tk.Menu(btn, tearoff=0)
+        for v in values:
+            menu.add_command(label=v, command=lambda val=v, k=kind: self._choose(k, val))
+
+        self._select_menu = menu
+        try:
+            menu.tk_popup(btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height())
+        except Exception:
+            pass
+
+    def _choose(self, kind: str, value: str):
+        if kind == "theme":
+            self._theme_btn.configure(text=value)
+            self._alterar_tema(value)
+        else:
+            self._font_btn.configure(text=value)
+            self._alterar_fonte(value)
+        self._select_menu = None
 
     # —— segurança ------------------------------------------------------------
     def _build_seguranca(self, container):
@@ -630,5 +661,8 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     def _encerrar_sessao(self):
         if messagebox.askyesno("Confirmação", "Deseja encerrar a sessão atual?"):
-            self.controller.mostrar_login()
+            try:
+                self.winfo_toplevel().mostrar_login()
+            except Exception:
+                pass
 

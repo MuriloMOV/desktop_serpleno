@@ -1,6 +1,11 @@
 import logging
 import customtkinter as ctk
 from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.application.controllers.bem_estar import BemEstarController
+from ser_pleno.ui.components.icons import ICONS, IconLabel
+from ser_pleno.presentation.components.ui_components import Divider, EmptyState, GhostButton, Card, Avatar, KPICard
+from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.utils.mood import mood_emoji_from_score
 
 from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, FONT_FAMILY,
@@ -30,7 +35,7 @@ _MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo
 
 # Helpers
 def _section_card(parent, title: str,
-                  action_text: str = "", action_cmd=None) -> ctk.CTkFrame:
+                  action_text: str = "", action_cmd=None) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
     """Card de seção com cabeçalho, divider e body."""
     outer = Card(parent)
 
@@ -54,8 +59,7 @@ def _section_card(parent, title: str,
 
     body = ctk.CTkFrame(outer, fg_color="transparent")
     body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=(SPACING["label_gap"], SPACING["section_gap"]))
-    outer.body = body
-    return outer
+    return outer, body
 
 
 
@@ -211,11 +215,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  GRÁFICO DE TENDÊNCIA
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_secao_grafico(self):
-        outer = _section_card(self, f"{ICONS['chart']}  Tendência de Bem-Estar — últimos 30 dias")
+        outer, body = _section_card(self, f"{ICONS['chart']}  Tendência de Bem-Estar — últimos 30 dias")
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
         self._secao_grafico_outer = outer
 
-        chart_wrap = ctk.CTkFrame(outer.body, fg_color="transparent")
+        chart_wrap = ctk.CTkFrame(body, fg_color="transparent")
         chart_wrap.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
         chart_wrap.grid_rowconfigure(0, weight=1)
         chart_wrap.grid_columnconfigure(0, weight=1)
@@ -357,6 +361,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             if i % step == 0 and self._chart_data:
                 raw = self._chart_data[i]
                 lbl = raw.get("entry_date") or raw.get("date") or raw.get("data") or ""
+                lbl = str(lbl)
                 if len(lbl) > 5:
                     lbl = lbl[5:]   # só MM-DD
                 self.canvas_30d.create_text(
@@ -561,9 +566,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  LISTA DE CHECK-INS
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_lista_checkins(self):
-        outer = _section_card(self, f"{ICONS['chart']} Check-ins Recentes")
+        outer, body = _section_card(self, f"{ICONS['chart']} Check-ins Recentes")
         outer.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
-        self._checkins_body = outer.body
+        self._checkins_body = body
 
     def populate_checkins(self, checkins: list):
         if not hasattr(self, "_checkins_body"):

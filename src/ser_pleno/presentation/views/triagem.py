@@ -10,7 +10,7 @@ from ser_pleno.presentation.components.ui_components import (
 )
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
-from ser_pleno.application.controllers.analise_triagem import AnaliseTriagemController
+from ser_pleno.application.controllers.triagem import TriagemController
 from ser_pleno.utils.async_runner import AsyncRunner
 from tkinter import messagebox
 
@@ -82,15 +82,15 @@ class _DateField(ctk.CTkFrame):
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  AnaliseTriagemFrame
+#  TriagemFrame
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-class AnaliseTriagemFrame(ctk.CTkScrollableFrame):
+class TriagemFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["page_bg"],
                          scrollbar_button_color=THEME["primary_medium"],
                          scrollbar_button_hover_color=THEME["primary"])
         self.controller = controller
-        self.controller_triagem = AnaliseTriagemController()
+        self.controller_triagem = TriagemController()
         self.data_master = []
 
         self._criar_toolbar_acoes()

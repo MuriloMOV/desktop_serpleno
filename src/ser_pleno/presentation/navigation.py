@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import OrderedDict
 
 import customtkinter as ctk
 
@@ -40,6 +41,7 @@ _MENU_BY_KEY = {item["key"]: item for item in MENU_ITEMS}
 
 SIDEBAR_WIDTH = 272
 PAGE_HEADER_HEIGHT = 86
+VIEW_CACHE_MAXSIZE = 8
 
 
 class NavigationManager:
@@ -47,12 +49,14 @@ class NavigationManager:
 
     def __init__(self, app, auth_service=None):
         self.app = app
-        self._active_menu = None
+        self._active_menu_key = None
         self.menu_buttons = {}
         self.view_factory = ViewFactory(app)
+        self._view_cache: OrderedDict[str, ctk.CTkFrame] = OrderedDict()
+        self._current_view: ctk.CTkFrame | None = None
 
     # ================= SIDEBAR =================
-    def criar_sidebar(self):
+    def create_sidebar(self):
         self.app.sidebar = ctk.CTkFrame(
             self.app.container,
             width=SIDEBAR_WIDTH,
@@ -63,7 +67,7 @@ class NavigationManager:
         self.app.sidebar.grid(row=0, column=0, sticky="nsew")
         self.app.sidebar.pack_propagate(False)
 
-        self._criar_marca()
+        self._create_brand()
         Divider(self.app.sidebar).pack(fill="x", padx=18, pady=(6, 16))
 
         menu_label = ctk.CTkLabel(
@@ -81,10 +85,10 @@ class NavigationManager:
         )
         self.app.menu_container.pack(fill="both", expand=True, padx=6, pady=(0, 8))
 
-        self._criar_menu()
-        self._criar_rodape_sidebar()
+        self._create_menu()
+        self._create_sidebar_footer()
 
-    def _criar_marca(self):
+    def _create_brand(self):
         brand_frame = ctk.CTkFrame(self.app.sidebar, fg_color="transparent")
         brand_frame.pack(pady=(24, 16), padx=20, fill="x")
 
@@ -111,7 +115,7 @@ class NavigationManager:
             text_color=THEME["text_secondary"],
         ).pack(anchor="w")
 
-    def _criar_rodape_sidebar(self):
+    def _create_sidebar_footer(self):
         footer = ctk.CTkFrame(self.app.sidebar, fg_color="transparent")
         footer.pack(fill="x", padx=18, pady=(12, 18), side="bottom")
 
@@ -160,12 +164,12 @@ class NavigationManager:
         )
         self.app.theme_toggle_btn.pack(fill="x")
 
-    def _criar_menu(self):
+    def _create_menu(self):
         self.menu_buttons = {}
         for item in MENU_ITEMS:
-            self._criar_botao_menu(item)
+            self._create_menu_button(item)
 
-    def _criar_botao_menu(self, item: dict) -> None:
+    def _create_menu_button(self, item: dict) -> None:
         key = item["key"]
         item_frame = ctk.CTkFrame(self.app.menu_container, fg_color="transparent")
         item_frame.pack(fill="x", padx=6, pady=3)
@@ -186,9 +190,9 @@ class NavigationManager:
         btn.pack(side="left", fill="x", expand=True)
 
         self.menu_buttons[key] = {"frame": item_frame, "indicator": indicator, "btn": btn}
-        self._aplicar_estilo_botao_menu(key, active=(key == self._active_menu))
+        self._apply_menu_button_style(key, active=(key == self._active_menu_key))
 
-    def _aplicar_estilo_botao_menu(self, key: str, active: bool = False) -> None:
+    def _apply_menu_button_style(self, key: str, active: bool = False) -> None:
         data = self.menu_buttons.get(key)
         if not data:
             return
@@ -215,7 +219,7 @@ class NavigationManager:
             )
 
     # ================= AREA DE CONTEUDO =================
-    def criar_area_conteudo(self):
+    def create_content_area(self):
         self.app.content = ctk.CTkFrame(self.app.container, fg_color=THEME["bg"])
         self.app.content.grid(row=0, column=1, sticky="nsew")
         self.app.content.grid_columnconfigure(0, weight=1)
@@ -247,16 +251,16 @@ class NavigationManager:
         self.app.content_body.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
 
     # ================= NAVEGACAO =================
-    def atualizar_menu(self, active_key: str) -> None:
-        self._active_menu = active_key
+    def update_menu(self, active_key: str) -> None:
+        self._active_menu_key = active_key
         for key in self.menu_buttons:
-            self._aplicar_estilo_botao_menu(key, key == active_key)
+            self._apply_menu_button_style(key, key == active_key)
 
     def get_active_screen(self) -> str:
         """Retorna a chave da tela atualmente ativa, ou 'dashboard' como fallback."""
-        return self._active_menu or "dashboard"
+        return self._active_menu_key or "dashboard"
 
-    def atualizar_header(self, title: str, subtitle: str) -> None:
+    def update_header(self, title: str, subtitle: str) -> None:
         if hasattr(self.app, "header_title") and self.app.header_title.winfo_exists():
             self.app.header_title.configure(text=title)
         if hasattr(self.app, "header_subtitle") and self.app.header_subtitle.winfo_exists():
@@ -267,24 +271,80 @@ class NavigationManager:
         if not item:
             return
         t0 = time.perf_counter()
-        self.atualizar_menu(key)
-        titulo, subtitulo = item["header"]
-        self.atualizar_header(titulo, subtitulo)
+        self.update_menu(key)
+        title, subtitle = item["header"]
+        self.update_header(title, subtitle)
         parent = getattr(self.app, "content_body", None)
         if parent is None or not hasattr(parent, "winfo_exists"):
-            self.criar_area_conteudo()
+            self.create_content_area()
             parent = self.app.content_body
-        frame = self.view_factory.create(key, parent)
-        if frame is not None:
+
+        # Esconde view atual antes de trocar
+        if self._current_view is not None and self._current_view.winfo_exists():
+            self._current_view.pack_forget()
+
+        # Reutiliza view cacheada se disponível
+        frame = self._view_cache.get(key)
+        if frame is not None and frame.winfo_exists():
+            self._view_cache.move_to_end(key)
+            reloader = getattr(frame, "reload", None)
+            if callable(reloader):
+                try:
+                    reloader()
+                except Exception:
+                    pass
             frame.pack(fill="both", expand=True)
+            self._current_view = frame
+        else:
+            frame = self.view_factory.create(key, parent)
+            if frame is not None:
+                if key in self._view_cache:
+                    old = self._view_cache.pop(key)
+                    if old.winfo_exists():
+                        old.destroy()
+                self._view_cache[key] = frame
+                self._current_view = frame
+                while len(self._view_cache) > VIEW_CACHE_MAXSIZE:
+                    _, oldest = self._view_cache.popitem(last=False)
+                    if oldest.winfo_exists():
+                        oldest.destroy()
+                frame.pack(fill="both", expand=True)
+
         try:
             logger.info("PERF nav_switch_%s_ms=%.1f", key, (time.perf_counter() - t0) * 1000)
         except Exception:
             pass
 
-    def limpar_tela(self):
+    def invalidate_view(self, key: str) -> None:
+        """Remove uma view do cache (usado após mutações de dados)."""
+        frame = self._view_cache.pop(key, None)
+        if frame is not None and frame.winfo_exists():
+            frame.destroy()
+        if self._active_menu_key == key:
+            self._current_view = None
+
+    def refresh(self, key: str) -> None:
+        """Força recriação de uma view na próxima navegação."""
+        self.invalidate_view(key)
+        if self._active_menu_key == key:
+            self.show(key)
+
+    def precreate(self, key: str) -> None:
+        """Pre-cria uma view e armazena no cache sem exibi-la."""
+        if key in self._view_cache:
+            return
+        parent = getattr(self.app, "content_body", None)
+        if parent is None or not hasattr(parent, "winfo_exists"):
+            return
+        frame = self.view_factory.create(key, parent)
+        if frame is not None:
+            self._view_cache[key] = frame
+
+    def clear_screen(self):
         for widget in self.app.container.winfo_children():
             widget.destroy()
+        self._view_cache.clear()
+        self._current_view = None
 
 
 def get_mode():

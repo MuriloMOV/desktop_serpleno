@@ -54,13 +54,24 @@ class ClienteAPI:
         # permite passar '/api/mural/' ou 'mural/' —” removemos duplicação de slashes
         return f"{self.base_url.rstrip('/')}/{ep.lstrip('/')}"
 
+    def _get_request_timeout(self, default: int) -> int:
+        try:
+            return int(os.environ.get("_request_timeout", default))
+        except Exception:
+            return default
+
     # ================= GET =================
 
-    def get(self, endpoint, params=None, retries: int = 2, timeout: int = 6):
+    def get(self, endpoint, params=None, retries: int = None, timeout: int = None):
         logging.getLogger('apps.desktop.api').debug(f"GET {endpoint} params={params}")
 
         if not requests:
             return {"success": False, "message": "Biblioteca requests não disponível"}
+
+        if retries is None:
+            retries = 1
+        if timeout is None:
+            timeout = self._get_request_timeout(3)
 
         last_exception = None
         for attempt in range(1, retries + 1):
@@ -96,10 +107,15 @@ class ClienteAPI:
 
     # ================= POST =================
 
-    def post(self, endpoint, data=None, json=None, files=None, headers=None, retries: int = 2, timeout: int = 8):
+    def post(self, endpoint, data=None, json=None, files=None, headers=None, retries: int = None, timeout: int = None):
 
         if not requests:
             return {"success": False, "message": "Requests não disponível"}
+
+        if retries is None:
+            retries = 1
+        if timeout is None:
+            timeout = self._get_request_timeout(4)
 
         last_exception = None
         for attempt in range(1, retries + 1):
@@ -129,13 +145,15 @@ class ClienteAPI:
 
     # ================= PUT =================
 
-    def put(self, endpoint, json=None):
+    def put(self, endpoint, json=None, timeout: int = None):
         if not requests:
             return {"success": False, "message": "Biblioteca requests não disponível"}
+        if timeout is None:
+            timeout = self._get_request_timeout(4)
         try:
             url = self._build_url(endpoint)
             session = self._get_session()
-            response = session.put(url, json=json, timeout=8)
+            response = session.put(url, json=json, timeout=timeout)
             logging.getLogger('apps.desktop.api').debug(f"[PUT] {url} -> {getattr(response,'status_code', None)}")
             if response.ok:
                 return self._safe_json(response)
@@ -146,13 +164,15 @@ class ClienteAPI:
 
     # ================= DELETE =================
 
-    def delete(self, endpoint):
+    def delete(self, endpoint, timeout: int = None):
         if not requests:
             return {"success": False, "message": "Biblioteca requests não disponível"}
+        if timeout is None:
+            timeout = self._get_request_timeout(4)
         try:
             url = self._build_url(endpoint)
             session = self._get_session()
-            response = session.delete(url, timeout=8)
+            response = session.delete(url, timeout=timeout)
             logging.getLogger('apps.desktop.api').debug(f"[DELETE] {url} -> {getattr(response,'status_code', None)}")
             if response.ok:
                 # some servers return 204 with empty body

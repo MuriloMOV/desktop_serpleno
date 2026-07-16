@@ -9,7 +9,7 @@ from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.ui.components.icons import ICONS, IconLabel
-from ser_pleno.presentation.components.ui_components import bind_clickable, Avatar
+from ser_pleno.presentation.components.ui_components import bind_clickable, Avatar, Divider
 from ser_pleno.utils.avatar_utils import get_avatar_color
 
 logger = logging.getLogger("apps.desktop")
@@ -52,6 +52,17 @@ _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")
 # ——————————————————————————————————————————————————————————————————————————————
 #  Helpers
 # ——————————————————————————————————————————————————————————————————————————————
+def _chip(parent, text: str, tema: str) -> ctk.CTkFrame:
+    color, soft = O["temas"].get(tema, _TEMA_DEFAULT)
+    f = ctk.CTkFrame(parent, fg_color=soft, corner_radius=RADIUS["sm"])
+    ctk.CTkLabel(
+        f, text=text,
+        font=font(size=11, weight="bold"),
+        text_color=color,
+    ).pack(padx=spacing("sm"), pady=spacing("xs"))
+    return f
+
+
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  FormField
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -179,13 +190,13 @@ class StudentCard(ctk.CTkFrame):
     def _build(self):
         nome    = self._student.get("name", "N/A")
         course  = self._student.get("course", "Sem curso")
-        av_color = _av_color(nome)
+        av_color = get_avatar_color(nome)
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
         inner.grid_columnconfigure(1, weight=1)
 
-        av = _avatar(inner, nome[:2], av_color, 38)
+        av = Avatar(inner, initials=nome[:2], size=38, color=av_color)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="ns")
 
         ctk.CTkLabel(inner, text=nome,

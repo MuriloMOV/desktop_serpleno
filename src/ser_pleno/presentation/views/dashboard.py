@@ -360,7 +360,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.controller = controller
-        self.controller_dashboard = DashboardController()
+        self.controller_dashboard = DashboardController(
+            app=self.controller.app,
+            auth_service=getattr(self.controller.app, "auth_service", None),
+        )
 
         self._criar_toolbar_acoes()
         self._criar_kpi_container()
@@ -542,9 +545,23 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._pending_humor_history = None
         self.chart_card.body.bind("<Configure>", self._schedule_draw_chart)
 
+        self._chart_empty = EmptyState(
+            self.chart_card.body,
+            icon=ICONS["chart"],
+            title="Sem dados de humor",
+            subtitle="Os registros aparecerão aqui quando houver entradas",
+        )
+        self._chart_empty.pack(expand=True, fill="both", padx=24, pady=24)
+        self._chart_empty.pack_forget()
+
     def _schedule_draw_chart(self, event=None):
         if self._chart_after_id:
-            self.after_cancel(self._chart_after_id)
+            try:
+                self.after_cancel(self._chart_after_id)
+            except Exception:
+                pass
+        if not hasattr(self, "canvas") or not self.canvas.winfo_exists():
+            return
         self._chart_after_id = self.after(80, lambda: self._draw_chart(self._pending_humor_history))
 
     # ——————————————————————————————————————————————————————————————————————
@@ -623,6 +640,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     #  Gráfico canvas
     # ——————————————————————————————————————————————————————————————————————
     def _draw_chart(self, humor_history=None):
+        if not hasattr(self, "canvas") or not self.canvas.winfo_exists():
+            return
         self.canvas.delete("all")
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
@@ -645,16 +664,17 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 dates = []
 
         if not pts:
-            for child in self.chart_card.body.winfo_children():
-                if child.winfo_exists():
-                    child.destroy()
-            EmptyState(
-                self.chart_card.body,
-                icon=ICONS["chart"],
-                title="Sem dados de humor",
-                subtitle="Os registros aparecerão aqui quando houver entradas",
-            ).pack(expand=True, fill="both", padx=24, pady=24)
+            self.canvas.pack_forget()
+            if hasattr(self, "_chart_empty") and self._chart_empty.winfo_exists():
+                self._chart_empty.pack(expand=True, fill="both", padx=24, pady=24)
             return
+
+        if hasattr(self, "_chart_empty") and self._chart_empty.winfo_exists():
+            self._chart_empty.pack_forget()
+        if not self.canvas.winfo_exists():
+            return
+        if not self.canvas.winfo_ismapped():
+            self.canvas.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
 
         mx, my = 44, 24
         cw2 = cw - 2 * mx

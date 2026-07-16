@@ -726,7 +726,7 @@ class PublicacaoModal(BaseModal):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  QuadroAvisosFrame —“ frame principal
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-class QuadroAvisosFrame(ctk.CTkFrame):
+class AvisosFrame(ctk.CTkFrame):
     def __init__(self, master, controller):
         super().__init__(master, fg_color=Q["page_bg"])
         self.controller = controller

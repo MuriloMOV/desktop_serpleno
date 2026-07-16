@@ -137,9 +137,16 @@ class <Nome>Repository:
 Adicionar em `MENU_ITEMS`:
 
 ```python
-{"key": "minha_tela", "label": "Minha Tela", "icon": ICONS["..."], "frame": MinhaViewFrame,
+{"key": "minha_tela", "label": "Minha Tela", "icon": ICONS["..."],
  "header": ("Minha Tela", "Descrição")}
 ```
+
+**Nota:** Views devem usar nomes de arquivo curtos e consistentes:
+- ✅ `triagem.py`, `comunicacao.py`, `avisos.py`
+- ❌ `analise_triagem.py`, `comunicacao_interna.py`, `quadro_avisos.py`
+
+Controllers seguem a mesma regra:
+- ✅ `controllers/triagem.py`, `controllers/avisos.py`
 
 ---
 
@@ -147,13 +154,42 @@ Adicionar em `MENU_ITEMS`:
 
 | Elemento | Padrão | Exemplo |
 |----------|--------|---------|
-| Classes | PascalCase | `ServicoEstudante`, `BaseViewFrame` |
-| Métodos/funções | snake_case | `listar_estudantes()`, `_build_ui()` |
+| Classes | PascalCase | `ServicoEstudante`, `BaseViewFrame`, `NavigationManager` |
+| Métodos/funções | snake_case (inglês) | `create_sidebar()`, `update_menu()`, `_build_ui()` |
 | Privados | Prefixo `_` | `_load_async()`, `_local_listar()` |
 | Constantes | UPPER_SNAKE_CASE | `MENU_ITEMS`, `API_BASE_URL` |
 | Logging | `logger.{debug,info,warning,error}` | `logger.info("Estudantes carregados")` |
 | Type hints | Obrigatórios em métodos públicos | `def listar(self, id: int) -> dict:` |
 | Docstrings | Google-style em classes públicas | Ver exemplo abaixo |
+
+### Nomenclatura — NavigationManager
+
+Métodos devem usar inglês:
+
+| Antes (pt-br) | Depois (inglês) |
+|---------------|-----------------|
+| `criar_sidebar()` | `create_sidebar()` |
+| `criar_area_conteudo()` | `create_content_area()` |
+| `atualizar_menu(key)` | `update_menu(key)` |
+| `atualizar_header(title, subtitle)` | `update_header(title, subtitle)` |
+| `limpar_tela()` | `clear_screen()` |
+| `_criar_marca()` | `_create_brand()` |
+| `_criar_rodape_sidebar()` | `_create_sidebar_footer()` |
+| `_criar_menu()` | `_create_menu()` |
+| `_criar_botao_menu()` | `_create_menu_button()` |
+| `_aplicar_estilo_botao_menu()` | `_apply_menu_button_style()` |
+
+### Nomenclatura — Views e Controllers
+
+Usar nomes curtos e consistentes:
+
+| Padrão correto | Incorreto |
+|----------------|-----------|
+| `views/triagem.py` + `TriagemFrame` | `views/analise_triagem.py` + `AnaliseTriagemFrame` |
+| `views/comunicacao.py` + `ComunicacaoFrame` | `views/comunicacao_interna.py` + `ComunicacaoInternaFrame` |
+| `views/avisos.py` + `AvisosFrame` | `views/quadro_avisos.py` + `QuadroAvisosFrame` |
+| `controllers/triagem.py` + `TriagemController` | `controllers/analise_triagem.py` + `AnaliseTriagemController` |
+| `controllers/avisos.py` + `AvisosController` | `controllers/quadro_avisos.py` + `QuadroAvisosController` |
 
 ### Exemplo de docstring
 
@@ -299,6 +335,35 @@ def _on_theme_changed(self, mode: str) -> None:
 on_theme_change(self._on_theme_changed)
 ```
 
+### 4.8 Estrutura modular do tema
+
+O design system foi dividido em módulos especializados dentro de `ser_pleno/ui/theme/`:
+
+```python
+# Import de ponto único (mantém compatibilidade)
+from ser_pleno.ui.theme import (
+    THEME, SPACING, RADIUS, ELEVATION,
+    LIGHT_THEME, DARK_THEME,
+    font, themed_font, mono_font,
+    blend_color, darken, lighten, shift_hue, readable_text_color,
+    get_theme, current, get_mode,
+    on_theme_change, off_theme_change, set_mode, toggle_mode, apply_global_style,
+)
+
+# Imports diretos de módulos específicos (opcional)
+from ser_pleno.ui.theme.palette import LIGHT_THEME, DARK_THEME
+from ser_pleno.ui.theme.typography import FONT_FAMILY, TYPO, font, themed_font
+from ser_pleno.ui.theme.spacing import SPACING, RADIUS, ELEVATION
+from ser_pleno.ui.theme.colors import SEMANTIC_COLORS, STATUS_COLORS, blend_color
+```
+
+**Arquitetura:**
+- `palette.py` — Paletas de cor light/dark
+- `typography.py` — Famílias de fonte, escala tipográfica, helpers de fonte
+- `spacing.py` — Espaçamento, raio, elevação
+- `colors.py` — Utilitários de manipulação de cor + constantes semânticas
+- `__init__.py` — Estado do tema ativo, listeners, re-exports
+
 ---
 
 ## 5. Estrutura do projeto
@@ -309,30 +374,54 @@ src/ser_pleno/
 ├── presentation/
 │   ├── navigation.py               # NavigationManager — sidebar, menu, conteúdo
 │   ├── theme_manager.py            # ThemeManager — toggle e reconstrução de UI
+│   ├── view_factory.py             # ViewFactory — instancia views por chave
 │   ├── components/
 │   │   ├── ui_components.py        # Componentes reutilizáveis (Card, KPICard, Avatar...)
 │   │   └── icons.py                # Ícones e constantes de emoji
 │   └── views/
 │       ├── base.py                 # BaseViewFrame — header + async loading
 │       ├── login.py
-│       └── ... (10 views)
+│       ├── dashboard.py
+│       ├── estudantes.py
+│       ├── agenda.py
+│       ├── bem_estar.py
+│       ├── triagem.py              # Antiga: analise_triagem.py
+│       ├── relatorios.py
+│       ├── comunicacao.py          # Antiga: comunicacao_interna.py
+│       ├── orientacoes.py
+│       ├── avisos.py               # Antiga: quadro_avisos.py
+│       └── configuracoes.py
 ├── application/
 │   ├── controllers/
 │   │   ├── base.py                 # BaseController
-│   │   └── ... (10 controllers)
-│   └── services/
-│       └── ... (10 services)
+│   │   ├── autenticacao.py
+│   │   ├── dashboard.py
+│   │   ├── estudantes.py
+│   │   ├── agenda.py
+│   │   ├── bem_estar.py
+│   │   ├── triagem.py              # Antiga: analise_triagem.py
+│   │   ├── relatorio.py
+│   │   ├── comunicacao.py
+│   │   ├── orientacoes.py
+│   │   ├── avisos.py               # Antiga: quadro_avisos.py
+│   │   └── configuracoes.py
+│   ├── services/
+│   │   └── ... (10 services)
+│   └── bootstrap.py                # BootstrapService — seed pós-login
 ├── infrastructure/
 │   ├── api/
 │   │   ├── api.py                  # ClienteAPI — HTTP client centralizado
 │   │   ├── mural.py                # ServicoMural — mural de avisos
-│   │   └── sync_service.py         # Fila de sincronização
+│   │   ├── sync_service.py         # Fila de sincronização
+│   │   └── connectivity.py         # Health check da API
 │   └── local/
 │       ├── local_cache.py          # SQLite fallback
-│       └── fallback_metrics.py     # Métricas de fallback
+│       ├── fallback_metrics.py     # Métricas de fallback
+│       └── seed_service.py         # Seed de dados locais
 ├── repositories/
-│   ├── base.py                     # BaseRepository + decorators
-│   └── ... (11 repositories)
+│   ├── base.py                     # BaseRepository + helpers de ID local
+│   ├── fallback.py                 # Decorators: with_local_fallback, write_with_fallback
+│   └── ... (10 repositories)
 ├── domain/
 │   └── models/                     # Dataclasses (opcional, não obrigatório)
 ├── config/
@@ -340,12 +429,19 @@ src/ser_pleno/
 │   ├── db_config.py                # Conexão MySQL
 │   └── operation_mode.py           # Modo de operação (independent/hybrid/connected)
 ├── ui/
-│   ├── theme.py                    # Design system (THEME, SPACING, RADIUS, fontes)
-│   └── theme_extensions.py         # extend_theme() + spacing()
+│   ├── theme/                      # Design system modular
+│   │   ├── __init__.py             # Ponto de entrada: THEME, toggle_mode, listeners
+│   │   ├── palette.py              # LIGHT_THEME, DARK_THEME
+│   │   ├── typography.py           # FONT_FAMILY, TYPO, font(), themed_font()
+│   │   ├── spacing.py              # SPACING, RADIUS, ELEVATION
+│   │   └── colors.py               # Utilitários de cor + constantes semânticas
+│   ├── theme_extensions.py         # extend_theme() + spacing()
+│   └── components/
+│       └── icons.py                # Ícones (ICONS, IconLabel, IconBadge, IconButton)
 └── utils/
     ├── async_runner.py             # AsyncRunner — threading seguro para UI
-    ├── avatar_utils.py             # get_avatar_color()
     ├── service_helpers.py          # with_api_fallback()
+    ├── mappers.py                  # Utilitários de mapeamento genéricos
     └── ...
 ```
 

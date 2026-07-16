@@ -11,6 +11,8 @@ from ser_pleno.infrastructure.db.query_helpers import (
     execute_query,
     fetch_all,
     fetch_one,
+    fetch_all_batch,
+    fetch_one_batch,
     execute_non_query,
 )
 from ser_pleno.repositories.fallback import (

@@ -114,6 +114,9 @@ Camada completa implementada:
 - **10 services** implementados
 - `ui_components.py` com componentes reutilizáveis (Card, KPICard, Avatar, etc.)
 - `docs/adr/` criado (2 ADRs)
+- **Design System modular:** `ui/theme/` dividido em `palette.py`, `typography.py`, `spacing.py`, `colors.py` e `__init__.py`, mantendo 100% compatibilidade de imports
+- **Nomenclatura padronizada:** views renomeadas para termos principais (`triagem.py`, `comunicacao.py`, `avisos.py`); métodos de `NavigationManager` renomeados para inglês
+- **Controllers desacoplados:** `DashboardController` e `ConfiguracoesController` não dependem mais de `app`; `QuadroAvisosController` também desacoplado
 
 ---
 
@@ -144,7 +147,8 @@ Camada completa implementada:
 
 - **mypy:** Adotar tipagem stricter gradualmente (ver `docs/desenvolvimento.md`)
 - **SQLAlchemy 2.0:** Reavaliar se o projeto crescer além do escopo atual (decisão atual: SQL raw funciona)
-- **DI Container / Event Bus:** Fora de escopo para ~10 telas CRUD desktop
+- **Controllers com navegação:** Avaliar introduzir `NavigationService` para substituir chamadas diretas a `app.mostrar_login()` (atualmente resolvido via `winfo_toplevel()` nas views)
+- **Testes de navegação:** Adicionar testes unitários para `NavigationManager` cobrindo `show()`, `update_menu()`, `update_header()` e transições de tema
 
 ---
 

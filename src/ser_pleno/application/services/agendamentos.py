@@ -228,11 +228,17 @@ class ServicoAgendamento:
                 logging.info(f"Agendamentos obtidos via banco local: {len(rows)} registros")
                 agendamentos = []
                 for row in rows:
+                    data_hora = row["data_hora"]
+                    if isinstance(data_hora, str):
+                        try:
+                            data_hora = datetime.strptime(data_hora, "%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            pass
                     agendamentos.append({
                         "id_agendamento": row["id"],
                         "nome": row["nome"],
                         "id_aluno": row["id_aluno"],
-                        "data_hora": row["data_hora"],
+                        "data_hora": data_hora,
                         "motivo": row["motivo"],
                         "status": self._convert_status_backend_to_frontend(row["status"]),
                         "local": row.get("local"),

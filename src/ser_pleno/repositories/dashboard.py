@@ -4,6 +4,8 @@
 from ser_pleno.repositories.base import (
     fetch_all,
     fetch_one,
+    fetch_all_batch,
+    fetch_one_batch,
     execute_non_query,
     with_local_fallback,
     local_cache,
@@ -41,8 +43,8 @@ class DashboardRepository:
         return dict(data)
 
     def _contar_kpis_consolidado(self):
-        base = fetch_one(
-            """
+        # Executa o count principal + helpers em batch para reutilizar conexão.
+        base_query = """
             SELECT
                 (SELECT COUNT(*) FROM aluno) AS total_alunos,
                 (SELECT COUNT(*) FROM aluno WHERE requires_attention = 1) AS total_atencao,
@@ -54,12 +56,73 @@ class DashboardRepository:
                 (SELECT AVG(mood_level) FROM desktop_moodentry WHERE DATE(entry_date) = CURDATE()) AS media_humor_hoje,
                 (SELECT AVG(overall_wellbeing) FROM desktop_wellnesscheckin WHERE DATE(check_in_date) >= CURDATE() - INTERVAL 7 DAY) AS media_bem_estar
             """
-        ) or {}
+        attention_query = "SELECT id_aluno, nome, attention_reason, priority_level FROM aluno WHERE requires_attention = 1"
+        upcoming_query = """
+            SELECT a.id, a.data_hora, a.status, al.nome AS student_name, al.curso
+            FROM agendamento a
+            LEFT JOIN aluno al ON a.student_id = al.id_aluno
+            WHERE a.data_hora > NOW() AND a.status != 'cancelled'
+            ORDER BY a.data_hora ASC
+            LIMIT %s
+        """
+        humor_query = """
+            SELECT DATE(entry_date) as data, AVG(mood_level) as media_humor
+            FROM desktop_moodentry
+            WHERE DATE(entry_date) >= CURDATE() - INTERVAL 30 DAY
+            GROUP BY DATE(entry_date)
+            ORDER BY data
+        """
+        bem_estar_query = """
+            SELECT AVG(overall_wellbeing) as media_bem_estar FROM desktop_wellnesscheckin WHERE DATE(check_in_date) >= CURDATE() - INTERVAL 7 DAY
+        """
 
-        attention_students = self._estudantes_atencao()
-        upcoming_appointments = self._proximos_agendamentos(5)
-        humor_history = self._historico_humor_30_dias()
-        bem_estar_dimensions = self._bem_estar_dimensoes()
+        base_row, attention_rows, upcoming_rows, humor_rows, bem_estar_row = fetch_one_batch([
+            (base_query, ()),
+            (attention_query, ()),
+            (upcoming_query, (5,)),
+            (humor_query, ()),
+            (bem_estar_query, ()),
+        ])
+
+        base = base_row or {}
+        attention_students = [
+            {
+                "id": r.get("id_aluno"),
+                "name": r.get("nome"),
+                "attention_reason": r.get("attention_reason") or r.get("attention_notes") or "Requer atenção",
+                "priority_level": r.get("priority_level") or 0,
+            }
+            for r in attention_rows
+        ]
+
+        upcoming_appointments = []
+        for r in upcoming_rows:
+            data_hora = r.get("data_hora")
+            upcoming_appointments.append(
+                {
+                    "id": r.get("id"),
+                    "student_name": r.get("student_name") or "Estudante",
+                    "curso": r.get("curso") or "Curso não informado",
+                    "time": data_hora.strftime("%H:%M") if hasattr(data_hora, "strftime") else "--:--",
+                    "date": data_hora.strftime("%Y-%m-%d") if hasattr(data_hora, "strftime") else str(data_hora),
+                }
+            )
+
+        humor_history = [
+            {
+                "data": r["data"].strftime("%d/%m") if hasattr(r["data"], "strftime") else str(r["data"]),
+                "media_humor": round(r["media_humor"], 2) if r.get("media_humor") else 0,
+            }
+            for r in humor_rows
+        ]
+
+        bem_estar_media = bem_estar_row.get("media_bem_estar") if bem_estar_row else 0
+        bem_estar_media = round(bem_estar_media, 2) if bem_estar_media else 0
+        bem_estar_dimensions = {
+            "academico": round(bem_estar_media * 0.9, 2),
+            "emocional": round(bem_estar_media * 0.8, 2),
+            "social": round(bem_estar_media * 0.85, 2),
+        }
 
         total_disp = base.get("total_disponibilidade") or 0
         total_agend = base.get("agendamentos_hoje_ativos") or 0
@@ -124,9 +187,13 @@ class DashboardRepository:
         rows = local_cache.list_students()
         return len(rows)
 
-    def _estudantes_atencao(self):
+    def _estudantes_atencao(self, cursor=None):
         query = "SELECT id_aluno, nome, attention_reason, priority_level FROM aluno WHERE requires_attention = 1"
-        rows = fetch_all(query)
+        if cursor is not None:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+        else:
+            rows = fetch_all(query)
         return [
             {
                 "id": r.get("id_aluno"),
@@ -150,7 +217,7 @@ class DashboardRepository:
             if r.get("requires_attention")
         ]
 
-    def _proximos_agendamentos(self, limite=5):
+    def _proximos_agendamentos(self, limite=5, cursor=None):
         query = """
             SELECT a.id, a.data_hora, a.status, al.nome AS student_name, al.curso
             FROM agendamento a
@@ -159,7 +226,11 @@ class DashboardRepository:
             ORDER BY a.data_hora ASC
             LIMIT %s
         """
-        rows = fetch_all(query, (limite,))
+        if cursor is not None:
+            cursor.execute(query, (limite,))
+            rows = cursor.fetchall()
+        else:
+            rows = fetch_all(query, (limite,))
         resultado = []
         for r in rows:
             data_hora = r.get("data_hora")
@@ -209,7 +280,7 @@ class DashboardRepository:
             return round(avg, 2)
         return None
 
-    def _historico_humor_30_dias(self):
+    def _historico_humor_30_dias(self, cursor=None):
         query = """
             SELECT DATE(entry_date) as data, AVG(mood_level) as media_humor
             FROM desktop_moodentry
@@ -217,7 +288,11 @@ class DashboardRepository:
             GROUP BY DATE(entry_date)
             ORDER BY data
         """
-        rows = fetch_all(query)
+        if cursor is not None:
+            cursor.execute(query)
+            rows = cursor.fetchall()
+        else:
+            rows = fetch_all(query)
         return [
             {
                 "data": r["data"].strftime("%d/%m") if hasattr(r["data"], "strftime") else str(r["data"]),
@@ -241,10 +316,13 @@ class DashboardRepository:
             resultado.append({"data": data_fmt, "media_humor": round(media, 2)})
         return resultado
 
-    def _bem_estar_dimensoes(self):
-        result = fetch_one(
-            "SELECT AVG(overall_wellbeing) as media_bem_estar FROM desktop_wellnesscheckin WHERE DATE(check_in_date) >= CURDATE() - INTERVAL 7 DAY"
-        )
+    def _bem_estar_dimensoes(self, cursor=None):
+        query = "SELECT AVG(overall_wellbeing) as media_bem_estar FROM desktop_wellnesscheckin WHERE DATE(check_in_date) >= CURDATE() - INTERVAL 7 DAY"
+        if cursor is not None:
+            cursor.execute(query)
+            result = cursor.fetchone()
+        else:
+            result = fetch_one(query)
         media = result.get("media_bem_estar") if result else 0
         media = round(media, 2) if media else 0
         return {

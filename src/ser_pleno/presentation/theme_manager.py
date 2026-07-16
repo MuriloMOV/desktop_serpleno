@@ -31,7 +31,7 @@ class ThemeManager:
             return
 
         tela_anterior = self.app.navigation.get_active_screen()
-        self.app.navigation.limpar_tela()
-        self.app.navigation.criar_sidebar()
-        self.app.navigation.criar_area_conteudo()
+        self.app.navigation.clear_screen()
+        self.app.navigation.create_sidebar()
+        self.app.navigation.create_content_area()
         self.app.navigation.show(tela_anterior)

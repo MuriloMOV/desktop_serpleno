@@ -51,8 +51,12 @@ def _global_exception_handler(exc_type, exc_value, exc_traceback):
 
 sys.excepthook = _global_exception_handler
 
+def _report_callback_exception(self, exc, val, tb):
+    logger = logging.getLogger("apps.desktop")
+    logger.error("Excecao em callback do CustomTkinter", exc_info=(exc, val, tb))
+
 try:
-    ctk.CTk.report_callback_exception = lambda *args: None
+    ctk.CTk.report_callback_exception = _report_callback_exception
 except Exception:
     pass
 
@@ -114,7 +118,7 @@ class App(ctk.CTk):
 
     # ================= LOGIN =================
     def mostrar_login(self):
-        self.navigation.limpar_tela()
+        self.navigation.clear_screen()
         frame = LoginFrame(self.container, self)
         frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
@@ -124,15 +128,16 @@ class App(ctk.CTk):
         self.usuario_logado = user_data
         self.usuario_logado_id = user_data["id"]
         self.auth_service = auth_service
-        self.navigation.limpar_tela()
+        self.navigation.clear_screen()
 
         self._t_controllers_start = time.perf_counter()
         self._t_controllers_end = time.perf_counter()
 
         self._t_ui_start = time.perf_counter()
-        self.navigation.criar_sidebar()
-        self.navigation.criar_area_conteudo()
-        self.navigation.show("dashboard")
+        self.navigation.create_sidebar()
+        # Conteúdo e dashboard são adiados para after_idle para o sidebar
+        # aparecer primeiro, reduzindo a latência percebida no login.
+        self.after_idle(self._build_main_content)
         self._t_ui_end = time.perf_counter()
         try:
             logger.info(
@@ -148,6 +153,14 @@ class App(ctk.CTk):
 
     def _is_login_active(self) -> bool:
         return not hasattr(self.navigation, "sidebar") or not self.navigation.sidebar.winfo_exists()
+
+    def _build_main_content(self) -> None:
+        """Constrói área de conteúdo e exibe dashboard após o sidebar."""
+        if not self.winfo_exists():
+            return
+        self.navigation.create_content_area()
+        self.navigation.precreate("dashboard")
+        self.navigation.show("dashboard")
 
 
 if __name__ == "__main__":

@@ -1,36 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Controller de Quadro de Avisos — mediação entre View e Services."""
+"""Re-export de retrocompatibilidade — use ``ser_pleno.application.controllers.avisos``.
 
-from ser_pleno.application.controllers.base import BaseController
-from ser_pleno.application.services.mural import ServicoMural
+Este módulo mantém os nomes antigos disponíveis para evitar quebras
+em código externo que ainda importe ``QuadroAvisosController``
+ou use o caminho ``ser_pleno.application.controllers.quadro_avisos``.
+"""
 
+from ser_pleno.application.controllers.avisos import AvisosController
 
-class QuadroAvisosController(BaseController):
-    """Coordena as requisições da View de Quadro de Avisos."""
+# Alias de retrocompatibilidade
+QuadroAvisosController = AvisosController
 
-    def __init__(self, app=None, auth_service=None):
-        super().__init__(ServicoMural, auth_service=auth_service)
-        self.app = app
-
-    def get_service(self):
-        return self._service
-
-    def listar_mensagens(self):
-        """Lista publicações do mural."""
-        return self._service.listar_mensagens()
-
-    def obter_mensagem(self, mensagem_id):
-        """Obtém uma publicação específica."""
-        return self._service.obter_mensagem(mensagem_id)
-
-    def criar_mensagem(self, payload):
-        """Cria uma nova publicação."""
-        return self._service.criar_mensagem(payload)
-
-    def atualizar_mensagem(self, mensagem_id, payload):
-        """Atualiza uma publicação existente."""
-        return self._service.atualizar_mensagem(mensagem_id, payload)
-
-    def deletar_mensagem(self, mensagem_id):
-        """Deleta uma publicação."""
-        return self._service.deletar_mensagem(mensagem_id)
+__all__ = ["QuadroAvisosController", "AvisosController"]

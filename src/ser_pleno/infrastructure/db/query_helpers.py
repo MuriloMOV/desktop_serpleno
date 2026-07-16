@@ -28,6 +28,57 @@ def execute_query(query, params=None, fetch=True, fetch_one=False, dictionary=Tr
         conn.close()
 
 
+def fetch_all_batch(queries):
+    """Executa múltiplas queries de fetch_all reutilizando uma única conexão.
+
+    Args:
+        queries: lista de tuplas (query, params) onde params pode ser None.
+
+    Returns:
+        Lista de resultados na mesma ordem das queries. Cada resultado é uma
+        lista de dicts (igual ao retorno de fetch_all).
+    """
+    if not queries:
+        return []
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    results = []
+    try:
+        for query, params in queries:
+            cursor.execute(query, params or ())
+            results.append(cursor.fetchall())
+    finally:
+        cursor.close()
+        conn.close()
+    return results
+
+
+def fetch_one_batch(queries):
+    """Executa múltiplas queries de fetch_one reutilizando uma única conexão.
+
+    Args:
+        queries: lista de tuplas (query, params) onde params pode ser None.
+
+    Returns:
+        Lista de resultados na mesma ordem das queries. Cada resultado é um
+        dict (igual ao retorno de fetch_one).
+    """
+    if not queries:
+        return []
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    results = []
+    try:
+        for query, params in queries:
+            cursor.execute(query, params or ())
+            row = cursor.fetchone()
+            results.append(dict(row) if row else {})
+    finally:
+        cursor.close()
+        conn.close()
+    return results
+
+
 def fetch_all(query, params=None):
     """Executa query e retorna todas as linhas como lista de dicts."""
     return execute_query(query, params=params, fetch=True, fetch_one=False, dictionary=True)

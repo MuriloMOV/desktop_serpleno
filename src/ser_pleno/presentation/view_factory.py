@@ -6,7 +6,7 @@ from ser_pleno.application.controllers.dashboard import DashboardController
 from ser_pleno.application.controllers.estudantes import EstudantesController
 from ser_pleno.application.controllers.agenda import AgendaController
 from ser_pleno.application.controllers.bem_estar import BemEstarController
-from ser_pleno.application.controllers.analise_triagem import AnaliseTriagemController
+from ser_pleno.application.controllers.triagem import TriagemController
 from ser_pleno.application.controllers.relatorio import RelatorioController
 from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.application.controllers.orientacoes import OrientacoesController
@@ -15,12 +15,12 @@ from ser_pleno.presentation.views.dashboard import DashboardFrame
 from ser_pleno.presentation.views.estudantes import EstudantesFrame
 from ser_pleno.presentation.views.agenda import AgendaFrame
 from ser_pleno.presentation.views.bem_estar import BemEstarFrame
-from ser_pleno.presentation.views.analise_triagem import AnaliseTriagemFrame
+from ser_pleno.presentation.views.triagem import TriagemFrame
 from ser_pleno.presentation.views.relatorio import RelatorioFrame
-from ser_pleno.presentation.views.comunicacao_interna import ComunicacaoInternaFrame
+from ser_pleno.presentation.views.comunicacao import ComunicacaoFrame
 from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
-from ser_pleno.application.controllers.quadro_avisos import QuadroAvisosController
-from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
+from ser_pleno.application.controllers.avisos import AvisosController
+from ser_pleno.presentation.views.avisos import AvisosFrame
 from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
 
 
@@ -34,11 +34,11 @@ class ViewFactory:
             "estudantes": EstudantesFrame,
             "agenda": AgendaFrame,
             "bem_estar": BemEstarFrame,
-            "analise": AnaliseTriagemFrame,
+            "analise": TriagemFrame,
             "relatorios": RelatorioFrame,
-            "comunicacao": ComunicacaoInternaFrame,
+            "comunicacao": ComunicacaoFrame,
             "orientacoes": OrientacoesFrame,
-            "avisos": QuadroAvisosFrame,
+            "avisos": AvisosFrame,
             "configuracoes": ConfiguracoesFrame,
         }
         self._controllers = {
@@ -46,11 +46,11 @@ class ViewFactory:
             "estudantes": EstudantesController,
             "agenda": AgendaController,
             "bem_estar": BemEstarController,
-            "analise": AnaliseTriagemController,
+            "analise": TriagemController,
             "relatorios": RelatorioController,
             "comunicacao": ComunicacaoController,
             "orientacoes": OrientacoesController,
-            "avisos": QuadroAvisosController,
+            "avisos": AvisosController,
             "configuracoes": ConfiguracoesController,
         }
 

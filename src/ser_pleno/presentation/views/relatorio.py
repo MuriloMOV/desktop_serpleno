@@ -1,6 +1,6 @@
 import logging
 import customtkinter as ctk
-from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton
+from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton, Card
 from ser_pleno.ui.components.icons import IconLabel, ICONS
 from ser_pleno.application.controllers.relatorio import RelatorioController
 from ser_pleno.utils.async_runner import AsyncRunner
@@ -425,9 +425,9 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         btn_row.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
 
         exports = [
-            (f"{ICONS['chart']}  Estudantes",    "CSV",  self.servico_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
-            (f"{ICONS['calendar']}  Agenda",        "CSV",  self.servico_relatorio.exportar_agendamentos,   THEME["kpi_green"],  THEME["kpi_green_soft"]),
-            (f"{ICONS['search']}  Triagens",      "CSV",  self.servico_relatorio.exportar_triagens,       THEME["kpi_amber"],  THEME["kpi_amber_soft"]),
+            (f"{ICONS['chart']}  Estudantes",    "CSV",  self.controller_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
+            (f"{ICONS['calendar']}  Agenda",        "CSV",  self.controller_relatorio.exportar_agendamentos,   THEME["kpi_green"],  THEME["kpi_green_soft"]),
+            (f"{ICONS['search']}  Triagens",      "CSV",  self.controller_relatorio.exportar_triagens,       THEME["kpi_amber"],  THEME["kpi_amber_soft"]),
             (f"{ICONS['chart']}  Relatório PDF", "PDF",  self._exportar_pdf,                            THEME["kpi_violet"], THEME["kpi_violet_soft"]),
         ]
 
@@ -636,7 +636,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     def _exportar_pdf(self):
         try:
             from tkinter import filedialog
-            res = self.servico_relatorio.gerar_relatorio({
+            res = self.controller_relatorio.gerar_relatorio({
                 "name": "Relatório Geral PDF",
                 "report_type": "geral",
                 "format": "pdf",
@@ -690,7 +690,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         if not messagebox.askyesno("Confirmar", "Excluir este relatório?"):
             return
         try:
-            res = self.servico_relatorio.deletar_relatorio(rid)
+            res = self.controller_relatorio.deletar_relatorio(rid)
             if res.get("success"):
                 messagebox.showinfo("Sucesso", "Relatório excluído.")
                 self._carregar_dados()

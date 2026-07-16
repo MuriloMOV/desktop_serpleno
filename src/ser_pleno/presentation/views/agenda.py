@@ -10,7 +10,7 @@ from ser_pleno.presentation.components.ui_components import (
     PageHeader, Card, PrimaryButton, GhostButton, Divider, EmptyState,
     InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
 )
-from ser_pleno.ui.components.icons import IconLabel, ICONS
+from ser_pleno.ui.components.icons import IconButton, IconLabel, ICONS
 
 logger = logging.getLogger(__name__)
 
@@ -429,16 +429,19 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             self.horarios_base = []
 
     def load_grid_data(self):
-        data_str = self.data_selecionada.strftime("%Y-%m-%d")
-        agendamentos_dia = self.controller_agenda.listar_agendamentos(data=data_str)
-        mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
-        self._renderizar_grid(self.container_grid, mapa_dia)
+        try:
+            data_str = self.data_selecionada.strftime("%Y-%m-%d")
+            agendamentos_dia = self.controller_agenda.listar_agendamentos(data=data_str)
+            mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
+            self._renderizar_grid(self.container_grid, mapa_dia)
 
-        proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
-        agendamentos_prox = self.controller_agenda.listar_agendamentos(data=proxima_semana_str)
-        mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
-        self._renderizar_grid(self.container_semana, mapa_prox)
-        self._atualizar_subtitulo_proxima_semana()
+            proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
+            agendamentos_prox = self.controller_agenda.listar_agendamentos(data=proxima_semana_str)
+            mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
+            self._renderizar_grid(self.container_semana, mapa_prox)
+            self._atualizar_subtitulo_proxima_semana()
+        except Exception as e:
+            logger.error("AgendaFrame.load_grid_data: ERRO = %s", e, exc_info=True)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Grid de agendamentos

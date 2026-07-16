@@ -8,8 +8,11 @@ from ser_pleno.application.services.comunicacao import ServicoComunicacao
 class ComunicacaoController(BaseController):
     """Coordena as requisições da View de Comunicação Interna."""
 
-    def __init__(self):
-        super().__init__(ServicoComunicacao)
+    def __init__(self, app=None, auth_service=None):
+        super().__init__(ServicoComunicacao, auth_service=auth_service)
+        self.app = app
+        self.usuario_logado = getattr(app, "usuario_logado", None) if app else None
+        self.usuario_logado_id = getattr(app, "usuario_logado_id", None) if app else None
 
     def get_service(self):
         return self._service

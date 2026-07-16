@@ -236,6 +236,7 @@ class LoginFrame(ctk.CTkFrame):
         self.canvas.place(relwidth=1, relheight=1)
 
         self._criar_bolhas()
+        self._pre_generate_gradients()
         self._criar_music_toggle()
         # Card arredondado desenhado no canvas via PIL
         card_img = self._criar_imagem_card()
@@ -278,20 +279,6 @@ class LoginFrame(ctk.CTkFrame):
                 card_y = (h - card_h) / 2
                 self.canvas.coords(self._card_img_id, card_x, card_y)
 
-    def _criar_imagem_card_redimensionada(self, width: int, height: int) -> ImageTk.PhotoImage:
-        """Cria imagem do card redimensionada para as dimensões especificadas."""
-        tamanho_original = (444, 720)
-        tamanho_destino = (width, height)
-
-        # Cria nova imagem com fundo branco
-        img_original = Image.new("RGBA", tamanho_destino, (255, 255, 255, 255))
-
-        # Aplica bordas arredondadas
-        draw = ImageDraw.Draw(img_original)
-        draw.rounded_rectangle([0, 0, width - 1, height - 1], radius=20, fill=(255, 255, 255, 255))
-
-        return ImageTk.PhotoImage(img_original)
-
     def _on_configure(self, event=None):
         if self._bg_draw_job:
             self.after_cancel(self._bg_draw_job)
@@ -299,35 +286,19 @@ class LoginFrame(ctk.CTkFrame):
         # Garante posicionamento do card imediatamente, sem esperar redesenho completo
         self.after_idle(self._posicionar_card)
 
-    def _posicionar_card(self):
-        if hasattr(self, "_card_img_id") and hasattr(self, "_card_img"):
-            w = self.winfo_width()
-            h = self.winfo_height()
-            if w > 1 and h > 1:
-                card_w, card_h = 444, 720
-                card_x = (w - card_w) / 2
-                card_y = (h - card_h) / 2
-                self.canvas.coords(self._card_img_id, card_x, card_y)
-
-    def _criar_imagem_card_redimensionada(self, width: int, height: int) -> ImageTk.PhotoImage:
-        """Cria imagem do card redimensionada para as dimensões especificadas."""
-        tamanho_original = (444, 720)
-        tamanho_destino = (width, height)
-
-        # Cria nova imagem com fundo branco
-        img_original = Image.new("RGBA", tamanho_destino, (255, 255, 255, 255))
-
-        # Aplica bordas arredondadas
-        draw = ImageDraw.Draw(img_original)
-        draw.rounded_rectangle([0, 0, width - 1, height - 1], radius=20, fill=(255, 255, 255, 255))
-
-        return ImageTk.PhotoImage(img_original)
-
     def _get_or_create_gradient(self, w: int, h: int) -> ImageTk.PhotoImage:
         key = (w, h)
         if key in self._gradient_cache:
             return self._gradient_cache[key]
 
+        pil_img = self._generate_gradient_pil(w, h)
+        photo = ImageTk.PhotoImage(pil_img)
+        if len(self._gradient_cache) >= self._GRADIENT_CACHE_MAX:
+            self._gradient_cache.pop(next(iter(self._gradient_cache)))
+        self._gradient_cache[key] = photo
+        return photo
+
+    def _generate_gradient_pil(self, w: int, h: int) -> "Image.Image":
         top_l = self.palette["grad_top_left"]
         top_r = self.palette["grad_top_right"]
         bot = self.palette["grad_bottom"]
@@ -339,29 +310,21 @@ class LoginFrame(ctk.CTkFrame):
             t = y / h
             color = _lerp_color(c_top, bot, t ** 0.8)
             img.paste(color, (0, y, w, min(y + step, h)))
+        return img
 
-        photo = ImageTk.PhotoImage(img)
-        if len(self._gradient_cache) >= self._GRADIENT_CACHE_MAX:
-            self._gradient_cache.pop(next(iter(self._gradient_cache)))
-        self._gradient_cache[key] = photo
-        return photo
-
-    def _desenhar_fundo(self, event=None):
-        self._bg_draw_job = None
-        w = self.winfo_width()
-        h = self.winfo_height()
-        if w <= 1 or h <= 1:
-            return
-        if (w, h) == self._last_bg_size:
-            self._posicionar_card()
-            return
-        self._last_bg_size = (w, h)
-
-        self._t_draw_start = time.perf_counter()
+    def _show_bg_placeholder(self, w: int, h: int) -> None:
+        """Mostra cor sólida como placeholder enquanto o gradiente é gerado."""
         self.canvas.delete("bg")
+        self.canvas.create_rectangle(0, 0, w, h, fill=self.palette["grad_top_left"], outline="", tags="bg")
+        self.canvas.tag_lower("bg")
+        if hasattr(self, "_card_img_id"):
+            self.canvas.tag_raise("card_img")
+            self.canvas.tag_raise("bubble")
+        self._elevar_elementos()
 
-        photo = self._get_or_create_gradient(w, h)
-        self.canvas.create_image(0, 0, anchor="nw", image=photo, tags="bg")
+    def _apply_gradient(self, w: int, h: int, photo: ImageTk.PhotoImage) -> None:
+        """Aplica gradiente já pronto ao canvas."""
+        self.canvas.delete("bg")
         self.canvas.create_image(0, 0, anchor="nw", image=photo, tags="bg")
         self.canvas.image_bg = photo
 
@@ -375,15 +338,7 @@ class LoginFrame(ctk.CTkFrame):
             fill=self.palette["grad_bottom_left"], outline="", tags="bg",
         )
 
-        # Atualiza card redimensionado se necessário
-        if hasattr(self, "_card_img_id") and hasattr(self, "_card"):
-            card_x = (w - 444) / 2
-            card_y = (h - 720) / 2
-            self.canvas.coords(self._card_img_id, card_x, card_y)
-
-        # Garante que os elementos de UI fiquem por cima
         self.canvas.tag_lower("bg")
-        # Eleva card_img acima do fundo, mas abaixo dos widgets
         if hasattr(self, "_card_img_id"):
             self.canvas.tag_raise("card_img")
             self.canvas.tag_raise("bubble")
@@ -395,6 +350,71 @@ class LoginFrame(ctk.CTkFrame):
                 logger.warning("PERF login_grad_draw_ms=%.1f size=%dx%d", draw_ms, w, h)
         except Exception:
             pass
+
+    def _desenhar_fundo(self, event=None):
+        self._bg_draw_job = None
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 1 or h <= 1:
+            return
+        if (w, h) == self._last_bg_size:
+            self._posicionar_card()
+            return
+        self._last_bg_size = (w, h)
+
+        self._t_draw_start = time.perf_counter()
+
+        # Placeholder imediato para responsividade
+        self._show_bg_placeholder(w, h)
+
+        # Se já está em cache, aplica direto
+        cached = self._gradient_cache.get((w, h))
+        if cached is not None:
+            self._apply_gradient(w, h, cached)
+            return
+
+        # Gera gradiente em background
+        def _generate():
+            return self._generate_gradient_pil(w, h)
+
+        def _on_ready(pil_img):
+            if not self._alive or not self.winfo_exists():
+                return
+            current_size = (self.winfo_width(), self.winfo_height())
+            if current_size != (w, h):
+                # Tamanho mudou durante geração; deixa o próximo ciclo tratar
+                return
+            photo = ImageTk.PhotoImage(pil_img)
+            self._gradient_cache[(w, h)] = photo
+            if len(self._gradient_cache) > self._GRADIENT_CACHE_MAX:
+                oldest = next(iter(self._gradient_cache))
+                del self._gradient_cache[oldest]
+            self._apply_gradient(w, h, photo)
+
+        def _on_error(exc):
+            logger.warning("Falha ao gerar gradiente em background: %s", exc)
+
+        from ser_pleno.utils.async_runner import AsyncRunner
+        AsyncRunner.run(
+            task=_generate,
+            on_success=_on_ready,
+            on_error=_on_error,
+            widget_ref=self,
+        )
+
+    def _pre_generate_gradients(self) -> None:
+        """Pré-gera gradientes para tamanhos comuns em background."""
+        common_sizes = [(1024, 768), (1280, 720), (800, 600)]
+        for w, h in common_sizes:
+            def _gen(size=(w, h)):
+                return self._generate_gradient_pil(*size)
+            def _on_ready(pil_img, size=(w, h)):
+                if not self._alive or not self.winfo_exists():
+                    return
+                photo = ImageTk.PhotoImage(pil_img)
+                self._gradient_cache[size] = photo
+            from ser_pleno.utils.async_runner import AsyncRunner
+            AsyncRunner.run(task=_gen, on_success=_on_ready, widget_ref=self)
 
     def _elevar_elementos(self):
         for b in self.bolhas:
@@ -410,7 +430,7 @@ class LoginFrame(ctk.CTkFrame):
     #  BOLHAS flutuantes —“ mais delicadas
     # ••••••••••••••••••••••••••••••••••
     def _criar_bolhas(self):
-        for _ in range(28):
+        for _ in range(16):
             x = random.randint(0, 1400)
             y = random.randint(50, 900)
             size = random.randint(14, 80)
@@ -438,29 +458,43 @@ class LoginFrame(ctk.CTkFrame):
 
     def _animar_bolhas(self):
         if not self._alive or not self.winfo_exists():
-            return  # não reagenda —” encerra o loop de vez
+            return  # não reagenda — encerra o loop de vez
 
         w, h = self.winfo_width(), self.winfo_height()
         if w > 1 and h > 1:
             for b in self.bolhas:
+                prev_x, prev_y = b["x"], b["y"]
                 b["y"] -= b["speed"]
                 b["wobble"] += 0.025
                 b["x"] += math.sin(b["wobble"]) * b["wobble_amp"]
 
+                wrapped = False
                 if b["y"] + b["size"] < -20:
                     b["y"] = float(h + b["size"] + random.randint(10, 80))
                     b["x"] = float(random.randint(-30, w + 30))
+                    wrapped = True
                 if b["x"] < -80:
                     b["x"] = float(w + 20)
+                    wrapped = True
                 elif b["x"] > w + 80:
                     b["x"] = -20.0
+                    wrapped = True
 
                 x, y, s = b["x"], b["y"], b["size"]
-                self.canvas.coords(b["id"], x, y, x + s, y + s)
-                rx, ry, rs = x + s * 0.2, y + s * 0.15, s * 0.18
-                self.canvas.coords(b["reflex_id"], rx, ry, rx + rs, ry + rs)
+                if wrapped:
+                    self.canvas.coords(b["id"], x, y, x + s, y + s)
+                else:
+                    self.canvas.move(b["id"], x - prev_x, y - prev_y)
 
-        self.after(22, self._animar_bolhas)
+                rx, ry, rs = x + s * 0.2, y + s * 0.15, s * 0.18
+                prev_rx = prev_x + s * 0.2
+                prev_ry = prev_y + s * 0.15
+                if wrapped:
+                    self.canvas.coords(b["reflex_id"], rx, ry, rx + rs, ry + rs)
+                else:
+                    self.canvas.move(b["reflex_id"], rx - prev_rx, ry - prev_ry)
+
+        self.after(33, self._animar_bolhas)
 
     # ••••••••••••••••••••••••••••••••••••••
     #  CARD DE LOGIN

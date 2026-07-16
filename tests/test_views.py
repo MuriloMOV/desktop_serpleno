@@ -7,9 +7,9 @@ from ser_pleno.presentation.views.dashboard import DashboardFrame
 from ser_pleno.presentation.views.agenda import AgendaFrame
 from ser_pleno.presentation.views.estudantes import EstudantesFrame
 from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
-from ser_pleno.presentation.views.analise_triagem import AnaliseTriagemFrame
-from ser_pleno.presentation.views.quadro_avisos import QuadroAvisosFrame
-from ser_pleno.presentation.views.comunicacao_interna import ComunicacaoInternaFrame
+from ser_pleno.presentation.views.triagem import TriagemFrame
+from ser_pleno.presentation.views.avisos import AvisosFrame
+from ser_pleno.presentation.views.comunicacao import ComunicacaoFrame
 from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
 from ser_pleno.application.controllers.autenticacao import AutenticacaoController
 from ser_pleno.application.controllers.dashboard import DashboardController
@@ -86,8 +86,8 @@ class TestViews:
         assert view is not None
         assert hasattr(view, 'controller_orientacoes')
 
-    @patch('ser_pleno.presentation.views.analise_triagem.AnaliseTriagemController')
-    def test_analise_triagem_view(self, MockController, app, controller):
+    @patch('ser_pleno.presentation.views.triagem.TriagemController')
+    def test_triagem_view(self, MockController, app, controller):
         # This view uses async data loading via controller
         mock_ctrl = MockController.return_value
         mock_ctrl.listar_triagens.return_value = {
@@ -96,7 +96,7 @@ class TestViews:
                 {"id": 1, "student_name": "Test Student", "scheduled_date": "2026-07-09", "priority": "Alta", "status": "Pendente"}
             ]
         }
-        view = AnaliseTriagemFrame(app, controller)
+        view = TriagemFrame(app, controller)
         
         # Verify it initialized correctly
         assert view is not None
@@ -104,27 +104,27 @@ class TestViews:
         # data_master is populated asynchronously, so it may be empty initially
         # but the view should still initialize without errors
 
-    def test_analise_triagem_create(self, app, controller):
+    def test_triagem_create(self, app, controller):
         """Test creating a screening via the view's API wrapper."""
-        view = AnaliseTriagemFrame(app, controller)
+        view = TriagemFrame(app, controller)
         
         # The view has static data, not a service
         # We can test that it renders correctly
         assert view is not None
 
-    @patch('ser_pleno.application.controllers.quadro_avisos.ServicoMural')
-    def test_quadro_avisos_view(self, MockServicoMural, app, controller):
-        view = QuadroAvisosFrame(app, controller)
+    @patch('ser_pleno.application.controllers.avisos.ServicoMural')
+    def test_avisos_view(self, MockServicoMural, app, controller):
+        view = AvisosFrame(app, controller)
         
         # Verify it initialized correctly
         assert view is not None
 
-    @patch('ser_pleno.presentation.views.comunicacao_interna.ComunicacaoController')
+    @patch('ser_pleno.presentation.views.comunicacao.ComunicacaoController')
     def test_comunicacao_view(self, MockController, app, controller):
         # Mock usuario_logado_id for the frame
         controller.usuario_logado_id = 1
         
-        view = ComunicacaoInternaFrame(app, controller)
+        view = ComunicacaoFrame(app, controller)
         
         # Test entry_mensagem attribute (not entry_msg)
         assert hasattr(view, 'entry_mensagem')

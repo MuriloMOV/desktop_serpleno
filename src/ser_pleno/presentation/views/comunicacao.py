@@ -59,7 +59,7 @@ def _make_avatar(parent, initials: str, color: str,
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Frame principal
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-class ComunicacaoInternaFrame(ctk.CTkFrame):
+class ComunicacaoFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller          = controller
@@ -914,7 +914,7 @@ class ComunicacaoInternaFrame(ctk.CTkFrame):
         for cid, widget in self._contact_widgets.items():
             if not widget.winfo_exists():
                 continue
-            unread = self.contador_nao_lidas.get(cid, 0)
+            unread = (self.contador_nao_lidas or {}).get(cid, 0) if isinstance(self.contador_nao_lidas, dict) else 0
             badge  = getattr(widget, "_badge_frame", None)
             if badge is None:
                 continue
