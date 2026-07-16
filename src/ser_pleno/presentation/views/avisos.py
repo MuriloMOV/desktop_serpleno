@@ -13,6 +13,8 @@ from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.presentation.components.ui_components import BaseModal, Card
+from ser_pleno.utils.async_runner import log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 logger = logging.getLogger("apps.desktop")
 
@@ -728,6 +730,8 @@ class PublicacaoModal(BaseModal):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class AvisosFrame(ctk.CTkFrame):
     def __init__(self, master, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(master, fg_color=Q["page_bg"])
         self.controller = controller
         self.app = getattr(controller, 'app', None)
@@ -745,6 +749,7 @@ class AvisosFrame(ctk.CTkFrame):
         self.lista.pack(fill="both", expand=True, padx=spacing("xl"), pady=(0, spacing("xl")))
 
         self.carregar_avisos_async()
+        log_view_init_ms("avisos", self._t0, widget_ref=self)
 
     # —— Cabeçalho —————————————————————————————————————————————————————————————
     def _build_header(self):
@@ -799,17 +804,19 @@ class AvisosFrame(ctk.CTkFrame):
                          text_color=Q["text_muted"]).pack(pady=30)
             return
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for post in reversed(posts):
             if not isinstance(post, dict):
                 continue
-            self._criar_card(
+            batch.add(lambda post=post: self._criar_card(
                 post.get("id"),
                 post.get("titulo")    or post.get("title")      or "(sem título)",
                 post.get("conteudo")  or post.get("content")    or "",
                 post.get("autor")     or post.get("author")     or "Sistema",
                 post.get("publicado_em") or post.get("created_at") or "",
                 post.get("categoria") or post.get("category")   or "informativo",
-            )
+            ))
+        batch.execute()
 
     def _on_load_error(self, e):
         self._limpar_lista()
@@ -834,14 +841,16 @@ class AvisosFrame(ctk.CTkFrame):
 
         # Barra lateral colorida
         color, _ = Q["cat"].get(categoria, _CAT_DEFAULT)
-        ctk.CTkFrame(card, width=4, corner_radius=0,
+        body = card.body
+        body.pack_configure(padx=(0, spacing("lg")), pady=spacing("md"))
+        ctk.CTkFrame(body, width=4, corner_radius=0,
                      fg_color=color).pack(side="left", fill="y")
 
-        body = ctk.CTkFrame(card, fg_color="transparent")
-        body.pack(fill="both", expand=True, padx=spacing("lg"), pady=spacing("md"))
+        content = ctk.CTkFrame(body, fg_color="transparent")
+        content.pack(side="left", fill="both", expand=True, padx=(4, 0))
 
         # Topo: chip + título + ações
-        top = ctk.CTkFrame(body, fg_color="transparent")
+        top = ctk.CTkFrame(content, fg_color="transparent")
         top.pack(fill="x", pady=(0, spacing("item_gap")))
 
         chip_frame = ctk.CTkFrame(top, fg_color=Q["cat"].get(categoria, _CAT_DEFAULT)[1],
@@ -879,7 +888,7 @@ class AvisosFrame(ctk.CTkFrame):
 
         # Conteúdo
         if descricao:
-            ctk.CTkLabel(body,
+            ctk.CTkLabel(content,
                          text=escape_html(descricao or ""),
                          wraplength=820, justify="left",
                          font=font(size=12),
@@ -887,9 +896,9 @@ class AvisosFrame(ctk.CTkFrame):
                          anchor="w").pack(anchor="w", pady=(0, 10))
 
         # Rodapé do card
-        ctk.CTkFrame(body, height=1, fg_color=Q["divider"]).pack(fill="x", pady=(0, 8))
+        ctk.CTkFrame(content, height=1, fg_color=Q["divider"]).pack(fill="x", pady=(0, 8))
 
-        footer_row = ctk.CTkFrame(body, fg_color="transparent")
+        footer_row = ctk.CTkFrame(content, fg_color="transparent")
         footer_row.pack(fill="x")
 
         for icon, val in [(ICONS["view"], autor), (ICONS["chart"], data)]:

@@ -9,6 +9,8 @@ from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.components.icons import ICONS, IconButton, IconLabel
 from ser_pleno.presentation.components.ui_components import bind_clickable
+from ser_pleno.utils.async_runner import log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +63,8 @@ def _make_avatar(parent, initials: str, color: str,
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class ComunicacaoFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller          = controller
         self.controller_comunicacao = ComunicacaoController()
@@ -85,6 +89,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.carregar_contatos()
         self._iniciar_atualizacao_periodica()
         self.bind("<Destroy>", self._on_destroy)
+        log_view_init_ms("comunicacao", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Ciclo de vida
@@ -221,12 +226,17 @@ class ComunicacaoFrame(ctk.CTkFrame):
         for w in self.scroll_contacts.winfo_children():
             w.destroy()
         self._contact_widgets = {}
-        for i, c in enumerate(lista):
-            self._criar_contato_item(c)
-            if select_first and i == 0:
-                w = self._contact_widgets.get(c["id"])
-                if w:
-                    self.selecionar_conversa(c, w)
+
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
+        for c in lista:
+            batch.add(lambda c=c: self._criar_contato_item(c))
+        batch.execute()
+
+        if select_first and lista:
+            first = lista[0]
+            w = self._contact_widgets.get(first.get("id"))
+            if w:
+                self.selecionar_conversa(first, w)
 
     def _criar_contato_item(self, contato: dict):
         cid   = contato["id"]
@@ -639,8 +649,10 @@ class ComunicacaoFrame(ctk.CTkFrame):
             text_color=THEME["text_secondary"],
         ).pack(padx=spacing("md"), pady=spacing("xs"))
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for msg in self.mensagens:
-            self.criar_mensagem(msg)
+            batch.add(lambda msg=msg: self.criar_mensagem(msg))
+        batch.execute()
 
         # Scroll para o final
         self.after(50, lambda: self.msg_area._parent_canvas.yview_moveto(1.0))

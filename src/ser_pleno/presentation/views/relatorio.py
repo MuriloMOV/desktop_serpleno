@@ -3,7 +3,8 @@ import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import Divider, EmptyState, PrimaryButton, GhostButton, Card
 from ser_pleno.ui.components.icons import IconLabel, ICONS
 from ser_pleno.application.controllers.relatorio import RelatorioController
-from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, FONT_FAMILY, font, themed_font
 from ser_pleno.ui.theme_extensions import spacing
 
@@ -34,12 +35,6 @@ _KPIS = [
 # ——————————————————————————————————————————————————————————————————————————————
 #  Helpers de layout
 # ——————————————————————————————————————————————————————————————————————————————
-def _section_title(parent, text: str, pady=(16, 12)):
-    ctk.CTkLabel(
-        parent, text=text,
-        font=themed_font("body", "bold"),
-        text_color=THEME["text"], anchor="w",
-    ).pack(fill="x", padx=spacing("xl"), pady=pady)
 
 def _chip(parent, text: str, tipo: str = "") -> ctk.CTkFrame:
     bg, fg = _CHIP.get(tipo, ("#E5E7EB", "#374151"))
@@ -108,6 +103,8 @@ class _KPICard(ctk.CTkFrame):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class RelatorioFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(
             parent,
             fg_color=THEME["page_bg"],
@@ -125,6 +122,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         self._criar_secao_exportacao()
         self._criar_lista_relatorios()
         self._carregar_dados()
+        log_view_init_ms("relatorio", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Dados
@@ -226,7 +224,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_grid_central(self):
         grid = ctk.CTkFrame(self, fg_color="transparent")
-        grid.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        grid.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0))
         grid.grid_columnconfigure(0, weight=3)
         grid.grid_columnconfigure(1, weight=2)
 
@@ -235,12 +233,12 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
 
     # —— Gráfico —————————————————————————————————————————————————————————————
     def _criar_card_grafico(self, parent):
-        card = Card(parent)
-        card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        card = Card(parent, padding=(SPACING["card_pad"], SPACING["label_gap"]))
+        card.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING["icon_gap"] // 2))
 
         # Cabeçalho do card
-        hdr = ctk.CTkFrame(card, fg_color="transparent")
-        hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
+        hdr = ctk.CTkFrame(card.body, fg_color="transparent")
+        hdr.pack(fill="x")
 
         ctk.CTkLabel(
             hdr, text="Atividades nos Últimos 30 Dias",
@@ -264,12 +262,12 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
                          font=themed_font("body_sm"),
                          text_color=THEME["text_muted"]).pack(side="left")
 
-        Divider(card).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["label_gap"], 0))
+        Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], 0))
 
         self.canvas_chart = ctk.CTkCanvas(
-            card, bg=THEME["surface"], height=220, highlightthickness=0
+            card.body, bg=THEME["surface"], height=220, highlightthickness=0
         )
-        self.canvas_chart.pack(fill="both", expand=True, padx=SPACING["icon_gap"], pady=(SPACING["label_gap"], SPACING["item_gap"]))
+        self.canvas_chart.pack(fill="both", expand=True)
         self.canvas_chart.bind("<Configure>", lambda e: self._draw_chart())
 
     def _draw_chart(self, data=None):
@@ -289,7 +287,7 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
                 icon=ICONS["chart"],
                 title="Sem dados para o gráfico",
                 subtitle="Os registros aparecerão aqui quando houver movimentação",
-            ).pack(expand=True, fill="both", padx=24, pady=24)
+            ).pack(expand=True, fill="both", padx=SPACING["icon_gap"], pady=SPACING["icon_gap"])
             return
 
         mx, my = 40, 20
@@ -345,12 +343,20 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
 
     # —— Resumo lateral ———————————————————————————————————————————————————————
     def _criar_card_resumo(self, parent):
-        card = Card(parent)
-        card.grid(row=0, column=1, sticky="nsew", padx=(spacing("sm"), 0))
+        card = Card(parent, padding=(SPACING["card_pad"], SPACING["label_gap"]))
+        card.grid(row=0, column=1, sticky="nsew", padx=(SPACING["icon_gap"] // 2, 0))
 
-        _section_title(card, "Resumo do Período")
-        ctk.CTkFrame(card, height=1, fg_color=THEME["divider"]).pack(
-            fill="x", padx=spacing("xl"), pady=(0, spacing("item_gap"))
+        hdr = ctk.CTkFrame(card.body, fg_color="transparent")
+        hdr.pack(fill="x")
+
+        ctk.CTkLabel(
+            hdr, text="Resumo do Período",
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).pack(fill="x")
+
+        ctk.CTkFrame(card.body, height=1, fg_color=THEME["divider"]).pack(
+            fill="x", pady=(SPACING["label_gap"], 0)
         )
 
         rows_cfg = [
@@ -360,8 +366,8 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             ("triagens_30d",      "Triagens (30d)",         THEME["text"],           None),
         ]
 
-        body = ctk.CTkFrame(card, fg_color="transparent")
-        body.pack(fill="x", padx=spacing("xl"), pady=(0, spacing("xs")))
+        body = ctk.CTkFrame(card.body, fg_color="transparent")
+        body.pack(fill="x", pady=(0, SPACING["label_gap"]))
 
         for key, label, _, _ in rows_cfg:
             row = ctk.CTkFrame(body, fg_color=THEME["row_bg"], corner_radius=RADIUS["md"])
@@ -380,14 +386,14 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             self._summary_vals[key] = val_lbl
 
         # Taxa de comparecimento —” destaque especial
-        Divider(card).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["label_gap"], SPACING["label_gap"]))
+        Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], SPACING["label_gap"]))
 
         comp_row = ctk.CTkFrame(
-            card,
+            card.body,
             fg_color=THEME["kpi_green_soft"],
             corner_radius=RADIUS["button"],
         )
-        comp_row.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
+        comp_row.pack(fill="x", pady=(0, SPACING["item_gap"]))
 
         ctk.CTkLabel(
             comp_row, text="Taxa de Comparecimento",
@@ -407,11 +413,11 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     #  EXPORTAÇAO
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_secao_exportacao(self):
-        card = Card(self)
-        card.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
+        card = Card(self, padding=(SPACING["card_pad"], SPACING["label_gap"]))
+        card.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], 0))
 
-        hdr = ctk.CTkFrame(card, fg_color="transparent")
-        hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], SPACING["section_gap"]))
+        hdr = ctk.CTkFrame(card.body, fg_color="transparent")
+        hdr.pack(fill="x")
 
         ctk.CTkLabel(
             hdr, text=f"{ICONS['export']}  Exportação de Dados",
@@ -419,10 +425,10 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             text_color=THEME["text"],
         ).pack(side="left")
 
-        Divider(card).pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
+        Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], 0))
 
-        btn_row = ctk.CTkFrame(card, fg_color="transparent")
-        btn_row.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
+        btn_row = ctk.CTkFrame(card.body, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(0, SPACING["item_gap"]))
 
         exports = [
             (f"{ICONS['chart']}  Estudantes",    "CSV",  self.controller_relatorio.exportar_estudantes,    THEME["kpi_blue"],   THEME["kpi_blue_soft"]),
@@ -461,12 +467,12 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
     #  LISTA DE RELATÓRIOS
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_lista_relatorios(self):
-        card = Card(self)
-        card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
+        card = Card(self, padding=(SPACING["card_pad"], SPACING["label_gap"]))
+        card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(SPACING["item_gap"], SPACING["page_y"]))
 
         # Cabeçalho com filtro
-        hdr = ctk.CTkFrame(card, fg_color="transparent")
-        hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
+        hdr = ctk.CTkFrame(card.body, fg_color="transparent")
+        hdr.pack(fill="x")
 
         ctk.CTkLabel(
             hdr, text="Relatórios Gerados",
@@ -492,11 +498,11 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
         )
         self.filtro_tipo.pack(side="right")
 
-        Divider(card).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["item_gap"], 0))
+        Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], 0))
 
         # Coluna header
-        col_hdr = ctk.CTkFrame(card, fg_color="transparent")
-        col_hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["label_gap"], 0))
+        col_hdr = ctk.CTkFrame(card.body, fg_color="transparent")
+        col_hdr.pack(fill="x", pady=(SPACING["label_gap"], 0))
         col_hdr.grid_columnconfigure(0, weight=3)
         col_hdr.grid_columnconfigure(1, weight=1)
         col_hdr.grid_columnconfigure(2, weight=1)
@@ -509,14 +515,14 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
                 text_color=THEME["text_secondary"], anchor="w",
             ).grid(row=0, column=i, sticky="w", padx=(0 if i else SPACING["icon_gap"], 0))
 
-        Divider(card).pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["label_gap"], 0))
+        Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], 0))
 
         self.reports_container = ctk.CTkScrollableFrame(
-            card, fg_color="transparent",
+            card.body, fg_color="transparent",
             scrollbar_button_color=THEME["border_strong"],
             scrollbar_button_hover_color=THEME["text_muted"],
         )
-        self.reports_container.pack(fill="both", expand=True, padx=SPACING["icon_gap"], pady=(SPACING["label_gap"], SPACING["icon_gap"]))
+        self.reports_container.pack(fill="both", expand=True, pady=(SPACING["label_gap"], SPACING["icon_gap"]))
 
     def _filtrar_por_tipo(self, tipo: str):
         # Re-renderiza com filtro (dados em memória)
@@ -549,8 +555,10 @@ class RelatorioFrame(ctk.CTkScrollableFrame):
             ).pack(pady=SPACING["section_gap"])
             return
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for r in reports:
-            self._criar_row_relatorio(r)
+            batch.add(lambda r=r: self._criar_row_relatorio(r))
+        batch.execute()
 
     def _criar_row_relatorio(self, report: dict):
         row = ctk.CTkFrame(

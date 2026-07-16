@@ -11,7 +11,8 @@ from ser_pleno.presentation.components.ui_components import (
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.application.controllers.triagem import TriagemController
-from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from tkinter import messagebox
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -86,6 +87,8 @@ class _DateField(ctk.CTkFrame):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class TriagemFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["page_bg"],
                          scrollbar_button_color=THEME["primary_medium"],
                          scrollbar_button_hover_color=THEME["primary"])
@@ -98,6 +101,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         self._criar_filtros()
         self._criar_tabela()
         self._carregar_triagens()
+        log_view_init_ms("triagem", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  CABEÇALHO
@@ -274,8 +278,10 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             ).pack(pady=SPACING["section_gap"])
             return
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for item in data_list:
-            self._criar_row(item)
+            batch.add(lambda item=item: self._criar_row(item))
+        batch.execute()
 
     def _criar_row(self, item: dict):
         row = ctk.CTkFrame(self.lista_triagens,

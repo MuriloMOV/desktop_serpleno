@@ -4,7 +4,9 @@ from ser_pleno.presentation.components.ui_components import (
     Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal
 )
 from ser_pleno.ui.components.icons import IconLabel, ICONS
-from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.cache import NotificationCache
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 from ser_pleno.application.controllers.dashboard import DashboardController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, FONT_FAMILY
@@ -353,6 +355,8 @@ class ProfileModal(BaseModal):
 
 class DashboardFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(
             parent,
             fg_color=THEME["bg"],
@@ -364,11 +368,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             app=self.controller.app,
             auth_service=getattr(self.controller.app, "auth_service", None),
         )
+        self._notification_cache = NotificationCache(ttl=60)
 
         self._criar_toolbar_acoes()
         self._criar_kpi_container()
         self._criar_grid_principal()
         self._carregar_dados()
+        log_view_init_ms("dashboard", self._t0, widget_ref=self)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Dados
@@ -580,8 +586,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         appointments = data.get("upcoming_appointments", [])
         if appointments:
+            batch = WidgetBatchBuilder(parent=self, batch_size=20)
             for appt in appointments:
-                _AgendaRow(card.body, appt).pack(fill="x", pady=3)
+                batch.add(lambda a=appt: _AgendaRow(card.body, a).pack(fill="x", pady=3))
+            batch.execute()
         else:
             EmptyState(
                 card.body, icon=ICONS["calendar"],
@@ -602,8 +610,10 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         students = data.get("attention_students", [])
         if students:
+            batch = WidgetBatchBuilder(parent=self, batch_size=20)
             for s in students:
-                _AlertaRow(card.body, s).pack(fill="x", pady=3)
+                batch.add(lambda s=s: _AlertaRow(card.body, s).pack(fill="x", pady=3))
+            batch.execute()
         else:
             EmptyState(
                 card.body, icon=ICONS["cross"],
@@ -626,10 +636,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             (f"{ICONS['chat']}  Emocional",  be.get("emocional", 0) / 5, "#EC4899", "#FCE7F3"),
             (f"{ICONS['group']}  Social",    be.get("social",    0) / 5, THEME["success"], THEME["success_soft"]),
         ]
+        batch = WidgetBatchBuilder(parent=self, batch_size=10)
         for nome, val, color, soft in dims:
-            _BemEstarBar(card.body, nome, val, color, soft).pack(
+            batch.add(lambda n=nome, v=val, c=color, s=soft: _BemEstarBar(card.body, n, v, c, s).pack(
                 fill="x", padx=spacing("xs"), pady=spacing("md")
-            )
+            ))
+        batch.execute()
 
     def _atualizar_secao_humor(self, data):
         humor_history = data.get("humor_history", [])
@@ -841,10 +853,23 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     def _atualizar_badge_notificacoes(self):
         if not hasattr(self, "help_badge") or not hasattr(self, "alert_badge"):
             return
-        ajuda   = self.controller_dashboard.obter_notificacoes_ajuda()
-        alertas = self.controller_dashboard.obter_notificacoes_alertas()
-        n_ajuda   = sum(1 for n in ajuda   if not n.get("lida", True))
-        n_alertas = sum(1 for n in alertas if not n.get("lida", True))
+
+        ajuda_cache = self._notification_cache.get_ajuda()
+        if ajuda_cache is not None:
+            ajuda, n_ajuda = ajuda_cache
+        else:
+            ajuda = self.controller_dashboard.obter_notificacoes_ajuda()
+            n_ajuda = sum(1 for n in ajuda if not n.get("lida", True))
+            self._notification_cache.set_ajuda(ajuda, n_ajuda)
+
+        alertas_cache = self._notification_cache.get_alertas()
+        if alertas_cache is not None:
+            alertas, n_alertas = alertas_cache
+        else:
+            alertas = self.controller_dashboard.obter_notificacoes_alertas()
+            n_alertas = sum(1 for n in alertas if not n.get("lida", True))
+            self._notification_cache.set_alertas(alertas, n_alertas)
+
         self._set_badge(self.help_badge,  n_ajuda,  getattr(self, "help_badge_anchor", None))
         self._set_badge(self.alert_badge, n_alertas, getattr(self, "alert_badge_anchor", None))
 
@@ -864,6 +889,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
     def _marcar_lida(self, notif_id, tipo):
         self.controller_dashboard.marcar_notificacao_como_lida(notif_id, tipo)
+        self._notification_cache.invalidate_all()
         self._atualizar_badge_notificacoes()
 
     def _marcar_todas_lidas(self, tipo):
@@ -873,6 +899,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                       else self.controller_dashboard.obter_notificacoes_alertas())
             for n in notifs:
                 self.controller_dashboard.marcar_notificacao_como_lida(n["id"], tipo)
+            self._notification_cache.invalidate_all()
             self._atualizar_badge_notificacoes()
         except Exception as e:
             logger.error("Erro ao marcar todas como lidas: %s", e)

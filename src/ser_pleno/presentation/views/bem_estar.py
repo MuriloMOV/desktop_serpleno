@@ -1,11 +1,12 @@
 import logging
 import customtkinter as ctk
-from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.application.controllers.bem_estar import BemEstarController
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.presentation.components.ui_components import Divider, EmptyState, GhostButton, Card, Avatar, KPICard
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.utils.mood import mood_emoji_from_score
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 from ser_pleno.ui.theme import (
     THEME, SPACING, RADIUS, FONT_FAMILY,
@@ -69,6 +70,8 @@ def _section_card(parent, title: str,
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class BemEstarFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(
             parent,
             fg_color=THEME["bg"],
@@ -86,6 +89,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._criar_lista_checkins()
 
         self.load_data()
+        log_view_init_ms("bem_estar", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••
     #  Dados
@@ -490,16 +494,18 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 ).pack(pady=12)
             return
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for s in risks:
             nivel = s.get("level", "normal").lower()
             if nivel not in self.colunas_risco:
                 nivel = "normal"
             counts[nivel] += 1
-            self._criar_card_risco(
-                self.colunas_risco[nivel]["content"], s,
-                self.colunas_risco[nivel]["color"],
-                self.colunas_risco[nivel]["soft"],
-            )
+            batch.add(lambda s=s, n=nivel: self._criar_card_risco(
+                self.colunas_risco[n]["content"], s,
+                self.colunas_risco[n]["color"],
+                self.colunas_risco[n]["soft"],
+            ))
+        batch.execute()
 
         for key, count in counts.items():
             self.colunas_risco[key]["count_lbl"].configure(text=str(count))
@@ -587,10 +593,12 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             ).pack(pady=20)
             return
 
+        batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for c in checkins:
             if not isinstance(c, dict):
                 continue
-            self._criar_row_checkin(c)
+            batch.add(lambda c=c: self._criar_row_checkin(c))
+        batch.execute()
 
     def _criar_row_checkin(self, c: dict):
         nome  = c.get("student_name", "Estudante")

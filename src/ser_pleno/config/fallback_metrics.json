@@ -1,29 +1,29 @@
 {
-  "read_fallback_total": 500,
-  "write_fallback_total": 1014,
+  "read_fallback_total": 528,
+  "write_fallback_total": 1024,
   "by_repository": {
     "EstudanteRepository": {
-      "total": 229,
-      "read": 229,
+      "total": 239,
+      "read": 239,
       "write": 0,
       "methods": {
-        "listar": 229
+        "listar": 239
       }
     },
     "AgendamentoRepository": {
-      "total": 117,
-      "read": 117,
+      "total": 122,
+      "read": 122,
       "write": 0,
       "methods": {
-        "listar_proximos": 117
+        "listar_proximos": 122
       }
     },
     "TriagemRepository": {
-      "total": 119,
-      "read": 119,
+      "total": 124,
+      "read": 124,
       "write": 0,
       "methods": {
-        "listar": 119
+        "listar": 124
       }
     },
     "students": {
@@ -54,11 +54,11 @@
       }
     },
     "orientations": {
-      "total": 115,
+      "total": 120,
       "read": 0,
-      "write": 115,
+      "write": 120,
       "methods": {
-        "create": 115
+        "create": 120
       }
     },
     "screenings": {
@@ -78,11 +78,11 @@
       }
     },
     "user_preferences": {
-      "total": 115,
+      "total": 120,
       "read": 0,
-      "write": 115,
+      "write": 120,
       "methods": {
-        "update": 115
+        "update": 120
       }
     },
     "alerts": {
@@ -94,16 +94,16 @@
       }
     },
     "DashboardRepository": {
-      "total": 35,
-      "read": 35,
+      "total": 43,
+      "read": 43,
       "write": 0,
       "methods": {
-        "obter_kpis": 34,
+        "obter_kpis": 42,
         "obter_notificacoes_alertas": 1
       }
     }
   },
-  "last_read_fallback": "2026-07-16T02:18:24.909273",
-  "last_write_fallback": "2026-07-16T02:18:24.881367",
+  "last_read_fallback": "2026-07-16T13:07:54.192843",
+  "last_write_fallback": "2026-07-16T12:02:53.810410",
   "started_at": "2026-07-10T00:41:45.736401"
 }

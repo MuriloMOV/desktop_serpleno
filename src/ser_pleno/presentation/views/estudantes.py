@@ -11,10 +11,13 @@ from ser_pleno.ui.theme import (
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
-    Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable
+    Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable,
+    SkeletonLoader,
 )
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
+from ser_pleno.utils.async_runner import log_view_init_ms
 
 
 
@@ -84,6 +87,8 @@ class _Field(ctk.CTkFrame):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class EstudantesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller        = controller
         self.controller_estudantes = EstudantesController()
@@ -99,6 +104,7 @@ class EstudantesFrame(ctk.CTkFrame):
         self._criar_conteudo()
 
         self.load_data()
+        log_view_init_ms("estudantes", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••
     #  Toolbar de ações
@@ -434,20 +440,24 @@ class EstudantesFrame(ctk.CTkFrame):
     def render_list(self, result):
         if not self.winfo_exists():
             return
-        for w in self.scroll_list.winfo_children():
-            w.destroy()
-        self._item_widgets = {}
+        self._mostrar_skeletons_lista()
 
-        students = []
-        if result.get("success"):
-            data = result.get("data", [])
-            if isinstance(data, dict):
-                students = data.get("students") or data.get("results") or []
-            elif isinstance(data, list):
-                students = data
+        def apply():
+            if not self.winfo_exists():
+                return
+            students = []
+            if result.get("success"):
+                data = result.get("data", [])
+                if isinstance(data, dict):
+                    students = data.get("students") or data.get("results") or []
+                elif isinstance(data, list):
+                    students = data
 
-        self._todos_estudantes = students
-        self._renderizar_estudantes(students)
+            self._todos_estudantes = students
+            self._renderizar_estudantes(students)
+
+        # Pequeno delay para o skeleton aparecer antes da renderização
+        self.after(60, apply)
 
     def _renderizar_estudantes(self, lista: list):
         for w in self.scroll_list.winfo_children():
@@ -463,10 +473,22 @@ class EstudantesFrame(ctk.CTkFrame):
 
         self.lbl_count.configure(text=f"{len(lista)} estudante{'s' if len(lista) != 1 else ''}")
 
+        batch = WidgetBatchBuilder(parent=self.scroll_list, batch_size=40)
         for st in lista:
             if not isinstance(st, dict):
                 continue
-            self._criar_item_estudante(st)
+            batch.add(lambda s=st: self._criar_item_estudante(s))
+        batch.execute()
+
+    def _mostrar_skeletons_lista(self):
+        for w in self.scroll_list.winfo_children():
+            w.destroy()
+        batch = WidgetBatchBuilder(parent=self.scroll_list, batch_size=20)
+        for _ in range(8):
+            batch.add(lambda: SkeletonLoader(self.scroll_list, width=260, height=56, variant="card").pack(
+                fill="x", pady=4, padx=4
+            ))
+        batch.execute()
 
     def _criar_item_estudante(self, st: dict):
         nome    = st.get("name", "??")

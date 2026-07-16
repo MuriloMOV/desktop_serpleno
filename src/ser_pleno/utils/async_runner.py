@@ -6,6 +6,7 @@ garantido na thread principal via CTk after(), evitando UI freezes e falhas sile
 
 import logging
 import threading
+import time
 import traceback
 from functools import partial
 from typing import Callable, Optional, Any
@@ -36,9 +37,11 @@ class AsyncRunner:
         :param on_complete: Callback chamado sempre ao final (sucesso ou erro).
         :param widget_ref: Widget CTk (qualquer) para agendar callbacks na thread principal.
         """
+        t0 = time.perf_counter()
         def _worker():
             try:
                 result = task()
+                logger.debug("AsyncRunner.task done in %.1fms", (time.perf_counter() - t0) * 1000)
                 if on_success:
                     _safe_after(widget_ref, partial(on_success, result))
             except Exception as exc:
@@ -70,4 +73,14 @@ def _safe_after(widget_ref: Any, callback: Callable[[], None]) -> None:
             pass
 
 
-__all__ = ["AsyncRunner"]
+def log_view_init_ms(view_name: str, t0: float, widget_ref: Any = None) -> None:
+    """Loga métrica de tempo de init de uma view."""
+    dt = (time.perf_counter() - t0) * 1000
+    msg = f"PERF view_init_{view_name}_ms={dt:.1f}"
+    if widget_ref is not None and hasattr(widget_ref, "winfo_exists") and widget_ref.winfo_exists():
+        widget_ref.after(0, lambda: logger.info(msg))
+    else:
+        logger.info(msg)
+
+
+__all__ = ["AsyncRunner", "log_view_init_ms"]

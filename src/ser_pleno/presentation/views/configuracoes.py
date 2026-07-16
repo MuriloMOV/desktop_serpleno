@@ -19,6 +19,7 @@ from ser_pleno.presentation.components.ui_components import (
     BaseModal,
 )
 from ser_pleno.ui.components.icons import IconLabel, ICONS
+from ser_pleno.utils.async_runner import log_view_init_ms
 
 logger = logging.getLogger("apps.desktop")
 
@@ -353,6 +354,8 @@ class AlterarSenhaModal(FormModal):
 # •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
         self.controller_configuracoes = ConfiguracoesController()
@@ -364,6 +367,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         self._build_header()
         self._build_body()
+        log_view_init_ms("configuracoes", self._t0, widget_ref=self)
 
     # —— helpers ---------------------------------------------------------------
     def _load_image(self, name: str, size: tuple[int, int]):

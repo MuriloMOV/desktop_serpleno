@@ -6,9 +6,12 @@ from ser_pleno.application.controllers.agenda import AgendaController
 from ser_pleno.repositories.agendamentos import AgendamentoRepository
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color, darken, lighten
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from ser_pleno.presentation.components.ui_components import (
     PageHeader, Card, PrimaryButton, GhostButton, Divider, EmptyState,
-    InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable
+    InputField, SearchField, Badge, Avatar, Pill, Toast, SectionHeader, BaseModal, bind_clickable,
+    SkeletonLoader,
 )
 from ser_pleno.ui.components.icons import IconButton, IconLabel, ICONS
 
@@ -386,6 +389,8 @@ class GradeManagementModal(BaseModal):
 
 class AgendaFrame(ctk.CTkScrollableFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
         self.controller_agenda = AgendaController(auth_service=getattr(controller, 'auth_service', None))
@@ -400,17 +405,65 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         self._criar_cabecalho()
         self._criar_container_agenda_dia()
         self._criar_container_proxima_semana()
-        self.refresh_all()
+
+        # Mostra skeletons imediatamente; dados reais chegam via async
+        self._mostrar_skeletons_grid(self.container_grid)
+        self._mostrar_skeletons_grid(self.container_semana)
+
+        # Carrega dados em background para não travar a UI na abertura
+        self.after_idle(self.refresh_all_async)
+        log_view_init_ms("agenda", self._t0, widget_ref=self)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Ciclo de vida e dados
     # ——————————————————————————————————————————————————————————————————————
 
+    def refresh_all_async(self):
+        """Carrega horários, estudantes e grids em background."""
+        def fetch():
+            self._carregar_horarios_base()
+            self._carregar_estudantes()
+            data_str = self.data_selecionada.strftime("%Y-%m-%d")
+            agendamentos_dia = self.controller_agenda.listar_agendamentos(data=data_str)
+            proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
+            agendamentos_prox = self.controller_agenda.listar_agendamentos(data=proxima_semana_str)
+            return data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox = result
+            mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
+            mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
+            self._renderizar_grid(self.container_grid, mapa_dia)
+            self._renderizar_grid(self.container_semana, mapa_prox)
+            self._atualizar_subtitulo_proxima_semana()
+
+        def on_error(exc):
+            logger.error("AgendaFrame.refresh_all_async: ERRO = %s", exc)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _mostrar_skeletons_grid(self, container):
+        for w in container.winfo_children():
+            w.destroy()
+        batch = WidgetBatchBuilder(parent=container, batch_size=20)
+        for idx in range(8):
+            def _mk(idx=idx):
+                return lambda: SkeletonLoader(container, width=220, height=100, variant="card").grid(
+                    row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew"
+                )
+            batch.add(_mk())
+        batch.execute()
+
     def refresh_all(self):
-        self._carregar_horarios_base()
-        self._carregar_estudantes()
-        self._atualizar_label_data()
-        self.load_grid_data()
+        """Mantido para compatibilidade; agora também é async."""
+        self.refresh_all_async()
 
     def _carregar_estudantes(self):
         try:
@@ -451,10 +504,22 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         for child in container.winfo_children():
             child.destroy()
 
-        for idx, hora in enumerate(self.horarios_base):
+        horarios = self.horarios_base or []
+        if not horarios:
+            EmptyState(
+                container, icon=ICONS["calendar"],
+                title="Nenhum horário configurado",
+                subtitle="Adicione horários na gestão de grade",
+            ).pack(pady=20)
+            return
+
+        batch = WidgetBatchBuilder(parent=container, batch_size=20)
+        for idx, hora in enumerate(horarios):
             info = mapa_dados.get(hora)
-            cell = ScheduleCell(container, hora, info, on_open=self._abrir_modal_agendamento)
-            cell.grid(row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew")
+            batch.add(lambda c=container, h=hora, i=info: ScheduleCell(
+                c, h, i, on_open=self._abrir_modal_agendamento
+            ).grid(row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew"))
+        batch.execute()
 
     # ——————————————————————————————————————————————————————————————————————
     #  Cabeçalho

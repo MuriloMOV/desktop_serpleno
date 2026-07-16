@@ -4,7 +4,9 @@ from tkinter import messagebox
 from datetime import datetime
 from typing import Any
 
-from ser_pleno.utils.async_runner import AsyncRunner
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
@@ -317,6 +319,8 @@ class OrientationHistoryCard(ctk.CTkFrame):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class OrientacoesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
+        import time as _time
+        self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=O["page_bg"])
         self.controller          = controller
         self.controller_orientacoes = OrientacoesController(auth_service=getattr(controller, 'auth_service', None))
@@ -329,6 +333,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         self._criar_conteudo()
         self._carregar_dados()
+        log_view_init_ms("orientacoes", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  CABEÇALHO
@@ -584,9 +589,10 @@ class OrientacoesFrame(ctk.CTkFrame):
             data = resultado.get("data") or {}
             orientacoes = data.get("orientations") or []
 
-        # Popula sidebar de estudantes com estudantes únicos do histórico
+        # Popula sidebar de estudantes com estudantes únicos do histórico —” O(n)
         estudantes_vistos: set = set()
         estudantes: list[dict] = []
+        por_estudante: dict = {}
         for o in orientacoes:
             sid = o.get("student_id") or o.get("student_name")
             if sid not in estudantes_vistos:
@@ -595,13 +601,13 @@ class OrientacoesFrame(ctk.CTkFrame):
                     "id":     sid,
                     "name":   o.get("student_name", "Estudante"),
                     "course": o.get("student_course", ""),
-                    "_all_orientations": [x for x in orientacoes
-                                          if x.get("student_id") == sid or
-                                          x.get("student_name") == o.get("student_name")],
                 })
+                por_estudante[sid] = []
+            por_estudante.setdefault(sid, []).append(o)
 
         self._todos_estudantes = estudantes
         self._todas_orientacoes = orientacoes
+        self._por_estudante = por_estudante
         self._popular_sidebar(estudantes)
 
         # Mostra todas se não há seleção
@@ -654,9 +660,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         card_widget.set_selected(True)
         self._selected_student = student
 
-        ors = student.get("_all_orientations",
-                          [o for o in self._todas_orientacoes
-                           if o.get("student_name") == student.get("name")])
+        sid = student.get("id")
+        ors = self._por_estudante.get(sid, [])
         self._mostrar_orientacoes(ors)
 
     def _mostrar_orientacoes(self, orientacoes: list):
@@ -670,17 +675,19 @@ class OrientacoesFrame(ctk.CTkFrame):
                          text_color=O["text_muted"]).pack(pady=30)
             return
 
+        batch = WidgetBatchBuilder(parent=self._area_historico, batch_size=20)
         for o in orientacoes:
-            OrientationHistoryCard(
+            batch.add(lambda o=o: OrientationHistoryCard(
                 self._area_historico, orientation=o,
                 on_view=self._ver_orientacao,
                 on_edit=self._editar_orientacao,
                 on_duplicate=self._duplicar_orientacao,
                 on_delete=self._excluir_orientacao,
-            ).pack(fill="both", expand=True, pady=(0, 10))
+            ).pack(fill="both", expand=True, pady=(0, 10)))
+        batch.execute()
 
-        # Força redistribuição do espaço interno
-        self.update_idletasks()
+        # Layout é recalculado naturalmente pelo Tkinter; removemos o
+        # update_idletasks() forçado que causava bloqueio da UI.
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Ações
