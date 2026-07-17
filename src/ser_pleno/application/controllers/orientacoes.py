@@ -49,3 +49,7 @@ class OrientacoesController(BaseController):
     def obter_estatisticas(self, id_estudante=None):
         """Obtém estatísticas das orientações."""
         return self._service.obter_estatisticas(id_estudante)
+
+    def listar_estudantes(self):
+        """Lista todos os estudantes cadastrados."""
+        return self._service.listar_estudantes()

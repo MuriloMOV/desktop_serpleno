@@ -258,6 +258,23 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao obter estatísticas: {e}")
             return {"success": True, "data": {"total": 0, "by_theme": [], "by_month": []}}
 
+    def listar_estudantes(self) -> Dict[str, Any]:
+        """Lista todos os estudantes cadastrados."""
+        try:
+            rows = self.repo.listar_estudantes()
+            estudantes = [
+                {
+                    "id": r.get("id"),
+                    "name": r.get("name") or "Estudante",
+                    "contact": r.get("contact", ""),
+                }
+                for r in rows
+            ]
+            return {"success": True, "data": estudantes}
+        except Exception as e:
+            logger.error(f"Erro ao listar estudantes: {e}")
+            return {"success": True, "data": []}
+
 
 # Instância global para fácil acesso
 servico_orientacoes = ServicoOrientacoes()

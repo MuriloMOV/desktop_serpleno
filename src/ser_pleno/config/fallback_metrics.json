@@ -1,29 +1,30 @@
 {
-  "read_fallback_total": 545,
-  "write_fallback_total": 1024,
+  "read_fallback_total": 611,
+  "write_fallback_total": 1028,
   "by_repository": {
     "EstudanteRepository": {
-      "total": 239,
-      "read": 239,
+      "total": 249,
+      "read": 249,
       "write": 0,
       "methods": {
-        "listar": 239
+        "listar": 249
       }
     },
     "AgendamentoRepository": {
-      "total": 122,
-      "read": 122,
+      "total": 130,
+      "read": 130,
       "write": 0,
       "methods": {
-        "listar_proximos": 122
+        "listar_proximos": 124,
+        "listar_horarios_base": 6
       }
     },
     "TriagemRepository": {
-      "total": 124,
-      "read": 124,
+      "total": 132,
+      "read": 132,
       "write": 0,
       "methods": {
-        "listar": 124
+        "listar": 132
       }
     },
     "students": {
@@ -54,11 +55,11 @@
       }
     },
     "orientations": {
-      "total": 120,
+      "total": 122,
       "read": 0,
-      "write": 120,
+      "write": 122,
       "methods": {
-        "create": 120
+        "create": 122
       }
     },
     "screenings": {
@@ -78,11 +79,11 @@
       }
     },
     "user_preferences": {
-      "total": 120,
+      "total": 122,
       "read": 0,
-      "write": 120,
+      "write": 122,
       "methods": {
-        "update": 120
+        "update": 122
       }
     },
     "alerts": {
@@ -94,16 +95,33 @@
       }
     },
     "DashboardRepository": {
-      "total": 60,
-      "read": 60,
+      "total": 82,
+      "read": 82,
       "write": 0,
       "methods": {
-        "obter_kpis": 59,
+        "obter_kpis": 81,
         "obter_notificacoes_alertas": 1
+      }
+    },
+    "OrientacaoRepository": {
+      "total": 6,
+      "read": 6,
+      "write": 0,
+      "methods": {
+        "listar_orientacoes": 6
+      }
+    },
+    "BemEstarRepository": {
+      "total": 12,
+      "read": 12,
+      "write": 0,
+      "methods": {
+        "obter_dashboard": 6,
+        "listar_checkins": 6
       }
     }
   },
-  "last_read_fallback": "2026-07-16T17:36:35.836671",
-  "last_write_fallback": "2026-07-16T12:02:53.810410",
+  "last_read_fallback": "2026-07-17T12:59:20.402178",
+  "last_write_fallback": "2026-07-17T11:43:01.675846",
   "started_at": "2026-07-10T00:41:45.736401"
 }

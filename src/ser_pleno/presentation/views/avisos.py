@@ -13,7 +13,7 @@ from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.presentation.components.ui_components import BaseModal, Card
-from ser_pleno.utils.async_runner import log_view_init_ms
+from ser_pleno.utils.async_runner import log_view_init_ms, AsyncRunner
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 logger = logging.getLogger("apps.desktop")
@@ -761,13 +761,28 @@ class AvisosFrame(ctk.CTkFrame):
             try:
                 res = fn()
                 if callback:
-                    self.after(0, lambda r=res: callback(r))
+                    AsyncRunner.run(
+                        task=lambda: res,
+                        on_success=callback,
+                        on_error=err_callback,
+                        widget_ref=self,
+                    )
             except Exception as e:
                 logger.exception("Erro em thread: %s", e)
                 if err_callback:
-                    self.after(0, lambda exc=e: err_callback(exc))
+                    AsyncRunner.run(
+                        task=lambda: (_ for _ in ()).throw(e),
+                        on_success=lambda _: None,
+                        on_error=err_callback,
+                        widget_ref=self,
+                    )
                 else:
-                    self.after(0, lambda exc=e: messagebox.showerror("Erro", str(exc)))
+                    AsyncRunner.run(
+                        task=lambda: (_ for _ in ()).throw(e),
+                        on_success=lambda _: None,
+                        on_error=lambda exc: messagebox.showerror("Erro", str(exc)),
+                        widget_ref=self,
+                    )
         threading.Thread(target=_worker, daemon=True).start()
 
     # —— Carregar ———————————————————————————————————————————————————————————————

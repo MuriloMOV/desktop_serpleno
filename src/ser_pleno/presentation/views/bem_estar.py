@@ -38,10 +38,10 @@ _MOOD_LABEL = {1: "Muito triste", 2: "Triste", 3: "Neutro", 4: "Bem", 5: "Ótimo
 def _section_card(parent, title: str,
                   action_text: str = "", action_cmd=None) -> tuple[ctk.CTkFrame, ctk.CTkFrame]:
     """Card de seção com cabeçalho, divider e body."""
-    outer = Card(parent, padding=(SPACING["card_pad"], SPACING["label_gap"]), auto_body=False)
+    outer = Card(parent, padding=(SPACING["card_pad"], SPACING["card_pad"]), auto_body=False)
 
     hdr = ctk.CTkFrame(outer, fg_color="transparent")
-    hdr.pack(fill="x")
+    hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["card_pad"], SPACING["label_gap"]))
 
     ctk.CTkLabel(
         hdr, text=title,
@@ -56,10 +56,10 @@ def _section_card(parent, title: str,
             text_color=THEME["primary"],
         ).pack(side="right")
 
-    Divider(outer).pack(fill="x")
+    Divider(outer).pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["label_gap"]))
 
     body = ctk.CTkFrame(outer, fg_color="transparent")
-    body.pack(fill="both", expand=True)
+    body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"]))
     return outer, body
 
 
@@ -199,7 +199,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_kpis(self, content):
         row = ctk.CTkFrame(content, fg_color="transparent")
-        row.pack(fill="x", pady=(SPACING["label_gap"], 0))
+        row.pack(fill="x", pady=(0, SPACING["section_gap"]))
 
         kpis = [
             ("Humor Médio",       f"{ICONS['mood_good']}  —",  ICONS["heart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "_kpi_humor",
@@ -224,11 +224,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_secao_grafico(self, content):
         outer, body = _section_card(content, f"{ICONS['chart']}  Tendência de Bem-Estar — últimos 30 dias")
-        outer.pack(fill="x", pady=(SPACING["label_gap"], 0))
+        outer.pack(fill="x", pady=(0, SPACING["section_gap"]))
         self._secao_grafico_outer = outer
 
         chart_wrap = ctk.CTkFrame(body, fg_color="transparent")
-        chart_wrap.pack(fill="both", expand=True, padx=spacing("xs"), pady=(spacing("xs"), spacing("md")))
+        chart_wrap.pack(fill="both", expand=True, padx=spacing("sm"), pady=(spacing("sm"), spacing("md")))
         chart_wrap.grid_rowconfigure(0, weight=1)
         chart_wrap.grid_columnconfigure(0, weight=1)
 
@@ -252,7 +252,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         # Barras de distribuição de humor
         dist_row = ctk.CTkFrame(body, fg_color="transparent")
-        dist_row.pack(fill="x", pady=(4, 4))
+        dist_row.pack(fill="x", pady=(spacing("xs"), spacing("sm")))
 
         self._dist_bars: dict[str, ctk.CTkFrame] = {}
         self._dist_pcts: dict[str, ctk.CTkLabel] = {}
@@ -263,15 +263,15 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             (f"{ICONS['mood_bad']}  Baixo",   THEME["danger"],  "mau",  10),
         ]:
             col = ctk.CTkFrame(dist_row, fg_color="transparent")
-            col.pack(side="left", expand=True, padx=SPACING["grid_gap"])
+            col.pack(side="left", expand=True, padx=SPACING["grid_gap"], pady=(0, spacing("xs")))
 
             ctk.CTkLabel(col, text=label,
                          font=themed_font("body", "bold"),
-                         text_color=THEME["text_secondary"]).pack(anchor="w")
+                         text_color=THEME["text_secondary"]).pack(anchor="w", pady=(0, spacing("xs")))
 
             bar_bg = ctk.CTkFrame(col, height=8, fg_color=THEME["chart_grid"],
                                   corner_radius=RADIUS["pill"])
-            bar_bg.pack(fill="x", pady=(5, 4))
+            bar_bg.pack(fill="x", pady=(0, spacing("xs")))
             bar_bg.pack_propagate(False)
 
             fill = ctk.CTkFrame(bar_bg, height=8, fg_color=color, corner_radius=RADIUS["pill"])
@@ -281,7 +281,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             pct_lbl = ctk.CTkLabel(col, text=f"{default}%",
                                    font=themed_font("body", "bold"),
                                    text_color=THEME["text"])
-            pct_lbl.pack(anchor="w")
+            pct_lbl.pack(anchor="w", pady=(spacing("xs"), 0))
             self._dist_pcts[pct_key] = pct_lbl
 
     def _schedule_draw_chart(self, event=None):
@@ -410,25 +410,29 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     #  VISÃO DE RISCO (kanban 4 colunas)
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_visao_risco(self, content):
-        # Título externo ao card
-        title_row = ctk.CTkFrame(content, fg_color="transparent")
-        title_row.pack(fill="x", pady=(SPACING["label_gap"], SPACING["label_gap"]))
+        # Card agrupando título + colunas
+        cols_card = Card(content, padding=(SPACING["card_pad"], SPACING["label_gap"]), auto_body=False)
+        cols_card.pack(fill="x", pady=(0, SPACING["section_gap"]))
+
+        hdr = ctk.CTkFrame(cols_card, fg_color="transparent")
+        hdr.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["card_pad"], SPACING["label_gap"]))
 
         ctk.CTkLabel(
-            title_row, text=f"{ICONS['mood_good']}  Visão de Risco dos Estudantes",
+            hdr, text=f"{ICONS['mood_good']}  Visão de Risco dos Estudantes",
             font=themed_font("h4", "bold"),
             text_color=THEME["text"],
         ).pack(side="left")
 
         ctk.CTkLabel(
-            title_row, text="Classificação por nível de atenção necessária",
+            hdr, text="Classificação por nível de atenção necessária",
             font=themed_font("body_sm"),
             text_color=THEME["text_secondary"],
         ).pack(side="left", padx=(10, 0), pady=(2, 0))
 
-        # Grid de colunas
-        cols_wrap = ctk.CTkFrame(self, fg_color="transparent")
-        cols_wrap.pack(fill="x", padx=SPACING["page_x"], pady=(0, SPACING["label_gap"]))
+        Divider(cols_card).pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["label_gap"]))
+
+        cols_wrap = ctk.CTkFrame(cols_card, fg_color="transparent")
+        cols_wrap.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"]))
         for i in range(4):
             cols_wrap.grid_columnconfigure(i, weight=1)
 
@@ -451,7 +455,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 col_card, fg_color=soft,
                 corner_radius=0, height=44,
             )
-            col_hdr.grid(row=0, column=0, sticky="ew")
+            col_hdr.grid(row=0, column=0, sticky="ew", padx=spacing("sm"), pady=spacing("sm"))
             col_hdr.grid_propagate(False)
             col_hdr.grid_columnconfigure(1, weight=1)
 
@@ -459,7 +463,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             ctk.CTkFrame(
                 col_hdr, width=10, height=10,
                 corner_radius=5, fg_color=color,
-            ).grid(row=0, column=0, padx=(14, 8))
+            ).grid(row=0, column=0, padx=(spacing("xs"), spacing("sm")))
 
             ctk.CTkLabel(
                 col_hdr, text=title,
@@ -472,7 +476,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 font=themed_font("body", "bold"),
                 text_color=color,
             )
-            count_lbl.grid(row=0, column=2, padx=(0, 14))
+            count_lbl.grid(row=0, column=2, padx=(spacing("sm"), spacing("xs")))
 
             # Corpo scrollável
             body = ctk.CTkScrollableFrame(
@@ -481,7 +485,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 scrollbar_button_color=THEME["border_strong"],
                 scrollbar_button_hover_color=THEME["text_muted"],
             )
-            body.grid(row=1, column=0, sticky="nsew", padx=spacing("sm"), pady=0)
+            body.grid(row=1, column=0, sticky="nsew", padx=spacing("sm"), pady=(0, spacing("sm")))
 
             self.colunas_risco[key] = {
                 "content": body,
@@ -540,15 +544,15 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             border_width=1,
             border_color=THEME["border"],
         )
-        card.pack(fill="x", pady=SPACING["item_gap"] // 2)
+        card.pack(fill="x", pady=SPACING["item_gap"])
 
         inner = ctk.CTkFrame(card, fg_color="transparent")
-        inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
+        inner.pack(fill="x", padx=spacing("lg"), pady=spacing("md"))
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar colorido
         av = Avatar(inner, initials=nome[:2], size=34, color=get_avatar_color(nome))
-        av.grid(row=0, column=0, rowspan=2, padx=(0, 8), sticky="ns")
+        av.grid(row=0, column=0, rowspan=2, padx=(0, spacing("md")), sticky="ns")
 
         ctk.CTkLabel(
             inner, text=nome,
@@ -565,7 +569,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         # Chip de motivo
         if msg:
             chip = ctk.CTkFrame(card, fg_color=soft, corner_radius=RADIUS["sm"])
-            chip.pack(fill="x", padx=spacing("md"), pady=(0, spacing("md")))
+            chip.pack(fill="x", padx=spacing("lg"), pady=(0, spacing("md")))
             ctk.CTkLabel(
                 chip, text=msg,
                 font=themed_font("caption", "bold"),
@@ -585,7 +589,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     # ••••••••••••••••••••••••••••••••••••••
     def _criar_lista_checkins(self, content):
         outer, body = _section_card(content, f"{ICONS['chart']} Check-ins Recentes")
-        outer.pack(fill="x", pady=(SPACING["label_gap"], 0))
+        outer.pack(fill="x", pady=(0, SPACING["section_gap"]))
         self._checkins_body = body
 
     def populate_checkins(self, checkins: list):
@@ -628,15 +632,15 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             fg_color=THEME["bg_alt"],
             corner_radius=RADIUS["lg"],
         )
-        row.pack(fill="x", pady=SPACING["item_gap"] // 2)
+        row.pack(fill="x", pady=SPACING["item_gap"])
 
         inner = ctk.CTkFrame(row, fg_color="transparent")
-        inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
+        inner.pack(fill="x", padx=spacing("lg"), pady=spacing("md"))
         inner.grid_columnconfigure(1, weight=1)
 
         # Avatar
         av = Avatar(inner, initials=nome[:2], size=38, color=get_avatar_color(nome))
-        av.grid(row=0, column=0, rowspan=2, padx=(0, 12), sticky="ns")
+        av.grid(row=0, column=0, rowspan=2, padx=(0, spacing("md")), sticky="ns")
 
         # Nome + curso
         ctk.CTkLabel(
@@ -654,7 +658,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         # Mood chip
         mood_frame = ctk.CTkFrame(inner, fg_color="transparent")
-        mood_frame.grid(row=0, column=2, rowspan=2, padx=(8, 0), sticky="e")
+        mood_frame.grid(row=0, column=2, rowspan=2, padx=(spacing("md"), 0), sticky="e")
 
         chip_bg = ctk.CTkFrame(
             mood_frame,

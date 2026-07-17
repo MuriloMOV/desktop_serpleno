@@ -152,7 +152,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
     #  FILTROS
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_filtros(self):
-        card = Card(self)
+        card = Card(self, auto_body=False)
         card.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
         hdr = ctk.CTkFrame(card, fg_color="transparent")
@@ -220,7 +220,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
     #  TABELA
     # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_tabela(self):
-        card = Card(self)
+        card = Card(self, auto_body=False)
         card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
 
         # Cabeçalho da tabela

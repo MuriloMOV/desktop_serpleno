@@ -15,6 +15,10 @@ class ThemeManager:
 
     def toggle(self):
         """Alterna entre tema claro e escuro."""
+        try:
+            self.app.focus()
+        except Exception:
+            pass
         toggle_mode()
 
     def _on_theme_changed(self, mode: str) -> None:

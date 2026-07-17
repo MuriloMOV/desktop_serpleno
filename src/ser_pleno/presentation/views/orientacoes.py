@@ -327,12 +327,16 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._selected_student: dict | None = None
         self._selected_card: StudentCard | None = None
         self._orientacao_editando_id: int | None = None
+        self._todos_estudantes: list[dict] = []
+        self._todas_orientacoes: list[dict] = []
+        self._por_estudante: dict = {}
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self._criar_conteudo()
         self._carregar_dados()
+        self._carregar_estudantes()
         log_view_init_ms("orientacoes", self._t0, widget_ref=self)
 
     # ••••••••••••••••••••••••••••••••••••••••••
@@ -579,6 +583,26 @@ class OrientacoesFrame(ctk.CTkFrame):
             widget_ref=self,
         )
 
+    def _carregar_estudantes(self):
+        def fetch():
+            return self.controller_orientacoes.listar_estudantes()
+
+        def on_success(resultado):
+            if resultado.get("success"):
+                estudantes = resultado.get("data", [])
+                self._todos_estudantes = estudantes
+                self._popular_sidebar(estudantes)
+
+        def on_error(exc):
+            logger.error("Erro ao carregar estudantes: %s", exc)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
     def _renderizar(self, resultado):
         # Limpa placeholder de histórico
         for w in self._area_historico.winfo_children():
@@ -608,7 +632,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._todos_estudantes = estudantes
         self._todas_orientacoes = orientacoes
         self._por_estudante = por_estudante
-        self._popular_sidebar(estudantes)
+        # NÃO repopular sidebar aqui; a sidebar é gerenciada por _carregar_estudantes
+        # para garantir que todos os estudantes apareçam, não apenas os que têm orientações.
 
         # Mostra todas se não há seleção
         if not orientacoes:
@@ -637,13 +662,21 @@ class OrientacoesFrame(ctk.CTkFrame):
         todos_row.pack(fill="x", pady=(0, spacing("xs")), padx=spacing("xs"))
         ctk.CTkLabel(todos_row, text=f"{ICONS['group']}  Todos os estudantes",
                      font=font(size=12, weight="bold"),
-                      text_color=O["accent"]).pack(padx=spacing("md"), pady=spacing("sm"))
+                     text_color=O["accent"]).pack(padx=spacing("md"), pady=spacing("sm"))
         bind_clickable(todos_row, lambda: self._mostrar_orientacoes(self._todas_orientacoes))
 
+        # Usa WidgetBatchBuilder para renderizar os cards de estudante em lotes,
+        # evitando bloqueio da UI com listas grandes.
+        batch = WidgetBatchBuilder(parent=self._scroll_students, batch_size=20)
         for st in estudantes:
-            card = StudentCard(self._scroll_students, st,
-                               on_select=self._selecionar_estudante)
-            card.pack(fill="x", pady=spacing("xs"), padx=spacing("xs"))
+            batch.add(lambda st=st: self._criar_student_card(st))
+        batch.execute()
+
+    def _criar_student_card(self, student: dict):
+        card = StudentCard(self._scroll_students, student,
+                           on_select=self._selecionar_estudante)
+        card.pack(fill="x", pady=spacing("xs"), padx=spacing("xs"))
+        return card
 
     def _filtrar_estudantes(self, _=None):
         termo = self._entry_busca.get().lower() if hasattr(self, "_entry_busca") else ""

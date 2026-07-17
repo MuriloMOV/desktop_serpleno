@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import customtkinter as ctk
+import tkinter as tk
 from tkinter import messagebox, Menu
 import os
 import json

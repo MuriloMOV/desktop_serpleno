@@ -56,6 +56,27 @@ class OrientacaoRepository:
             })
         return resultado
 
+    @with_local_fallback("_local_listar_estudantes")
+    def listar_estudantes(self):
+        """Lista todos os estudantes cadastrados."""
+        query = """
+            SELECT a.id_aluno as id, a.nome as name, a.email as contact
+            FROM aluno a
+            ORDER BY a.nome ASC
+        """
+        return fetch_all(query)
+
+    def _local_listar_estudantes(self):
+        rows = local_cache.list_students()
+        resultado = []
+        for r in rows:
+            resultado.append({
+                "id": r.get("id"),
+                "name": r.get("nome"),
+                "contact": r.get("email"),
+            })
+        return resultado
+
     @with_local_fallback("_local_obter_orientacao")
     def obter_orientacao(self, id_orientacao):
         """Obtem uma orientacao especifica pelo ID."""
