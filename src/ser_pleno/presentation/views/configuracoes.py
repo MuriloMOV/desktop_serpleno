@@ -260,6 +260,7 @@ class FormModal(BaseModal):
                   icon: str = ICONS["lock"]):
         super().__init__(parent, title, width, height, fg_color=THEME["surface"])
         self.withdraw()
+        self._title = title
         self._icon = icon
         self._build()
         self.transient(parent.winfo_toplevel())

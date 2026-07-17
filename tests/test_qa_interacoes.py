@@ -603,14 +603,16 @@ class TestConfiguracoesQA:
     def test_toggle_menu_theme(self, app, controller):
         with patch("ser_pleno.presentation.views.configuracoes.ConfiguracoesController") as MockCtrl:
             view = ConfiguracoesFrame(app, controller)
-            view._toggle_menu("theme")
-            view._toggle_menu("theme")
+            with patch("tkinter.Menu.tk_popup"):
+                view._toggle_menu("theme")
+                view._toggle_menu("theme")
 
     def test_toggle_menu_font(self, app, controller):
         with patch("ser_pleno.presentation.views.configuracoes.ConfiguracoesController") as MockCtrl:
             view = ConfiguracoesFrame(app, controller)
-            view._toggle_menu("font")
-            view._toggle_menu("font")
+            with patch("tkinter.Menu.tk_popup"):
+                view._toggle_menu("font")
+                view._toggle_menu("font")
 
     def test_alterar_senha_modal_campos(self, app, controller):
         with patch("ser_pleno.presentation.views.configuracoes.ConfiguracoesController") as MockCtrl:
@@ -637,9 +639,10 @@ class TestConfiguracoesQA:
     def test_encerrar_sessao(self, app, controller):
         with patch("ser_pleno.presentation.views.configuracoes.ConfiguracoesController") as MockCtrl:
             view = ConfiguracoesFrame(app, controller)
+            app.mostrar_login = MagicMock()
             with patch("tkinter.messagebox.askyesno", return_value=True):
-                with patch.object(view.winfo_toplevel(), "mostrar_login"):
-                    view._encerrar_sessao()
+                view._encerrar_sessao()
+            app.mostrar_login.assert_called_once()
 
 
 class TestBemEstarQA:
@@ -749,6 +752,8 @@ class TestNavigationQA:
 
     def test_show_dashboard(self, app, controller):
         from ser_pleno.presentation.navigation import NavigationManager
+        app.container = ctk.CTkFrame(app)
+        app.container.grid(row=0, column=0, sticky="nsew")
         nav = NavigationManager(app, auth_service=None)
         app.usuario_logado = {"first_name": "Admin", "username": "admin"}
         with patch("ser_pleno.presentation.navigation.ViewFactory") as MockFactory:
@@ -826,8 +831,9 @@ class TestExceptionSafety:
                 def fake_run(task, on_success, on_error, widget_ref):
                     on_error(RuntimeError("falha"))
                 mock_run.side_effect = fake_run
-                view._carregar_dados()
-                assert True
+                with patch("tkinter.messagebox.showerror"):
+                    view._carregar_dados()
+                    assert True
 
 
 class TestCoverageReport:
