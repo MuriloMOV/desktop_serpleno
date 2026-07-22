@@ -622,6 +622,26 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             self._alterar_fonte(value)
         self._select_menu = None
 
+    def _alterar_fonte(self, value: str):
+        """Altera o tamanho de fonte global da aplicação."""
+        try:
+            tamanho = 18 if "Grande" in value else 16
+            ctk.set_widget_scaling(tamanho / 16)
+            logger.info("Fonte alterada para: %s (scaling=%s)", value, tamanho / 16)
+        except Exception as exc:
+            logger.exception("Erro ao alterar fonte: %s", exc)
+
+    def _alterar_tema(self, value: str):
+        """Altera o tema da aplicação."""
+        try:
+            if "Escuro" in value:
+                ctk.set_appearance_mode("dark")
+            else:
+                ctk.set_appearance_mode("light")
+            logger.info("Tema alterado para: %s", value)
+        except Exception as exc:
+            logger.exception("Erro ao alterar tema: %s", exc)
+
     # —— segurança ------------------------------------------------------------
     def _build_seguranca(self, container):
         card = SectionCard(container, ICONS["settings"], "Sessão & Segurança")

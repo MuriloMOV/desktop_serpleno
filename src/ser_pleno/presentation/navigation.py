@@ -16,8 +16,8 @@ from ser_pleno.presentation.view_factory import ViewFactory
 logger = logging.getLogger(__name__)
 
 MENU_ITEMS = [
-    {"key": "dashboard",     "label": "Dashboard",         "icon": ICONS["chart"],
-     "header": ("Dashboard", "Resumo geral do ambiente")},
+    {"key": "dashboard",     "label": "Painel",         "icon": ICONS["chart"],
+     "header": ("Painel", "Resumo geral do ambiente")},
     {"key": "estudantes",    "label": "Estudantes",        "icon": ICONS["users"],
      "header": ("Estudantes", "Acompanhamento e gestao academica")},
     {"key": "agenda",        "label": "Agenda",            "icon": ICONS["calendar"],
@@ -231,7 +231,7 @@ class NavigationManager:
 
         self.app.header_title = ctk.CTkLabel(
             header,
-            text="Dashboard",
+            text="Painel",
             font=font(24, "bold"),
             text_color=THEME["text"],
             anchor="w",

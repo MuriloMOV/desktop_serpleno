@@ -725,6 +725,13 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                       height=38, corner_radius=RADIUS["button"],
         ).pack(pady=(0, SPACING["item_gap"]))
 
+    # Aliases para callbacks da tabela
+    def _ver_detalhe(self, item: dict):
+        self._modal_detalhe(item)
+
+    def _editar(self, item: dict):
+        self._modal_editar_triagem(item)
+
     # Aliases legados
     def criar_cabecalho(self):       pass
     def criar_cards_metricas(self):  pass
