@@ -56,7 +56,7 @@ class PageHeader(ctk.CTkFrame):
         if show_breadcrumb:
             bc = ctk.CTkFrame(inner, fg_color="transparent")
             bc.pack(anchor="w", pady=(0, 6))
-            parts = breadcrumb_parts or ["Home", "Dashboard"]
+            parts = breadcrumb_parts or ["Início", "Painel"]
             for i, part in enumerate(parts):
                 ctk.CTkLabel(bc, text=part, font=themed_font("overline"),
                              text_color=THEME["text_disabled"] if i > 0 else THEME["text_secondary"]

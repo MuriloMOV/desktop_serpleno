@@ -322,7 +322,7 @@ class ProfileModal(BaseModal):
         for label, value in [
             ("Usuário",  self.user_data.get("username", "")),
             ("Função",   "Analista Escolar"),
-            ("Módulos",  "Dashboard, Estudantes, Agenda, Bem-Estar"),
+            ("Módulos",  "Painel, Estudantes, Agenda, Bem-Estar"),
         ]:
             self._row(body, label, value)
 
@@ -809,7 +809,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         entry_nome.insert(0, user.get("first_name", ""))
         entry_nome.pack(fill="x", pady=(0, 10))
 
-        entry_email = ctk.CTkEntry(card, placeholder_text="Email")
+        entry_email = ctk.CTkEntry(card, placeholder_text="E-mail")
         entry_email.insert(0, user.get("email", ""))
         entry_email.pack(fill="x", pady=(0, 10))
 

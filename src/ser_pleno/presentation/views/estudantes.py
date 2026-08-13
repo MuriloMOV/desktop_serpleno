@@ -666,7 +666,7 @@ class EstudantesFrame(ctk.CTkFrame):
         entry_nome.insert(0, st.get("name", ""))
         entry_nome.pack(fill="x", pady=(0, 10))
 
-        entry_email = ctk.CTkEntry(card, placeholder_text="Email")
+        entry_email = ctk.CTkEntry(card, placeholder_text="E-mail")
         entry_email.insert(0, st.get("contact", ""))
         entry_email.pack(fill="x", pady=(0, 10))
 
