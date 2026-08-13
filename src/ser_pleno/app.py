@@ -3,7 +3,11 @@ import sys
 import time
 import threading
 
-_base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if hasattr(sys, "_MEIPASS"):
+    _base_dir = sys._MEIPASS
+else:
+    _base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 _env_path = os.path.join(_base_dir, ".env")
 if os.path.exists(_env_path):
     with open(_env_path, "r", encoding="utf-8") as _f:
@@ -26,15 +30,33 @@ logger = logging.getLogger(__name__)
 from ser_pleno.infrastructure.api.connectivity import atualizar_disponibilidade_api_async
 
 from ser_pleno.ui.theme import (
-    THEME, SPACING, RADIUS, ELEVATION, font, themed_font,
-    get_mode, apply_global_style, toggle_mode, on_theme_change,
+    THEME,
+    SPACING,
+    RADIUS,
+    ELEVATION,
+    font,
+    themed_font,
+    get_mode,
+    apply_global_style,
+    toggle_mode,
+    on_theme_change,
 )
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.presentation.components.ui_components import (
-    PageHeader, SectionHeader, Card, KPICard,
-    PrimaryButton, SecondaryButton, GhostButton,
-    Badge, EmptyState, Divider, blend_color,
-    SkeletonLoader, Tooltip, Avatar,
+    PageHeader,
+    SectionHeader,
+    Card,
+    KPICard,
+    PrimaryButton,
+    SecondaryButton,
+    GhostButton,
+    Badge,
+    EmptyState,
+    Divider,
+    blend_color,
+    SkeletonLoader,
+    Tooltip,
+    Avatar,
 )
 from ser_pleno.presentation.views.login import LoginFrame
 from ser_pleno.presentation.navigation import NavigationManager
@@ -49,11 +71,14 @@ def _global_exception_handler(exc_type, exc_value, exc_traceback):
     logger = logging.getLogger("apps.desktop")
     logger.error("Excecao nao tratada", exc_info=(exc_type, exc_value, exc_traceback))
 
+
 sys.excepthook = _global_exception_handler
+
 
 def _report_callback_exception(self, exc, val, tb):
     logger = logging.getLogger("apps.desktop")
     logger.error("Excecao em callback do CustomTkinter", exc_info=(exc, val, tb))
+
 
 try:
     ctk.CTk.report_callback_exception = _report_callback_exception
@@ -88,6 +113,7 @@ class App(ctk.CTk):
 
         try:
             from ser_pleno.infrastructure.api.sync_service import get_sync_service
+
             sync_service = get_sync_service()
             if sync_service:
                 sync_service.start_background_sync()
@@ -123,7 +149,7 @@ class App(ctk.CTk):
         frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
     # ================= SISTEMA =================
-    def iniciar_sistema(self, user_data, auth_service=None):
+    def iniciar_sistema(self, user_data, auth_service=None, login_start=None):
         self._t_login_fim = time.perf_counter()
         self.usuario_logado = user_data
         self.usuario_logado_id = user_data["id"]
@@ -141,8 +167,9 @@ class App(ctk.CTk):
         self._t_ui_end = time.perf_counter()
         try:
             logger.info(
-                "PERF login_flow_ms=%.1f controllers_ms=%.1f ui_build_ms=%.1f",
+                "PERF login_flow_ms=%.1f auth_ms=%.1f controllers_ms=%.1f ui_build_ms=%.1f",
                 (self._t_login_fim - self._t_boot_fim) * 1000,
+                (self._t_login_fim - login_start) * 1000 if login_start else 0.0,
                 (self._t_controllers_end - self._t_controllers_start) * 1000,
                 (self._t_ui_end - self._t_ui_start) * 1000,
             )

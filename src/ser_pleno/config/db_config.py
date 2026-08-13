@@ -1,3 +1,4 @@
+import logging
 import os
 from contextlib import contextmanager
 from typing import Generator
@@ -5,6 +6,8 @@ from typing import Generator
 import mysql.connector
 from mysql.connector import MySQLConnection
 from mysql.connector.pooling import MySQLConnectionPool
+
+logger = logging.getLogger(__name__)
 
 
 def _env_int(name: str, default: int) -> int:
@@ -37,7 +40,8 @@ def _get_pool() -> MySQLConnectionPool:
                 pool_size=_POOL_SIZE,
                 **DB_CONFIG,
             )
-        except Exception:
+        except Exception as e:
+            logger.error("Falha ao criar pool MySQL: %s", e, exc_info=True)
             _pool = None
     if _pool is None:
         raise RuntimeError("Não foi possível inicializar o pool de conexões MySQL")
