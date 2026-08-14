@@ -78,7 +78,7 @@ class TestAutenticacaoRepository:
         assert result["id"] == 1
 
     @patch("ser_pleno.repositories.autenticacao.execute_non_query")
-    @patch("ser_pleno.repositories.autenticacao.queue_sync")
+    @patch("ser_pleno.infrastructure.api.sync_service.queue_sync")
     def test_atualizar_senha(self, mock_queue_sync, mock_exec):
         mock_exec.return_value = 1
         repo = AutenticacaoRepository()
