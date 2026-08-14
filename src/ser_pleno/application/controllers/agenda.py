@@ -49,3 +49,7 @@ class AgendaController(BaseController):
     def remover_horario_disponibilidade(self, horario):
         """Remove um horário de disponibilidade."""
         return self._service.remover_horario_disponibilidade(horario)
+
+    def listar_agendamentos_mes(self, ano, mes):
+        """Lista agendamentos de um mês específico para o calendário."""
+        return self._service.listar_agendamentos_mes(ano, mes)

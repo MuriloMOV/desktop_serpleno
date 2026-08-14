@@ -8,8 +8,8 @@ from ser_pleno.application.services.estudantes import ServicoEstudante
 class EstudantesController(BaseController):
     """Coordena as requisições da View de Estudantes."""
 
-    def __init__(self):
-        super().__init__(ServicoEstudante)
+    def __init__(self, auth_service=None):
+        super().__init__(ServicoEstudante, auth_service=auth_service)
 
     def get_service(self):
         return self._service

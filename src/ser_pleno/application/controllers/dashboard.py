@@ -3,6 +3,7 @@
 
 from ser_pleno.application.controllers.base import BaseController
 from ser_pleno.application.services.dashboard import ServicoDashboard
+from ser_pleno.application.services.analytics import ServicoAnalytics
 
 
 class DashboardController(BaseController):
@@ -13,6 +14,7 @@ class DashboardController(BaseController):
         self.app = app
         self.usuario_logado = getattr(app, "usuario_logado", None) if app else None
         self.usuario_logado_id = getattr(app, "usuario_logado_id", None) if app else None
+        self._service_analytics = ServicoAnalytics(auth_service=auth_service)
 
     def get_service(self):
         return self._service
@@ -32,6 +34,22 @@ class DashboardController(BaseController):
     def marcar_notificacao_como_lida(self, notificacao_id, tipo="alerta"):
         """Marca uma notificação como lida."""
         self._service.marcar_notificacao_como_lida(notificacao_id, tipo)
+
+    def carregar_mood_timeline(self, student_id: int = None, days: int = 30):
+        """Carrega timeline de humor via SerPleno."""
+        return self._service_analytics.obter_mood_timeline(student_id=student_id, days=days)
+
+    def carregar_wellness_distribution(self):
+        """Carrega distribuição de bem-estar via SerPleno."""
+        return self._service_analytics.obter_wellness_distribution()
+
+    def carregar_risk_overview(self):
+        """Carrega overview de risco via SerPleno."""
+        return self._service_analytics.obter_risk_overview()
+
+    def carregar_engagement_stats(self):
+        """Carrega estatísticas de engajamento via SerPleno."""
+        return self._service_analytics.obter_engagement_stats()
 
     def mostrar_login(self):
         """Abre a tela de login."""

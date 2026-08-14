@@ -10,26 +10,22 @@ class AvisosController(BaseController):
 
     def __init__(self, app=None, auth_service=None):
         super().__init__(ServicoMural, auth_service=auth_service)
+        self.usuario_logado = getattr(app, "usuario_logado", None) if app else None
 
     def get_service(self):
         return self._service
 
-    def listar_mensagens(self):
-        """Lista publicações do mural."""
-        return self._service.listar_mensagens()
+    def listar_mensagens(self, busca=None, pagina=1):
+        return self._service.listar_mensagens(busca=busca, pagina=pagina)
 
     def obter_mensagem(self, mensagem_id):
-        """Obtém uma publicação específica."""
         return self._service.obter_mensagem(mensagem_id)
 
     def criar_mensagem(self, payload):
-        """Cria uma nova publicação."""
         return self._service.criar_mensagem(payload)
 
     def atualizar_mensagem(self, mensagem_id, payload):
-        """Atualiza uma publicação existente."""
         return self._service.atualizar_mensagem(mensagem_id, payload)
 
     def deletar_mensagem(self, mensagem_id):
-        """Deleta uma publicação."""
         return self._service.deletar_mensagem(mensagem_id)

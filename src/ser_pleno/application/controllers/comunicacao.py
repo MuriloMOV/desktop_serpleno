@@ -41,6 +41,10 @@ class ComunicacaoController(BaseController):
         """Envia uma mensagem."""
         return self._service.enviar_mensagem(usuario_id, destinatario_id, texto)
 
+    def enviar_mensagem_arquivo(self, usuario_id, destinatario_id, nome, caminho, categoria=""):
+        """Envia uma mensagem de arquivo."""
+        return self._service.enviar_mensagem_arquivo(usuario_id, destinatario_id, nome, caminho, categoria)
+
     def obter_mensagens_grupo(self):
         """Obtém mensagens do grupo."""
         return self._service.obter_mensagens_grupo()
@@ -56,6 +60,14 @@ class ComunicacaoController(BaseController):
     def marcar_mensagem_lida(self, mensagem_id):
         """Marca uma mensagem como lida."""
         return self._service.marcar_mensagem_lida(mensagem_id)
+
+    def marcar_todas_mensagens_lidas(self, usuario_id):
+        """Marca todas as mensagens como lidas."""
+        return self._service.marcar_todas_mensagens_lidas(usuario_id)
+
+    def excluir_mensagem(self, mensagem_id):
+        """Exclui uma mensagem."""
+        return self._service.excluir_mensagem(mensagem_id)
 
     def contar_mensagens_nao_lidas(self, usuario_id):
         """Conta mensagens não lidas."""

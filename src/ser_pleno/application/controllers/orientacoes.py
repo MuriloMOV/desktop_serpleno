@@ -14,9 +14,9 @@ class OrientacoesController(BaseController):
     def get_service(self):
         return self._service
 
-    def listar_orientacoes(self, id_estudante=None, tema=None, pagina=1):
+    def listar_orientacoes(self, id_estudante=None, tema=None, pagina=1, date_from=None, date_to=None, search=None):
         """Lista orientações com filtros opcionais."""
-        return self._service.listar_orientacoes(id_estudante, tema, pagina)
+        return self._service.listar_orientacoes(id_estudante, tema, pagina, date_from, date_to, search)
 
     def obter_orientacao(self, id_orientacao):
         """Obtém detalhes de uma orientação específica."""
@@ -53,3 +53,15 @@ class OrientacoesController(BaseController):
     def listar_estudantes(self):
         """Lista todos os estudantes cadastrados."""
         return self._service.listar_estudantes()
+
+    def listar_anexos(self, orientation_id):
+        """Lista anexos de uma orientação."""
+        return self._service.listar_anexos(orientation_id)
+
+    def adicionar_anexo(self, orientation_id, arquivo_path, uploaded_by_id):
+        """Adiciona um anexo a uma orientação."""
+        return self._service.adicionar_anexo(orientation_id, arquivo_path, uploaded_by_id)
+
+    def deletar_anexo(self, attachment_id):
+        """Deleta um anexo."""
+        return self._service.deletar_anexo(attachment_id)
