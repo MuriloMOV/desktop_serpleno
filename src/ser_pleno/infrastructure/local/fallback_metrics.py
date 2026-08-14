@@ -12,8 +12,10 @@ from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
+from ser_pleno.config.paths import get_project_root
+
 _METRICS_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    get_project_root(),
     "config",
     "fallback_metrics.json",
 )

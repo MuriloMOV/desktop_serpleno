@@ -11,6 +11,7 @@ O sistema pode alternar entre modos automaticamente baseado na disponibilidade d
 import os
 import json
 import logging
+import threading
 from enum import Enum
 from typing import Optional
 from datetime import datetime
@@ -29,15 +30,12 @@ class OperationMode(Enum):
 class OperationConfig:
     """Gerenciador de configuração de modo de operação"""
     
-    # Arquivo de configuração local
     CONFIG_FILE = os.path.join("config", "operation_config.json")
-    
-    # Configurações padrão
     DEFAULT_CONFIG = {
         "mode": "db_primary",
         "api_base_url": os.getenv("SERPLENO_API_URL", "http://127.0.0.1:8000"),
         "api_timeout": 5,
-        "sync_interval": 300,  # 5 minutos
+        "sync_interval": 300,
         "auto_sync": True,
         "offline_cache_size": 1000,
         "last_sync": None,
@@ -45,12 +43,15 @@ class OperationConfig:
     }
     
     _instance: Optional['OperationConfig'] = None
+    _lock = threading.RLock()
     _config: dict = {}
     
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._config = {}  # Inicializa no __new__ para evitar problemas de tipo
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._config = {}
         return cls._instance
     
     def __init__(self):
@@ -59,7 +60,8 @@ class OperationConfig:
     
     def _get_config_path(self) -> str:
         """Retorna o caminho do arquivo de configuração"""
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        from ser_pleno.config.paths import get_project_root
+        base_dir = get_project_root()
         return os.path.join(base_dir, self.CONFIG_FILE)
     
     def _load_config(self):

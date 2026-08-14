@@ -5,7 +5,9 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+from ser_pleno.config.paths import get_project_root
+
+LOG_DIR = os.path.join(get_project_root(), "logs")
 LOG_FILE = os.path.join(LOG_DIR, "ser_pleno_desktop.log")
 
 os.makedirs(LOG_DIR, exist_ok=True)

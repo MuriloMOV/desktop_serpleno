@@ -3,12 +3,11 @@ import sys
 import time
 import threading
 
-if hasattr(sys, "_MEIPASS"):
-    _base_dir = sys._MEIPASS
-else:
-    _base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from ser_pleno.config.paths import get_project_root
 
-_env_path = os.path.join(_base_dir, ".env")
+base_dir = get_project_root()
+
+_env_path = os.path.join(base_dir, ".env")
 if os.path.exists(_env_path):
     with open(_env_path, "r", encoding="utf-8") as _f:
         for _line in _f:
@@ -82,8 +81,8 @@ def _report_callback_exception(self, exc, val, tb):
 
 try:
     ctk.CTk.report_callback_exception = _report_callback_exception
-except Exception:
-    pass
+except Exception as exc:
+    logger.exception("Falha ao registrar report_callback_exception: %s", exc)
 
 
 class App(ctk.CTk):
@@ -108,8 +107,8 @@ class App(ctk.CTk):
 
         try:
             atualizar_disponibilidade_api_async()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Falha em atualizar_disponibilidade_api_async: %s", exc)
 
         try:
             from ser_pleno.infrastructure.api.sync_service import get_sync_service
@@ -117,8 +116,8 @@ class App(ctk.CTk):
             sync_service = get_sync_service()
             if sync_service:
                 sync_service.start_background_sync()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Falha em start_background_sync: %s", exc)
 
         self.mostrar_login()
         self._t_boot_fim = time.perf_counter()
@@ -127,8 +126,8 @@ class App(ctk.CTk):
                 "PERF boot cold_start_ms=%.1f",
                 (self._t_boot_fim - self._t_boot) * 1000,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Falha ao logar PERF boot cold_start: %s", exc)
 
     def _setup_window(self):
         apply_global_style("light")
@@ -139,8 +138,8 @@ class App(ctk.CTk):
         # Falhas aqui são ignoradas para não quebrar inicialização.
         try:
             self.state("zoomed")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Falha ao aplicar estado maximizado: %s", exc)
 
     # ================= LOGIN =================
     def mostrar_login(self):
@@ -173,8 +172,8 @@ class App(ctk.CTk):
                 (self._t_controllers_end - self._t_controllers_start) * 1000,
                 (self._t_ui_end - self._t_ui_start) * 1000,
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.exception("Falha ao logar PERF login_flow: %s", exc)
 
         self._bootstrap.run_post_login_seed()
 
