@@ -6,6 +6,7 @@ import logging
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font, font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.application.controllers.comunicacao import ComunicacaoController
+from ser_pleno.infrastructure.api.websocket_client import WebSocketChatClient
 from ser_pleno.utils.async_runner import AsyncRunner
 from ser_pleno.ui.components.icons import ICONS, IconButton, IconLabel
 from ser_pleno.presentation.components.ui_components import bind_clickable
@@ -53,7 +54,7 @@ def _make_avatar(parent, initials: str, color: str,
     ctk.CTkLabel(
         av, text=initials[:2],
         font=font(size=size // 3, weight="bold"),
-        text_color="#FFFFFF",
+        text_color=THEME["text_on_primary"],
     ).place(relx=0.5, rely=0.5, anchor="center")
     return av
 
@@ -76,10 +77,13 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.contador_nao_lidas: dict = {}
         self.atualizacao_periodica    = True
         self.usuario_logado_id        = controller.usuario_logado_id
-        self.base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        from ser_pleno.config.paths import get_project_root
+        self.base_path = get_project_root()
         self.img_path  = os.path.join(self.base_path, "..", "imagens")
         self._images: dict = {}
-        self._contact_widgets: dict = {}   # id → frame widget
+        self._contact_widgets: dict = {}
+        self._ws_client: WebSocketChatClient | None = None
+        self._ws_connected = False
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -96,9 +100,90 @@ class ComunicacaoFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••••••
     def _on_destroy(self, _=None):
         self.atualizacao_periodica = False
+        self._disconnect_ws()
 
-    def on_destroy(self, event):          # alias legado
+    def on_destroy(self, event):
         self._on_destroy(event)
+
+    # ••••••••••••••••••••••••••••••••••••••••••
+    #  WebSocket
+    # ••••••••••••••••••••••••••••••••••••••••••
+    def _get_ws_base_url(self) -> str:
+        try:
+            from ser_pleno.infrastructure.api.api import ClienteAPI
+            api = ClienteAPI()
+            return api.base_url
+        except Exception as exc:
+            logger.debug("Falha ao obter base_url da API: %s", exc)
+            return "http://localhost:8000"
+
+    def _connect_ws(self):
+        if self._ws_client and self._ws_client.is_connected():
+            return
+        base_url = self._get_ws_base_url()
+        self._ws_client = WebSocketChatClient(base_url=base_url)
+        self._ws_client.on("message", self._on_ws_message)
+        self._ws_client.on("open", self._on_ws_open)
+        self._ws_client.on("close", self._on_ws_close)
+        self._ws_client.on("error", self._on_ws_error)
+        if self.conversa_ativa and self.conversa_ativa.get("role") != "group":
+            target_id = self.conversa_ativa.get("id")
+            if target_id is not None:
+                self._ws_client.connect(self.usuario_logado_id, target_id)
+
+    def _connect_ws_group(self):
+        if self._ws_client and self._ws_client.is_connected():
+            self._disconnect_ws()
+        base_url = self._get_ws_base_url()
+        self._ws_client = WebSocketChatClient(base_url=base_url)
+        self._ws_client.on("message", self._on_ws_message)
+        self._ws_client.on("open", self._on_ws_open)
+        self._ws_client.on("close", self._on_ws_close)
+        self._ws_client.on("error", self._on_ws_error)
+        self._ws_client.connect_group(self.usuario_logado_id)
+
+    def _disconnect_ws(self) -> None:
+        if self._ws_client:
+            try:
+                self._ws_client.disconnect()
+            except Exception as exc:
+                logger.debug("Falha ao desconectar WebSocket: %s", exc)
+            self._ws_client = None
+            self._ws_connected = False
+
+    def _on_ws_open(self):
+        self._ws_connected = True
+        if hasattr(self, "lbl_chat_status"):
+            self.lbl_chat_status.configure(text="Online (WebSocket)")
+
+    def _on_ws_close(self):
+        self._ws_connected = False
+        if hasattr(self, "lbl_chat_status"):
+            self.lbl_chat_status.configure(text="Reconectando...")
+
+    def _on_ws_error(self, exc):
+        self._ws_connected = False
+        if hasattr(self, "lbl_chat_status"):
+            self.lbl_chat_status.configure(text="Erro na conexão")
+
+    def _on_ws_message(self, msg: dict) -> None:
+        try:
+            if not self.winfo_exists():
+                return
+            self.after(0, lambda: self._processar_mensagem_ws(msg))
+        except Exception as exc:
+            logger.debug("Falha em _on_ws_message: %s", exc)
+
+    def _processar_mensagem_ws(self, msg: dict):
+        if not self.winfo_exists():
+            return
+        try:
+            self.mensagens.append(msg)
+            self.atualizar_area_mensagens()
+            self.carregar_contador_nao_lidas()
+            self.atualizar_lista_contatos()
+        except Exception as e:
+            logger.error("Erro ao processar mensagem WebSocket: %s", e)
 
     # ••••••••••••••••••••••••••••••••••••••••••
     #  Imagens
@@ -114,12 +199,13 @@ class ComunicacaoFrame(ctk.CTkFrame):
         ]
         for path in candidates:
             if path and os.path.exists(path):
-                try:
-                    img = ctk.CTkImage(light_image=Image.open(path), size=size)
-                    self._images[key] = img
-                    return img
-                except Exception as e:
-                    logger.error("Erro ao carregar imagem %s: %s", name, e)
+                def _load(p=path, s=size):
+                    from PIL import Image
+                    return ctk.CTkImage(light_image=Image.open(p), size=s)
+                def _on_ready(img, k=key):
+                    self._images[k] = img
+                AsyncRunner.run(task=_load, on_success=_on_ready, widget_ref=self)
+                return None
         return None
 
     def get_avatar_por_papel(self, papel: str) -> str:
@@ -163,9 +249,18 @@ class ComunicacaoFrame(ctk.CTkFrame):
             command=self._nova_conversa,
         ).pack(side="right")
 
+        # Botão marcar todas como lidas
+        IconButton(
+            hdr, icon=ICONS["check"], size=34,
+            fg_color=THEME["primary_soft"],
+            hover_color=THEME["primary_hover"],
+            text_color=THEME["primary"],
+            command=self.marcar_todas_mensagens_lidas,
+        ).pack(side="right", padx=(0, spacing("xs")))
+
         # —— Campo de busca ——————————————————————————————————————————
         search_wrap = ctk.CTkFrame(
-            sidebar, fg_color="#F3F4F6",
+            sidebar, fg_color=THEME["bg_alt"],
             corner_radius=10,
         )
         search_wrap.grid(row=1, column=0, sticky="ew", padx=spacing("md"), pady=(0, spacing("item_gap")))
@@ -178,8 +273,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.entry_busca = ctk.CTkEntry(
             search_wrap,
             placeholder_text="Buscar conversas...",
-            fg_color="#F3F4F6",
-            border_width=0,
+            fg_color=THEME["bg_alt"], border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
             font=font(size=13),
@@ -196,8 +290,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.scroll_contacts = ctk.CTkScrollableFrame(
             sidebar,
             fg_color="transparent",
-            scrollbar_button_color="#D1D5DB",
-            scrollbar_button_hover_color="#9CA3AF",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.scroll_contacts.grid(row=2, column=0, sticky="nsew")
 
@@ -340,7 +434,6 @@ class ComunicacaoFrame(ctk.CTkFrame):
             w.destroy()
 
     def selecionar_conversa(self, contato: dict, item_widget=None):
-        # Limpa seleção anterior
         for w in self.scroll_contacts.winfo_children():
             if hasattr(w, "contato_data"):
                 w.configure(fg_color="transparent")
@@ -350,21 +443,24 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.conversa_ativa = contato
         self.conversa_atual = contato
 
-        # Atualiza header do chat
         nome  = contato["name"]
         papel = contato["role"]
         sub   = "Grupo de comunicação" if papel == "group" else papel.capitalize()
 
         self.lbl_chat_nome.configure(text=nome)
-        self.lbl_chat_status.configure(text=sub)
+        self.lbl_chat_status.configure(text="Conectando..." if not self._ws_connected else "Online (WebSocket)")
 
-        # Atualiza avatar no header
         av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
         av_init  = nome[:2].upper() if papel != "group" else ICONS["group"]
         for w in self._header_av_slot.winfo_children():
             w.destroy()
         av = _make_avatar(self._header_av_slot, av_init, av_color, size=42)
         av.pack(expand=True)
+
+        if papel == "group":
+            self._connect_ws_group()
+        else:
+            self._connect_ws()
 
         self.carregar_mensagens()
 
@@ -452,8 +548,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.msg_area = ctk.CTkScrollableFrame(
             parent,
             fg_color="transparent",
-            scrollbar_button_color="#D1D5DB",
-            scrollbar_button_hover_color="#9CA3AF",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.msg_area.grid(row=1, column=0, sticky="nsew", padx=spacing("lg"), pady=spacing("md"))
 
@@ -476,7 +572,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
         # Caixa de input
         box = ctk.CTkFrame(
             inner,
-            fg_color="#F9FAFB",
+            fg_color=THEME["input_bg"],
             corner_radius=14,
             border_width=1,
             border_color=THEME["input_border"],
@@ -497,7 +593,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.entry_mensagem = ctk.CTkEntry(
             box,
             placeholder_text="Digite sua mensagem...",
-            fg_color="#F9FAFB",
+            fg_color=THEME["input_bg"],
             border_width=0,
             text_color=THEME["text"],
             placeholder_text_color=THEME["text_muted"],
@@ -522,7 +618,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
             box, icon=ICONS["send_plane"], size=40,
             fg_color=THEME["primary"],
             hover_color=THEME["primary_hover"],
-            text_color="#FFFFFF",
+            text_color=THEME["text_on_primary"],
             command=self.enviar_mensagem,
         )
         self.btn_enviar.pack(side="right", padx=(4, 8))
@@ -721,7 +817,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
         try:
             ts  = datetime.datetime.fromisoformat(msg["timestamp"].replace("Z", "+00:00"))
             time_str = ts.strftime("%H:%M")
-        except Exception:
+        except Exception as exc:
+            logger.debug("Falha ao formatar timestamp da mensagem: %s", exc)
             time_str = ""
 
         ctk.CTkLabel(
@@ -736,6 +833,13 @@ class ComunicacaoFrame(ctk.CTkFrame):
                 font=font(size=10),
                 text_color=THEME["primary"] if msg.get("read") else THEME["text_muted"],
             ).pack(side="left")
+
+        # Menu de contexto (right-click)
+        def _abrir_menu(event):
+            self._abrir_menu_contexto_mensagem(event, msg, bubble)
+
+        bubble.bind("<Button-3>", _abrir_menu)
+        wrapper.bind("<Button-3>", _abrir_menu)
 
     def _criar_mensagem_arquivo(self, bubble, msg: dict, txt_color: str):
         nome   = os.path.basename(msg["caminho_arquivo"])
@@ -800,10 +904,19 @@ class ComunicacaoFrame(ctk.CTkFrame):
             return
         try:
             if self.conversa_ativa["role"] == "group":
+                if self._ws_client and self._ws_client.is_connected():
+                    self._ws_client.send({"type": "group_message", "text": txt, "sender_id": self.usuario_logado_id})
                 res = self.controller_comunicacao.enviar_mensagem_grupo_texto(
                     self.usuario_logado_id, txt
                 )
             else:
+                if self._ws_client and self._ws_client.is_connected():
+                    self._ws_client.send({
+                        "type": "private_message",
+                        "text": txt,
+                        "sender_id": self.usuario_logado_id,
+                        "recipient_id": self.conversa_ativa["id"],
+                    })
                 res = self.controller_comunicacao.enviar_mensagem(
                     self.usuario_logado_id, self.conversa_ativa["id"], txt
                 )
@@ -842,7 +955,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
                     self.usuario_logado_id, nome, caminho, categoria
                 )
             else:
-                res = self.controller_comunicacao.enviar_mensagem(
+                res = self.controller_comunicacao.enviar_mensagem_arquivo(
                     self.usuario_logado_id, self.conversa_ativa["id"],
                     nome, caminho, categoria
                 )
@@ -918,6 +1031,121 @@ class ComunicacaoFrame(ctk.CTkFrame):
                 self.contador_nao_lidas = data["data"]
         except Exception as e:
             logger.error("Erro ao carregar contador: %s", e)
+
+    def marcar_todas_mensagens_lidas(self):
+        try:
+            res = self.controller_comunicacao.marcar_todas_mensagens_lidas(
+                self.usuario_logado_id
+            )
+            if res["success"]:
+                self.carregar_contador_nao_lidas()
+                self.atualizar_lista_contatos()
+                if self.conversa_atual:
+                    self.carregar_mensagens()
+        except Exception as e:
+            logger.error("Erro ao marcar todas como lidas: %s", e)
+
+    def excluir_mensagem(self, mensagem_id: int):
+        try:
+            res = self.controller_comunicacao.excluir_mensagem(mensagem_id)
+            if res["success"]:
+                self.carregar_mensagens()
+                self.carregar_contador_nao_lidas()
+                self.atualizar_lista_contatos()
+        except Exception as e:
+            logger.error("Erro ao excluir mensagem: %s", e)
+
+    def _abrir_menu_contexto_mensagem(self, event, msg: dict, bubble_widget):
+        menu = ctk.CTkFrame(self, fg_color=THEME["surface"], corner_radius=8, border_width=1, border_color=THEME["border"])
+        x = event.x_root - self.winfo_rootx()
+        y = event.y_root - self.winfo_rooty()
+        menu.place(x=x, y=y)
+        menu.lift()
+        menu.grab_set()
+
+        def fechar_menu():
+            menu.grab_release()
+            menu.destroy()
+
+        opcoes = []
+        if not msg.get("read"):
+            opcoes.append(("Marcar como lida", lambda: self._marcar_mensagem_lida_individual(msg, fechar_menu)))
+        opcoes.append(("Excluir", lambda: self._confirmar_exclusao_mensagem(msg, fechar_menu)))
+
+        for texto, cmd in opcoes:
+            btn = ctk.CTkButton(
+                menu, text=texto,
+                font=font(size=12),
+                fg_color="transparent",
+                hover_color=THEME["primary_soft"],
+                text_color=THEME["text"],
+                anchor="w",
+                command=cmd,
+            )
+            btn.pack(fill="x", padx=spacing("sm"), pady=spacing("xs"))
+
+        menu.bind("<FocusOut>", lambda e: fechar_menu())
+        menu.focus_set()
+
+    def _marcar_mensagem_lida_individual(self, msg: dict, fechar_menu):
+        try:
+            self.controller_comunicacao.marcar_mensagem_lida(msg["id"])
+            self.carregar_mensagens()
+            self.carregar_contador_nao_lidas()
+            self.atualizar_lista_contatos()
+        except Exception as e:
+            logger.error("Erro ao marcar mensagem como lida: %s", e)
+        finally:
+            fechar_menu()
+
+    def _confirmar_exclusao_mensagem(self, msg: dict, fechar_menu):
+        fechar_menu()
+        confirmacao = ctk.CTkFrame(self, fg_color=THEME["surface"], corner_radius=12, border_width=1, border_color=THEME["border"])
+        confirmacao.place(relx=0.5, rely=0.5, anchor="center")
+        confirmacao.lift()
+
+        ctk.CTkLabel(
+            confirmacao, text="Excluir mensagem?",
+            font=font(size=14, weight="bold"),
+            text_color=THEME["text"],
+        ).pack(padx=spacing("lg"), pady=(spacing("lg"), spacing("item_gap")))
+
+        ctk.CTkLabel(
+            confirmacao, text="Esta ação não pode ser desfeita.",
+            font=font(size=12),
+            text_color=THEME["text_secondary"],
+        ).pack(padx=spacing("lg"), pady=(0, spacing("md")))
+
+        botoes = ctk.CTkFrame(confirmacao, fg_color="transparent")
+        botoes.pack(padx=spacing("lg"), pady=(0, spacing("lg")), fill="x")
+
+        def confirmar():
+            confirmacao.destroy()
+            self.excluir_mensagem(msg["id"])
+
+        def cancelar():
+            confirmacao.destroy()
+
+        ctk.CTkButton(
+            botoes, text="Cancelar",
+            font=font(size=12),
+            fg_color=THEME["bg_alt"],
+            hover_color=THEME["primary_soft"],
+            text_color=THEME["text"],
+            command=cancelar,
+        ).pack(side="left", fill="x", expand=True, padx=(0, spacing("xs")))
+
+        ctk.CTkButton(
+            botoes, text="Excluir",
+            font=font(size=12, weight="bold"),
+            fg_color=THEME["danger"],
+            hover_color="#DC2626",
+            text_color=THEME["text_on_primary"],
+            command=confirmar,
+        ).pack(side="left", fill="x", expand=True, padx=(spacing("xs"), 0))
+
+        confirmacao.bind("<FocusOut>", lambda e: confirmacao.destroy())
+        confirmacao.focus_set()
 
     def atualizar_lista_contatos(self):
         """Atualiza badges de não-lidas sem redesenhar a lista inteira."""

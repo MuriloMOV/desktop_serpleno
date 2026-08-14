@@ -1,7 +1,7 @@
 import logging
 import customtkinter as ctk
 from ser_pleno.presentation.components.ui_components import (
-    Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal
+    Card, EmptyState, PrimaryButton, Divider, KPICard, bind_clickable, BaseModal, Toast
 )
 from ser_pleno.ui.components.icons import IconLabel, ICONS
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
@@ -108,6 +108,50 @@ class _AlertaRow(ctk.CTkFrame):
             font=themed_font("caption", "bold"),
             text_color=THEME["danger"],
         ).pack(padx=spacing("sm"), pady=spacing("xs"))
+
+
+class _RecenteRow(ctk.CTkFrame):
+    """Linha de atendimento recente."""
+    def __init__(self, parent, appt: dict):
+        super().__init__(
+            parent,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        self._build(appt)
+
+    def _build(self, appt):
+        ctk.CTkFrame(
+            self, width=spacing("xs"), corner_radius=2, fg_color=THEME["success"],
+        ).pack(side="left", fill="y", padx=(spacing("sm"), spacing("md")), pady=spacing("md"))
+
+        info = ctk.CTkFrame(self, fg_color="transparent")
+        info.pack(side="left", pady=spacing("md"), fill="x", expand=True)
+
+        ctk.CTkLabel(
+            info, text=appt.get("student_name", "?"),
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            info, text=appt.get("curso", ""),
+            font=themed_font("caption"),
+            text_color=THEME["text_secondary"], anchor="w",
+        ).pack(anchor="w", pady=(spacing("xs"), 0))
+
+        # Hora
+        time_frame = ctk.CTkFrame(
+            self, fg_color=THEME["success_soft"],
+            corner_radius=RADIUS["button"],
+        )
+        time_frame.pack(side="right", padx=spacing("md"), pady=spacing("md"))
+        ctk.CTkLabel(
+            time_frame,
+            text=f"{ICONS['check']}  {appt.get('time', '')}",
+            font=themed_font("body", "bold"),
+            text_color=THEME["success"],
+        ).pack(padx=spacing("md"), pady=spacing("sm"))
 
 
 class _BemEstarBar(ctk.CTkFrame):
@@ -388,10 +432,35 @@ class DashboardFrame(ctk.CTkScrollableFrame):
 
         def on_success(data):
             self._atualizar_dashboard(data)
+            self._carregar_dados_serpleno()
 
         def on_error(exc):
-            import tkinter.messagebox as mb
-            mb.showerror("Erro", f"Não foi possível carregar o dashboard.\n{exc}")
+            self._show_error(f"Não foi possível carregar o dashboard.\n{exc}")
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _carregar_dados_serpleno(self):
+        def fetch():
+            mood = self.controller_dashboard.carregar_mood_timeline()
+            wellness = self.controller_dashboard.carregar_wellness_distribution()
+            risk = self.controller_dashboard.carregar_risk_overview()
+            engagement = self.controller_dashboard.carregar_engagement_stats()
+            return mood, wellness, risk, engagement
+
+        def on_success(result):
+            mood, wellness, risk, engagement = result
+            self._atualizar_secao_humor_serpleno(mood)
+            self._atualizar_secao_bem_estar_serpleno(wellness)
+            self._atualizar_secao_risco(risk)
+            self._atualizar_secao_engajamento(engagement)
+
+        def on_error(exc):
+            logger.debug("Dados SerPleno não disponíveis: %s", exc)
 
         AsyncRunner.run(
             task=fetch,
@@ -404,6 +473,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         self._render_kpis(data)
         self._atualizar_secao_agenda(data)
         self._atualizar_secao_alertas(data)
+        self._atualizar_secao_atendimentos_recentes(data)
         self._atualizar_secao_bem_estar(data)
         self._atualizar_secao_humor(data)
         # Atualiza badges de forma não-bloqueante
@@ -460,6 +530,43 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             text_color="white",
         ).place(relx=0.5, rely=0.5, anchor="center")
 
+    def _criar_quick_actions(self):
+        bar = ctk.CTkFrame(self, fg_color="transparent")
+        bar.pack(fill="x", padx=SPACING["page_x"], pady=(0, SPACING["section_gap"]))
+
+        actions = [
+            ("Novo Agendamento", ICONS["calendar"], self._quick_novo_agendamento),
+            ("Nova Triagem", ICONS["document"], self._quick_nova_triagem),
+            ("Enviar Mensagem", ICONS["send"], self._quick_enviar_mensagem),
+            ("Ver Alertas", ICONS["bell"], self._abrir_notificacoes_alertas),
+        ]
+
+        for text, icon, command in actions:
+            btn = PrimaryButton(
+                bar, text=f"{icon}  {text}" if icon else text,
+                command=command, height=36, width=160,
+                text_color="white",
+            )
+            btn.pack(side="left", padx=(0, spacing("sm")))
+
+    def _quick_novo_agendamento(self):
+        try:
+            self.controller.app.mostrar_tela("agenda")
+        except Exception as e:
+            self._show_error(f"Não foi possível abrir a agenda.\n{e}")
+
+    def _quick_nova_triagem(self):
+        try:
+            self.controller.app.mostrar_tela("triagem")
+        except Exception as e:
+            self._show_error(f"Não foi possível abrir a triagem.\n{e}")
+
+    def _quick_enviar_mensagem(self):
+        try:
+            self.controller.app.mostrar_tela("comunicacao")
+        except Exception as e:
+            self._show_error(f"Não foi possível abrir a comunicação.\n{e}")
+
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(
             parent, corner_radius=9, fg_color=THEME["danger"],
@@ -482,11 +589,13 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     def _mostrar_skeletons(self):
         self._limpar(self.kpi_frame)
         self._kpi_cards = []
-        for i in range(5):
-            self.kpi_frame.grid_columnconfigure(i, weight=1)
+        for i in range(7):
+            row = 0 if i < 4 else 1
+            col = i if i < 4 else i - 4
+            self.kpi_frame.grid_columnconfigure(col, weight=1)
             EmptyState(
                 self.kpi_frame, icon="", title="",
-            ).grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
+            ).grid(row=row, column=col, sticky="ew", padx=SPACING["grid_gap"] // 2)
 
     def _render_kpis(self, data):
         media_humor = data.get("media_humor")
@@ -499,8 +608,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
              ICONS["calendar"], THEME["kpi_green"],  THEME["kpi_green_soft"], "Horários livres"),
             ("Alertas Ativos",    str(data.get("alerts", 0)),
              ICONS["bell"], THEME["kpi_red"],    THEME["kpi_red_soft"],   "Requerem atenção"),
+            ("Estudantes em Atenção", str(len(data.get("attention_students", []))),
+             ICONS["priority_high"], THEME["kpi_amber"], THEME["kpi_amber_soft"], "Requerem acompanhamento"),
             ("Total de Estudantes", str(data.get("total_students", 0)),
              ICONS["group"], THEME["kpi_violet"], THEME["kpi_violet_soft"],"Alunos cadastrados"),
+            ("Triagens Pendentes", str(data.get("screenings_pending", 0)),
+             ICONS["document"], THEME["kpi_pink"],  THEME["kpi_pink_soft"],  "Aguardando avaliação"),
             ("Humor Médio",
              f"{media_humor:.1f}/5" if media_humor else "—",
              humor_emoji, THEME["kpi_amber"], THEME["kpi_amber_soft"], "Média dos últimos 30 dias"),
@@ -509,12 +622,14 @@ class DashboardFrame(ctk.CTkScrollableFrame):
         if not getattr(self, "_kpi_cards", None):
             self._kpi_cards = []
             for i, (title, value, icon, accent, soft, sub) in enumerate(kpis):
-                self.kpi_frame.grid_columnconfigure(i, weight=1)
+                row = 0 if i < 4 else 1
+                col = i if i < 4 else i - 4
+                self.kpi_frame.grid_columnconfigure(col, weight=1)
                 card = KPICard(
                     self.kpi_frame, title=title, value=value, icon=icon,
-                     accent=accent, trend="", unit="", size="wide",
+                    accent=accent, trend="", unit="", size="wide",
                 )
-                card.grid(row=0, column=i, sticky="ew", padx=SPACING["grid_gap"] // 2)
+                card.grid(row=row, column=col, sticky="ew", padx=SPACING["grid_gap"] // 2)
                 self._kpi_cards.append(card)
         else:
             for card, (title, value, icon, accent, soft, sub) in zip(self._kpi_cards, kpis):
@@ -524,6 +639,8 @@ class DashboardFrame(ctk.CTkScrollableFrame):
     #  Grid principal
     # ——————————————————————————————————————————————————————————————————————
     def _criar_grid_principal(self):
+        self._criar_quick_actions()
+
         grid = ctk.CTkFrame(self, fg_color="transparent")
         grid.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=SPACING["section_gap"])
 
@@ -621,6 +738,52 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                 subtitle="Nenhum estudante em alerta",
             ).pack(pady=10)
 
+    def _atualizar_secao_atendimentos_recentes(self, data):
+        card = getattr(self, "_recent_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(
+                self.right_col, title=f"{ICONS['check']}  Atendimentos Recentes",
+            )
+            card.pack(fill="x", pady=(0, 14))
+            self._recent_card = card
+        else:
+            self._limpar(card.body)
+
+        appointments = data.get("recent_appointments", [])
+        if appointments:
+            batch = WidgetBatchBuilder(parent=self, batch_size=20)
+            for appt in appointments:
+                batch.add(lambda a=appt: _RecenteRow(card.body, a).pack(fill="x", pady=3))
+            batch.execute()
+        else:
+            EmptyState(
+                card.body, icon=ICONS["clock"],
+                title="Sem atendimentos recentes",
+                subtitle="Nenhum atendimento concluído ainda",
+            ).pack(pady=10)
+
+    def _atualizar_secao_humor(self, data):
+        humor_history = data.get("humor_history", [])
+        self._pending_humor_history = humor_history if humor_history else None
+        self._schedule_draw_chart()
+
+    def _atualizar_secao_humor_serpleno(self, mood_data):
+        if not mood_data or not mood_data.get("success"):
+            return
+        data = mood_data.get("data", {})
+        timeline = data.get("timeline", []) if isinstance(data, dict) else list(data)
+        if not timeline:
+            return
+        history = [
+            {
+                "data": item.get("date", ""),
+                "media_humor": item.get("average", 0),
+            }
+            for item in timeline
+        ]
+        self._pending_humor_history = history
+        self._schedule_draw_chart()
+
     def _atualizar_secao_bem_estar(self, data):
         card = getattr(self, "_bem_estar_card", None)
         if card is None or not card.winfo_exists():
@@ -643,10 +806,129 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             ))
         batch.execute()
 
-    def _atualizar_secao_humor(self, data):
-        humor_history = data.get("humor_history", [])
-        self._pending_humor_history = humor_history if humor_history else None
-        self._schedule_draw_chart()
+    def _atualizar_secao_bem_estar_serpleno(self, wellness_data):
+        if not wellness_data or not wellness_data.get("success"):
+            return
+        data = wellness_data.get("data", {})
+        card = getattr(self, "_bem_estar_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(self.left_col, title=f"{ICONS['heart']}  Bem-Estar por Dimensão")
+            card.pack(fill="x", pady=(0, 14))
+            self._bem_estar_card = card
+        else:
+            self._limpar(card.body)
+
+        academico = data.get("academico", 0)
+        emocional = data.get("emocional", 0)
+        social = data.get("social", 0)
+        dims = [
+            (f"{ICONS['chart']} Acadêmico", academico / 100.0, THEME["primary"], THEME["primary_soft"]),
+            (f"{ICONS['chat']}  Emocional",  emocional / 100.0, "#EC4899", "#FCE7F3"),
+            (f"{ICONS['group']}  Social",    social / 100.0, THEME["success"], THEME["success_soft"]),
+        ]
+        batch = WidgetBatchBuilder(parent=self, batch_size=10)
+        for nome, val, color, soft in dims:
+            batch.add(lambda n=nome, v=val, c=color, s=soft: _BemEstarBar(card.body, n, v, c, s).pack(
+                fill="x", padx=spacing("xs"), pady=spacing("md")
+            ))
+        batch.execute()
+
+    def _atualizar_secao_risco(self, risk_data):
+        if not risk_data or not risk_data.get("success"):
+            return
+        data = risk_data.get("data", {})
+        groups = data.get("groups", {})
+        counts = data.get("counts", {})
+
+        card = getattr(self, "_risk_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(self.right_col, title=f"{ICONS['priority_high']}  Visão de Risco")
+            card.pack(fill="x", pady=(0, 14))
+            self._risk_card = card
+        else:
+            self._limpar(card.body)
+
+        risk_configs = [
+            ("critical", "Crítico", THEME["danger"], THEME["danger_soft"]),
+            ("high",     "Alto",    THEME["warning"], THEME["warning_soft"]),
+            ("medium",   "Médio",   THEME["kpi_amber"], THEME["kpi_amber_soft"]),
+            ("low",      "Normal",  THEME["success"], THEME["success_soft"]),
+        ]
+        grid = ctk.CTkFrame(card.body, fg_color="transparent")
+        grid.pack(fill="x", pady=spacing("sm"))
+        for i in range(4):
+            grid.grid_columnconfigure(i, weight=1)
+
+        for col, (level, label, color, soft) in enumerate(risk_configs):
+            students = groups.get(level, [])
+            count = counts.get(level, 0)
+            chip = ctk.CTkFrame(card.body, fg_color=soft, corner_radius=RADIUS["pill"])
+            chip.pack(side="top", pady=(0, spacing("xs")))
+            ctk.CTkLabel(
+                chip,
+                text=f"{label}: {count}",
+                font=themed_font("caption", "bold"),
+                text_color=color,
+            ).pack(padx=spacing("sm"), pady=spacing("xs"))
+
+            if students:
+                batch = WidgetBatchBuilder(parent=self, batch_size=5)
+                for s in students[:5]:
+                    batch.add(lambda s=s: self._criar_risk_student_row(card.body, s, color))
+                batch.execute()
+
+    def _criar_risk_student_row(self, parent, student: dict, color: str):
+        row = ctk.CTkFrame(parent, fg_color=THEME["bg_alt"], corner_radius=RADIUS["md"])
+        row.pack(fill="x", pady=spacing("xs"))
+        ctk.CTkLabel(
+            row, text=student.get("name", "?"),
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).pack(side="left", padx=spacing("sm"), pady=spacing("xs"))
+        if student.get("reasons"):
+            ctk.CTkLabel(
+                row, text=student["reasons"][0],
+                font=themed_font("caption"),
+                text_color=color, anchor="w",
+            ).pack(side="right", padx=spacing("sm"), pady=spacing("xs"))
+
+    def _atualizar_secao_engajamento(self, engagement_data):
+        if not engagement_data or not engagement_data.get("success"):
+            return
+        data = engagement_data.get("data", {})
+
+        card = getattr(self, "_engagement_card", None)
+        if card is None or not card.winfo_exists():
+            card = Card(self.right_col, title=f"{ICONS['group']}  Engajamento SerPleno")
+            card.pack(fill="x", pady=(0, 14))
+            self._engagement_card = card
+        else:
+            self._limpar(card.body)
+
+        stats = [
+            ("Alunos Ativos",       str(data.get("alunos_ativos", 0)),      THEME["primary"]),
+            ("Registros de Humor",  str(data.get("registros_humor", 0)),    THEME["kpi_amber"]),
+            ("Autoavaliações",      str(data.get("autoavaliacoes", 0)),     THEME["success"]),
+            ("Check-ins",           str(data.get("check_ins", 0)),          THEME["kpi_violet"]),
+        ]
+        grid = ctk.CTkFrame(card.body, fg_color="transparent")
+        grid.pack(fill="x", pady=spacing("sm"))
+        for i in range(4):
+            grid.grid_columnconfigure(i, weight=1)
+
+        for col, (label, value, accent) in enumerate(stats):
+            frame = ctk.CTkFrame(grid, fg_color=THEME["bg_alt"], corner_radius=RADIUS["lg"])
+            frame.grid(row=0, column=col, sticky="ew", padx=SPACING["grid_gap"] // 2, pady=(0, spacing("xs")))
+            ctk.CTkLabel(
+                frame, text=value,
+                font=themed_font("h2", "bold"),
+                text_color=accent,
+            ).pack(pady=(spacing("sm"), 0))
+            ctk.CTkLabel(
+                frame, text=label,
+                font=themed_font("caption"),
+                text_color=THEME["text_secondary"],
+            ).pack(pady=(0, spacing("sm")))
 
     # ——————————————————————————————————————————————————————————————————————
     #  Gráfico canvas
@@ -742,7 +1024,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                    THEME["dot_mid"] if v < 3.5 else THEME["dot_good"])
             self.canvas.create_oval(
                 x - 4, y - 4, x + 4, y + 4,
-                fill=dot, outline="#FFFFFF", width=2,
+                fill=dot, outline=THEME["surface"], width=2,
             )
 
         # Labels X (datas)
@@ -824,7 +1106,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             email = entry_email.get().strip()
             senha = entry_senha.get().strip()
             if not nome or not email:
-                messagebox.showerror("Erro", "Nome e email são obrigatórios.", parent=modal)
+                self._show_error("Nome e email são obrigatórios.")
                 return
             try:
                 user["first_name"] = nome
@@ -834,12 +1116,12 @@ class DashboardFrame(ctk.CTkScrollableFrame):
                     auth_controller = AutenticacaoController()
                     res = auth_controller.alterar_senha(user.get("password", ""), senha)
                     if not res.get("success"):
-                        messagebox.showerror("Erro", res.get("message", "Falha ao alterar senha."), parent=modal)
+                        self._show_error(res.get("message", "Falha ao alterar senha."))
                         return
-                messagebox.showinfo("Sucesso", "Perfil atualizado.", parent=modal)
+                self._show_success("Perfil atualizado.")
                 modal.destroy()
             except Exception as e:
-                messagebox.showerror("Erro", f"Falha ao atualizar perfil.\n{e}", parent=modal)
+                self._show_error(f"Falha ao atualizar perfil.\n{e}")
 
         ctk.CTkButton(footer, text="Cancelar", command=modal.destroy,
                       width=110, height=36, corner_radius=10,
@@ -903,7 +1185,7 @@ class DashboardFrame(ctk.CTkScrollableFrame):
             self._atualizar_badge_notificacoes()
         except Exception as e:
             logger.error("Erro ao marcar todas como lidas: %s", e)
-            messagebox.showerror("Erro", f"Erro ao marcar notificações como lidas:\n{e}", parent=self.winfo_toplevel())
+            self._show_error(f"Erro ao marcar notificações como lidas:\n{e}")
 
     # ——————————————————————————————————————————————————————————————————————
     #  Utilitários

@@ -1,6 +1,7 @@
 import logging
+import os
+import shutil
 import customtkinter as ctk
-from tkinter import messagebox
 from datetime import datetime
 from typing import Any
 
@@ -10,30 +11,29 @@ from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.ui.components.icons import ICONS, IconLabel
-from ser_pleno.presentation.components.ui_components import bind_clickable, Avatar, Divider
-from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.views.base import _ErrorModal
+from ser_pleno.presentation.components.ui_components import (
+    bind_clickable, Avatar, Divider, BaseModal, EmptyState, Toast, Card,
+)
 
 logger = logging.getLogger("apps.desktop")
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  Design tokens —” herdando do THEME global
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 O = extend_theme(THEME, {
     "card_radius":  RADIUS["card"],
     "card_bg":      THEME["surface"],
     "card_border":  THEME["border"],
     "danger_hover": "#B91C1C",
-    "text_light":   "#9CA3AF",
-    "input_border": "#E5E7EB",
+    "text_light":   THEME["text_muted"],
+    "input_border": THEME["border"],
     "input_error":  THEME["danger"],
     "input_error_soft": THEME["danger_soft"],
-    "sidebar_bg":   "#FFFFFF",
-    "sidebar_border": "#E5E7EB",
-    "student_bg":   "#FAFAFA",
-    "student_hover": "#F3F4F6",
-    "student_active": "#E5E7EB",
+    "sidebar_bg":   THEME["surface"],
+    "sidebar_border": THEME["border"],
+    "student_bg":   THEME["bg_alt"],
+    "student_hover": THEME["primary_soft"],
+    "student_active": THEME["primary_soft"],
     "av_colors": [
         "#4F46E5", "#7C3AED", "#059669",
         "#D97706", "#DC2626", "#0891B2",
@@ -51,9 +51,6 @@ O = extend_theme(THEME, {
 _TEMA_DEFAULT = ("#4F46E5", "#EEF2FF")
 
 
-# ——————————————————————————————————————————————————————————————————————————————
-#  Helpers
-# ——————————————————————————————————————————————————————————————————————————————
 def _chip(parent, text: str, tema: str) -> ctk.CTkFrame:
     color, soft = O["temas"].get(tema, _TEMA_DEFAULT)
     f = ctk.CTkFrame(parent, fg_color=soft, corner_radius=RADIUS["sm"])
@@ -65,9 +62,6 @@ def _chip(parent, text: str, tema: str) -> ctk.CTkFrame:
     return f
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  FormField
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class FormField(ctk.CTkFrame):
     def __init__(self, parent, label: str, placeholder: str = "",
                  icon: str = "", password: bool = False,
@@ -102,14 +96,15 @@ class FormField(ctk.CTkFrame):
                 fg_color=O["input_bg"], border_width=0,
                 button_color=O["accent"],
                 button_hover_color=O["accent_hover"],
-                dropdown_fg_color="#FFFFFF",
+                dropdown_fg_color=THEME["surface"],
                 dropdown_text_color=O["text"],
                 font=font(size=13),
                 height=height or 38,
             )
-            if initial: self.widget.set(initial)
-            self.widget.grid(row=0, column=col, columnspan=2-col,
-                             sticky="ew", padx=(8 if col==0 else 4, 8), pady=4)
+            if initial:
+                self.widget.set(initial)
+            self.widget.grid(row=0, column=col, columnspan=2 - col,
+                             sticky="ew", padx=(8 if col == 0 else 4, 8), pady=4)
         elif multiline:
             self.widget = ctk.CTkTextbox(
                 self._box, height=height or 100,
@@ -117,9 +112,10 @@ class FormField(ctk.CTkFrame):
                 font=font(size=13),
                 corner_radius=0, text_color=O["text"],
             )
-            if initial: self.widget.insert("1.0", initial)
-            self.widget.grid(row=0, column=col, columnspan=2-col,
-                             sticky="nsew", padx=(8 if col==0 else 4, 8), pady=4)
+            if initial:
+                self.widget.insert("1.0", initial)
+            self.widget.grid(row=0, column=col, columnspan=2 - col,
+                             sticky="nsew", padx=(8 if col == 0 else 4, 8), pady=4)
         else:
             self.widget = ctk.CTkEntry(
                 self._box,
@@ -131,9 +127,10 @@ class FormField(ctk.CTkFrame):
                 height=height or 40,
                 show="●" if password else "",
             )
-            if initial: self.widget.insert(0, initial)
-            self.widget.grid(row=0, column=col, columnspan=2-col,
-                             sticky="ew", padx=(8 if col==0 else 4, 8), pady=4)
+            if initial:
+                self.widget.insert(0, initial)
+            self.widget.grid(row=0, column=col, columnspan=2 - col,
+                             sticky="ew", padx=(8 if col == 0 else 4, 8), pady=4)
 
         self.widget.bind("<FocusIn>",  self._on_focus_in)
         self.widget.bind("<FocusOut>", self._on_focus_out)
@@ -169,7 +166,7 @@ class FormField(ctk.CTkFrame):
         self._label.configure(text_color=O["text_muted"])
 
     def _on_focus_in(self, _=None):
-        self._box.configure(border_color=O["input_focus"], fg_color="#FFFFFF")
+        self._box.configure(border_color=O["input_focus"], fg_color=THEME["surface"])
         self._label.configure(text_color=O["accent"])
 
     def _on_focus_out(self, _=None):
@@ -177,9 +174,6 @@ class FormField(ctk.CTkFrame):
         self._label.configure(text_color=O["text_muted"])
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  StudentCard —“ item da lista lateral
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class StudentCard(ctk.CTkFrame):
     def __init__(self, parent, student: dict[str, Any], on_select):
         super().__init__(parent, fg_color=O["student_bg"],
@@ -190,8 +184,8 @@ class StudentCard(ctk.CTkFrame):
         self._build()
 
     def _build(self):
-        nome    = self._student.get("name", "N/A")
-        course  = self._student.get("course", "Sem curso")
+        nome     = self._student.get("name", "N/A")
+        course   = self._student.get("course", "Sem curso")
         av_color = get_avatar_color(nome)
 
         inner = ctk.CTkFrame(self, fg_color="transparent")
@@ -209,9 +203,9 @@ class StudentCard(ctk.CTkFrame):
                      font=font(size=11),
                      text_color=O["text_muted"], anchor="w").grid(row=1, column=1, sticky="w")
 
-        self.bind("<Enter>",    lambda e: self.configure(fg_color=O["student_hover"])
+        self.bind("<Enter>", lambda e: self.configure(fg_color=O["student_hover"])
                                 if not self._selected else None)
-        self.bind("<Leave>",    lambda e: self.configure(
+        self.bind("<Leave>", lambda e: self.configure(
             fg_color=O["student_active"] if self._selected else O["student_bg"]))
         bind_clickable(self, lambda: self._on_select(self._student, self))
 
@@ -220,38 +214,32 @@ class StudentCard(ctk.CTkFrame):
         self.configure(fg_color=O["student_active"] if selected else O["student_bg"])
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  OrientationHistoryCard —“ card de orientação no histórico
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class OrientationHistoryCard(ctk.CTkFrame):
     def __init__(self, parent, orientation: dict[str, Any],
                  on_view, on_edit, on_duplicate, on_delete):
         super().__init__(parent, fg_color=O["card_bg"],
                          corner_radius=O["card_radius"],
                          border_width=1, border_color=O["card_border"])
-        self._o          = orientation
-        self._on_view    = on_view
-        self._on_edit    = on_edit
+        self._o           = orientation
+        self._on_view     = on_view
+        self._on_edit     = on_edit
         self._on_duplicate = on_duplicate
-        self._on_delete  = on_delete
+        self._on_delete   = on_delete
         self._build()
 
     def _build(self):
-        tema  = self._o.get("theme", "Geral")
+        tema   = self._o.get("theme", "Geral")
         color, soft = O["temas"].get(tema, _TEMA_DEFAULT)
 
-        # Barra lateral colorida pelo tema
         ctk.CTkFrame(self, width=4, corner_radius=0,
                      fg_color=color).pack(side="left", fill="y")
 
         body = ctk.CTkFrame(self, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=spacing("md"), pady=spacing("md"))
 
-        # —— Topo: círculo de data + info + ações —————————————————————————————
         top = ctk.CTkFrame(body, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
 
-        # Círculo com o dia
         date_str = self._o.get("session_date", "")
         day_txt  = "?"
         if date_str:
@@ -269,7 +257,6 @@ class OrientationHistoryCard(ctk.CTkFrame):
                      font=font(size=17, weight="bold"),
                      text_color=color).place(relx=0.5, rely=0.5, anchor="center")
 
-        # Título + tema chip
         meta = ctk.CTkFrame(top, fg_color="transparent")
         meta.pack(side="left", fill="x", expand=True)
 
@@ -281,7 +268,6 @@ class OrientationHistoryCard(ctk.CTkFrame):
         chip = _chip(meta, tema, tema)
         chip.pack(anchor="w", pady=(4, 0))
 
-        # Ações à direita
         acts = ctk.CTkFrame(top, fg_color="transparent")
         acts.pack(side="right", anchor="n")
 
@@ -289,8 +275,8 @@ class OrientationHistoryCard(ctk.CTkFrame):
             (f"{ICONS['view']}  Ver",      lambda: self._on_view(self._o),
              O["accent_soft"], O["accent"]),
             (f"{ICONS['cross']}  Editar",   lambda: self._on_edit(self._o),
-             O["accent"],     "#FFFFFF"),
-            (f"{ICONS['duplicate']}  Duplicar", lambda: self._on_duplicate(self._o.get("id")),
+             O["accent"],     THEME["text_on_primary"]),
+            (f"{ICONS['duplicate']}  Dup.",  lambda: self._on_duplicate(self._o.get("id")),
              O["divider"],    O["text_muted"]),
             (f"{ICONS['delete']}  Excluir",  lambda: self._on_delete(self._o.get("id")),
              O["danger_soft"], O["danger"]),
@@ -302,7 +288,6 @@ class OrientationHistoryCard(ctk.CTkFrame):
                           font=font(size=11, weight="bold")).pack(
                 side="left", padx=(0, 4))
 
-        # —— Prévia do conteúdo ———————————————————————————————————————————————
         content = self._o.get("content", "")
         if content:
             Divider(body)
@@ -314,22 +299,24 @@ class OrientationHistoryCard(ctk.CTkFrame):
                 anchor="w", pady=(8, 0), fill="x")
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  OrientacoesFrame —“ frame principal
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class OrientacoesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         import time as _time
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=O["page_bg"])
-        self.controller          = controller
-        self.controller_orientacoes = OrientacoesController(auth_service=getattr(controller, 'auth_service', None))
+        self.controller           = controller
+        self.controller_orientacoes = OrientacoesController(
+            auth_service=getattr(controller, 'auth_service', None))
         self._selected_student: dict | None = None
         self._selected_card: StudentCard | None = None
         self._orientacao_editando_id: int | None = None
+        self._anexos_selecionados: list[dict] = []
+        self._anexos_existentes_ids: list[int] = []
         self._todos_estudantes: list[dict] = []
         self._todas_orientacoes: list[dict] = []
         self._por_estudante: dict = {}
+        self._action_plan_itens: list[dict] = []
+        self._toast = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -339,15 +326,6 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._carregar_estudantes()
         log_view_init_ms("orientacoes", self._t0, widget_ref=self)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  CABEÇALHO
-    # ••••••••••••••••••••••••••••••••••••••••••
-    def _criar_cabecalho(self):
-        raise NotImplementedError
-
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  LAYOUT: sidebar + painel
-    # ••••••••••••••••••••••••••••••••••••••••••
     def _criar_conteudo(self):
         wrap = ctk.CTkFrame(self, fg_color="transparent")
         wrap.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("lg"))
@@ -358,7 +336,20 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._criar_sidebar_estudantes(wrap)
         self._criar_painel_principal(wrap)
 
-    # —— Sidebar de estudantes ————————————————————————————————————————————————
+    def _show_error(self, message: str, title: str = "Nao foi possivel concluir") -> None:
+        try:
+            _ErrorModal(self.winfo_toplevel(), message=message, title=title)
+        except Exception:
+            pass
+
+    def _show_success(self, message: str, duration: int = 3000) -> None:
+        try:
+            if hasattr(self, "_toast") and self._toast and self._toast.winfo_exists():
+                self._toast.destroy()
+            self._toast = Toast(self.winfo_toplevel(), message=message, status="success", duration=duration)
+        except Exception:
+            pass
+
     def _criar_sidebar_estudantes(self, parent):
         sidebar = ctk.CTkFrame(parent, fg_color=O["sidebar_bg"],
                                 corner_radius=O["card_radius"],
@@ -367,15 +358,13 @@ class OrientacoesFrame(ctk.CTkFrame):
         sidebar.grid_rowconfigure(2, weight=1)
         sidebar.grid_columnconfigure(0, weight=1)
 
-        # Título
         hdr = ctk.CTkFrame(sidebar, fg_color="transparent")
         hdr.grid(row=0, column=0, sticky="ew", padx=spacing("md"), pady=(spacing("md"), spacing("item_gap")))
         ctk.CTkLabel(hdr, text="Estudantes",
                      font=font(size=13, weight="bold"),
                      text_color=O["text"]).pack(side="left")
 
-        # Busca
-        search_wrap = ctk.CTkFrame(sidebar, fg_color="#F3F4F6", corner_radius=10)
+        search_wrap = ctk.CTkFrame(sidebar, fg_color=THEME["bg_alt"], corner_radius=10)
         search_wrap.grid(row=1, column=0, sticky="ew", padx=spacing("sm"), pady=(0, spacing("item_gap")))
 
         ctk.CTkLabel(search_wrap, text=ICONS["search"],
@@ -385,9 +374,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._entry_busca = ctk.CTkEntry(
             search_wrap,
             placeholder_text="Buscar estudante...",
-            fg_color="#F3F4F6", border_width=0,
-            text_color=O["text"],
-            placeholder_text_color=O["text_light"],
+            fg_color=THEME["bg_alt"], border_width=0,
+            text_color=THEME["text"],
+            placeholder_text_color=THEME["text_muted"],
             font=font(size=13), height=36,
         )
         self._entry_busca.pack(side="left", fill="x", expand=True, padx=(4, 8))
@@ -396,15 +385,13 @@ class OrientacoesFrame(ctk.CTkFrame):
         ctk.CTkFrame(sidebar, height=1, fg_color=O["divider"]).grid(
             row=1, column=0, sticky="sew", padx=0, pady=(42, 0))
 
-        # Lista
         self._scroll_students = ctk.CTkScrollableFrame(
             sidebar, fg_color="transparent",
-            scrollbar_button_color="#D1D5DB",
-            scrollbar_button_hover_color="#9CA3AF",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
         )
         self._scroll_students.grid(row=2, column=0, sticky="nsew")
 
-        # Placeholder de carregamento
         self._students_placeholder = ctk.CTkLabel(
             self._scroll_students,
             text="Carregando estudantes...",
@@ -413,35 +400,36 @@ class OrientacoesFrame(ctk.CTkFrame):
         )
         self._students_placeholder.pack(pady=20)
 
-    # —— Painel principal —————————————————————————————————————————————————————
     def _criar_painel_principal(self, parent):
         self._painel = ctk.CTkFrame(parent, fg_color="transparent")
         self._painel.grid(row=0, column=1, sticky="nsew")
         self._painel.grid_rowconfigure(1, weight=1)
         self._painel.grid_columnconfigure(0, weight=1)
 
-        # Barra de tabs
         self._tab_bar = ctk.CTkFrame(self._painel, fg_color="transparent")
         self._tab_bar.grid(row=0, column=0, sticky="ew", pady=(0, 8))
 
         self._tab_ativo = "historico"
         self._tab_btns: dict[str, ctk.CTkButton] = {}
 
-        for key, label in [(ICONS["chart"], f"{ICONS['chart']}  Histórico"),
-                           ("nova",      " +  Nova Orientação")]:
+        for key, label in [
+            ("historico",    f"{ICONS['chart']}  Histórico"),
+            ("nova",         f"{ICONS['cross']}  Nova Orientação"),
+            ("estatisticas", f"{ICONS['chart']}  Estatísticas"),
+            ("filtros",      f"{ICONS['search']}  Filtros"),
+        ]:
             btn = ctk.CTkButton(
                 self._tab_bar, text=label,
                 command=lambda k=key: self._mudar_tab(k),
                 height=36, width=170, corner_radius=10,
                 font=font(size=12, weight="bold"),
-                fg_color=O["accent"]      if key == "historico" else O["accent_soft"],
-                hover_color=O["accent_hover"],
-                text_color="#FFFFFF"      if key == "historico" else O["accent"],
-            )
+            fg_color=O["accent"]      if key == "historico" else O["accent_soft"],
+            hover_color=O["accent_hover"],
+            text_color=THEME["text_on_primary"]      if key == "historico" else O["accent"],
+        )
             btn.pack(side="left", padx=(0, 8))
             self._tab_btns[key] = btn
 
-        # Área de conteúdo das tabs
         self._area_historico = ctk.CTkScrollableFrame(
             self._painel, fg_color="transparent",
             scrollbar_button_color="#C7D2FE",
@@ -452,9 +440,18 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._area_nova.grid(row=1, column=0, sticky="nsew")
         self._area_nova.grid_remove()
 
-        self._construir_form_nova(self._area_nova)
+        self._area_estatisticas = ctk.CTkFrame(self._painel, fg_color="transparent")
+        self._area_estatisticas.grid(row=1, column=0, sticky="nsew")
+        self._area_estatisticas.grid_remove()
 
-        # Placeholder inicial
+        self._area_filtros = ctk.CTkFrame(self._painel, fg_color="transparent")
+        self._area_filtros.grid(row=1, column=0, sticky="nsew")
+        self._area_filtros.grid_remove()
+
+        self._construir_form_nova(self._area_nova)
+        self._construir_area_estatisticas(self._area_estatisticas)
+        self._construir_area_filtros(self._area_filtros)
+
         self._hist_placeholder = ctk.CTkLabel(
             self._area_historico,
             text="Selecione um estudante para ver as orientações",
@@ -469,23 +466,29 @@ class OrientacoesFrame(ctk.CTkFrame):
             ativo = k == key
             btn.configure(
                 fg_color=O["accent"]      if ativo else O["accent_soft"],
-                text_color="#FFFFFF"      if ativo else O["accent"],
+                text_color=THEME["text_on_primary"]      if ativo else O["accent"],
             )
-        if key == "historico":
-            self._area_nova.grid_remove()
-            self._area_historico.grid()
-        else:
-            self._area_historico.grid_remove()
-            self._area_nova.grid()
+        self._area_nova.grid_remove()
+        self._area_historico.grid_remove()
+        self._area_estatisticas.grid_remove()
+        self._area_filtros.grid_remove()
 
-    # —— Formulário de nova orientação ————————————————————————————————————————
+        if key == "historico":
+            self._area_historico.grid()
+        elif key == "nova":
+            self._area_nova.grid()
+        elif key == "estatisticas":
+            self._area_estatisticas.grid()
+            self._carregar_estatisticas()
+        elif key == "filtros":
+            self._area_filtros.grid()
+
     def _construir_form_nova(self, parent):
         card = ctk.CTkFrame(parent, fg_color=O["card_bg"],
                             corner_radius=O["card_radius"],
                             border_width=1, border_color=O["card_border"])
         card.pack(fill="both", expand=True)
 
-        # Banner
         banner = ctk.CTkFrame(card, fg_color=O["accent_soft"],
                               corner_radius=0, height=56)
         banner.pack(fill="x"); banner.pack_propagate(False)
@@ -506,8 +509,27 @@ class OrientacoesFrame(ctk.CTkFrame):
                      text_color=O["text_muted"]).pack(anchor="w")
 
         body = ctk.CTkScrollableFrame(card, fg_color="transparent",
-                                       scrollbar_button_color="#D1D5DB")
+                                       scrollbar_button_color=THEME["border_strong"])
         body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
+
+        self._badge_estudante = ctk.CTkFrame(body, fg_color=O["input_bg"],
+                                              corner_radius=10,
+                                              border_width=1, border_color=O["input_border"])
+        self._badge_estudante.pack(fill="x", pady=(0, 10))
+        self._badge_estudante_content = ctk.CTkFrame(self._badge_estudante, fg_color="transparent")
+        self._badge_estudante_content.pack(fill="x", padx=spacing("md"), pady=spacing("sm"))
+        self._atualizar_badge_estudante()
+
+        templates_row = ctk.CTkFrame(body, fg_color="transparent")
+        templates_row.pack(fill="x", pady=(0, 10))
+        ctk.CTkLabel(templates_row, text=f"{ICONS['file_text']}  Modelos Rápidos:",
+                     font=font(size=12), text_color=O["text_muted"], anchor="w").pack(side="left")
+        ctk.CTkButton(templates_row, text="Selecionar Modelo",
+                      command=self._abrir_dialogo_templates,
+                      height=30, width=160, corner_radius=8,
+                      fg_color=O["accent_soft"], hover_color=O["accent"],
+                      text_color=O["accent"],
+                      font=font(size=11, weight="bold")).pack(side="right")
 
         self.f_titulo = FormField(body, f"{ICONS['chart']}Título", placeholder="Título da orientação")
         self.f_titulo.pack(fill="x", pady=(0, 10))
@@ -522,8 +544,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         row.grid_columnconfigure((0, 1), weight=1)
 
         self.f_tema = FormField(row, f"{ICONS['pin']}  Tema",
-                                 values=["Acadêmico","Emocional","Social",
-                                         "Familiar","Vocacional","Geral"],
+                                 values=["Acadêmico", "Emocional", "Social",
+                                         "Familiar", "Vocacional", "Geral"],
                                  initial="Geral")
         self.f_tema.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
@@ -531,7 +553,11 @@ class OrientacoesFrame(ctk.CTkFrame):
                                  placeholder="YYYY-MM-DD", icon=ICONS["calendar"])
         self.f_data.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
-        self.f_encaminhamento = FormField(body, f"{ICONS['search']}—  Encaminhamento",
+        self.f_mensagem = FormField(body, f"{ICONS['heart']}  Mensagem Motivacional",
+                                     placeholder="Mensagem de apoio ao estudante...")
+        self.f_mensagem.pack(fill="x", pady=(0, 10))
+
+        self.f_encaminhamento = FormField(body, f"{ICONS['search']}  Encaminhamento",
                                            placeholder="Serviço ou profissional indicado")
         self.f_encaminhamento.pack(fill="x", pady=(0, 10))
 
@@ -539,13 +565,35 @@ class OrientacoesFrame(ctk.CTkFrame):
                                 multiline=True, height=70)
         self.f_obs.pack(fill="x", pady=(0, 10))
 
-        # Rodapé
+        self._anexos_frame = ctk.CTkFrame(body, fg_color="transparent")
+        self._anexos_frame.pack(fill="x", pady=(0, 10))
+
+        anexos_header = ctk.CTkFrame(self._anexos_frame, fg_color="transparent")
+        anexos_header.pack(fill="x")
+        ctk.CTkLabel(anexos_header, text=f"{ICONS['attach']}  Anexos",
+                     font=font(size=12), text_color=O["text_muted"], anchor="w").pack(side="left")
+        ctk.CTkButton(anexos_header, text="Adicionar Anexo",
+                      command=self._adicionar_anexo,
+                      height=30, width=140, corner_radius=8,
+                      fg_color=O["accent_soft"], hover_color=O["accent"],
+                      text_color=O["accent"],
+                      font=font(size=11, weight="bold")).pack(side="right")
+
+        self._anexos_lista = ctk.CTkScrollableFrame(self._anexos_frame, fg_color="transparent",
+                                                     height=100, scrollbar_button_color=THEME["border_strong"])
+        self._anexos_lista.pack(fill="x", pady=(4, 0))
+
+        self._criar_secao_plano_acao(body)
+
         ctk.CTkFrame(card, height=1, fg_color=O["divider"]).pack(fill="x")
         footer = ctk.CTkFrame(card, fg_color="transparent", height=58)
         footer.pack(fill="x", padx=spacing("xl")); footer.pack_propagate(False)
 
         def _cancelar():
             self._orientacao_editando_id = None
+            self._anexos_existentes_ids.clear()
+            self._anexos_selecionados.clear()
+            self._action_plan_itens.clear()
             self._mudar_tab("historico")
 
         ctk.CTkButton(footer, text="Cancelar",
@@ -563,9 +611,394 @@ class OrientacoesFrame(ctk.CTkFrame):
                       text_color="white",
                       font=font(size=13, weight="bold")).pack(side="right", pady=spacing("md"))
 
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  Dados
-    # ••••••••••••••••••••••••••••••••••••••••••
+    def _criar_secao_plano_acao(self, parent):
+        frame = ctk.CTkFrame(parent, fg_color="transparent")
+        frame.pack(fill="x", pady=(0, 10))
+
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(header, text=f"{ICONS['check_circle']}  Plano de Ação",
+                     font=font(size=12, weight="bold"),
+                     text_color=O["text"], anchor="w").pack(side="left")
+
+        self._action_plan_frame = ctk.CTkScrollableFrame(frame, fg_color="transparent",
+                                                           height=120, scrollbar_button_color=THEME["border_strong"])
+        self._action_plan_frame.pack(fill="x", pady=(0, 4))
+
+        self._action_plan_var = ctk.StringVar(value="")
+        ap_entry_row = ctk.CTkFrame(frame, fg_color="transparent")
+        ap_entry_row.pack(fill="x")
+        self._ap_entry = ctk.CTkEntry(
+            ap_entry_row, textvariable=self._action_plan_var,
+            placeholder_text="Nova tarefa do plano de ação...",
+            fg_color=O["input_bg"], border_width=1, border_color=O["input_border"],
+            text_color=O["text"], font=font(size=12), height=34,
+        )
+        self._ap_entry.pack(side="left", fill="x", expand=True, padx=(0, 6))
+        self._ap_entry.bind("<Return>", lambda e: self._adicionar_item_plano_acao())
+
+        ctk.CTkButton(ap_entry_row, text="Adicionar",
+                      command=self._adicionar_item_plano_acao,
+                      height=34, width=90, corner_radius=8,
+                      fg_color=O["accent_soft"], hover_color=O["accent"],
+                      text_color=O["accent"],
+                      font=font(size=11, weight="bold")).pack(side="right")
+
+    def _adicionar_item_plano_acao(self, texto: str = "", done: bool = False):
+        txt = texto.strip() or self._action_plan_var.get().strip()
+        if not txt:
+            return
+        self._action_plan_var.set("")
+        item: dict = {"text": txt, "done": done}
+        self._action_plan_itens.append(item)
+        self._renderizar_plano_acao()
+
+    def _remover_item_plano_acao(self, index: int):
+        if 0 <= index < len(self._action_plan_itens):
+            self._action_plan_itens.pop(index)
+            self._renderizar_plano_acao()
+
+    def _toggle_item_plano_acao(self, index: int):
+        if 0 <= index < len(self._action_plan_itens):
+            self._action_plan_itens[index]["done"] = not self._action_plan_itens[index]["done"]
+            self._renderizar_plano_acao()
+
+    def _renderizar_plano_acao(self):
+        for w in self._action_plan_frame.winfo_children():
+            w.destroy()
+        if not self._action_plan_itens:
+            ctk.CTkLabel(self._action_plan_frame,
+                         text="Nenhuma tarefa adicionada",
+                         font=font(size=11), text_color=O["text_light"]).pack(pady=8, anchor="w")
+            return
+        for i, item in enumerate(self._action_plan_itens):
+            row = ctk.CTkFrame(self._action_plan_frame, fg_color=O["input_bg"],
+                               corner_radius=8, border_width=1, border_color=O["input_border"])
+            row.pack(fill="x", pady=2)
+
+            cb = ctk.CTkCheckBox(row, text="",
+                                 command=lambda idx=i: self._toggle_item_plano_acao(idx),
+                                 fg_color=O["accent"], hover_color=O["accent_hover"],
+                                 border_color=O["input_border"],
+                                 width=24)
+            if item.get("done"):
+                cb.select()
+            cb.pack(side="left", padx=(8, 4), pady=4)
+
+            text_c = O["text"] if not item.get("done") else O["text_muted"]
+            weight_c = "bold" if not item.get("done") else "normal"
+            lbl = ctk.CTkLabel(row, text=item.get("text", ""),
+                               font=font(size=12, weight=weight_c),
+                               text_color=text_c,
+                               anchor="w")
+            lbl.pack(side="left", fill="x", expand=True, padx=(4, 4), pady=4)
+
+            ctk.CTkButton(row, text=ICONS["close"],
+                          width=24, height=24, corner_radius=6,
+                          fg_color="transparent", hover_color=O["danger_soft"],
+                          text_color=O["danger"], font=font(size=12),
+                          command=lambda idx=i: self._remover_item_plano_acao(idx)
+                          ).pack(side="right", padx=(0, 6))
+
+    def _atualizar_badge_estudante(self):
+        for w in self._badge_estudante_content.winfo_children():
+            w.destroy()
+        if not self._selected_student:
+            ctk.CTkLabel(self._badge_estudante_content,
+                         text=f"{ICONS['users']}  Nenhum estudante selecionado",
+                         font=font(size=12), text_color=O["text_muted"]).pack(anchor="w")
+            return
+        nome   = self._selected_student.get("name", "N/A")
+        course = self._selected_student.get("course", "")
+        av_color = get_avatar_color(nome)
+        row = ctk.CTkFrame(self._badge_estudante_content, fg_color="transparent")
+        row.pack(fill="x")
+        av = Avatar(row, initials=nome[:2], size=28, color=av_color)
+        av.pack(side="left", padx=(0, 8))
+        info = ctk.CTkFrame(row, fg_color="transparent")
+        info.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(info, text=nome, font=font(size=12, weight="bold"),
+                     text_color=O["text"], anchor="w").pack(anchor="w")
+        if course:
+            ctk.CTkLabel(info, text=course, font=font(size=10),
+                         text_color=O["text_muted"], anchor="w").pack(anchor="w")
+        ctk.CTkButton(row, text="Limpar",
+                      command=self._limpar_selecao_estudante,
+                      height=26, width=60, corner_radius=8,
+                      fg_color="transparent", hover_color=O["danger_soft"],
+                      text_color=O["danger"], font=font(size=10, weight="bold")).pack(side="right")
+
+    def _limpar_selecao_estudante(self):
+        if self._selected_card:
+            self._selected_card.set_selected(False)
+        self._selected_card    = None
+        self._selected_student = None
+        self._atualizar_badge_estudante()
+        self._mostrar_orientacoes(self._todas_orientacoes)
+
+    def _construir_area_estatisticas(self, parent):
+        card = ctk.CTkFrame(parent, fg_color=O["card_bg"],
+                            corner_radius=O["card_radius"],
+                            border_width=1, border_color=O["card_border"])
+        card.pack(fill="both", expand=True)
+
+        banner = ctk.CTkFrame(card, fg_color=O["accent_soft"],
+                              corner_radius=0, height=56)
+        banner.pack(fill="x"); banner.pack_propagate(False)
+        bi = ctk.CTkFrame(banner, fg_color="transparent")
+        bi.pack(fill="both", expand=True, padx=spacing("xl"))
+        ctk.CTkLabel(bi, text=f"{ICONS['chart']}  Estatísticas de Orientações",
+                     font=font(size=13, weight="bold"),
+                     text_color=O["accent"]).pack(side="left")
+
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
+
+        self._stats_total_frame = ctk.CTkFrame(body, fg_color=O["accent_soft"],
+                                                corner_radius=12)
+        self._stats_total_frame.pack(fill="x", pady=(0, 12))
+        self._stats_total_label = ctk.CTkLabel(self._stats_total_frame,
+                                               text="Carregando estatísticas...",
+                                               font=font(size=18, weight="bold"),
+                                               text_color=O["accent"])
+        self._stats_total_label.pack(padx=spacing("xl"), pady=spacing("md"))
+
+        row_charts = ctk.CTkFrame(body, fg_color="transparent")
+        row_charts.pack(fill="both", expand=True)
+        row_charts.grid_columnconfigure((0, 1), weight=1)
+
+        tema_frame = ctk.CTkFrame(row_charts, fg_color=O["input_bg"],
+                                   corner_radius=12, border_width=1, border_color=O["input_border"])
+        tema_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+        ctk.CTkLabel(tema_frame, text="Por Tema",
+                     font=font(size=12, weight="bold"),
+                     text_color=O["text"]).pack(anchor="w", padx=spacing("md"), pady=(spacing("md"), 4))
+        self._stats_tema_canvas = ctk.CTkCanvas(tema_frame, height=200, bg=O["card_bg"],
+                                                 highlightthickness=0)
+        self._stats_tema_canvas.pack(fill="both", expand=True, padx=spacing("md"), pady=(0, spacing("md")))
+
+        mes_frame = ctk.CTkFrame(row_charts, fg_color=O["input_bg"],
+                                  corner_radius=12, border_width=1, border_color=O["input_border"])
+        mes_frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        ctk.CTkLabel(mes_frame, text="Por Mês (últimos 12)",
+                     font=font(size=12, weight="bold"),
+                     text_color=O["text"]).pack(anchor="w", padx=spacing("md"), pady=(spacing("md"), 4))
+        self._stats_mes_canvas = ctk.CTkCanvas(mes_frame, height=200, bg=O["card_bg"],
+                                                highlightthickness=0)
+        self._stats_mes_canvas.pack(fill="both", expand=True, padx=spacing("md"), pady=(0, spacing("md")))
+
+    def _carregar_estatisticas(self):
+        if not hasattr(self, "_stats_total_label"):
+            return
+        aluno_id = (self._selected_student.get("id")
+                    if self._selected_student else None)
+
+        def fetch():
+            return self.controller_orientacoes.obter_estatisticas(aluno_id)
+
+        def on_success(resultado):
+            if not self.winfo_exists():
+                return
+            data      = resultado.get("data") if isinstance(resultado, dict) else {}
+            total     = data.get("total", 0)
+            by_theme  = data.get("by_theme", [])
+            by_month  = data.get("by_month", [])
+            self._stats_total_label.configure(
+                text=f"Total de Orientações: {total}")
+            self._desenhar_grafico_tema(by_theme)
+            self._desenhar_grafico_mes(by_month)
+
+        def on_error(exc):
+            logger.error("Erro ao carregar estatísticas: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
+
+    def _desenhar_grafico_tema(self, dados: list[dict]):
+        canvas = self._stats_tema_canvas
+        canvas.delete("all")
+        cw = canvas.winfo_width()
+        ch = canvas.winfo_height()
+        if cw < 80 or ch < 80:
+            canvas.after(100, lambda: self._desenhar_grafico_tema(dados))
+            return
+
+        if not dados:
+            canvas.create_text(cw // 2, ch // 2, text="Sem dados",
+                               font=(THEME.get("font_family", "Segoe UI"), 11),
+                               fill=O["text_light"])
+            return
+
+        top = sorted(dados, key=lambda x: x.get("count", 0), reverse=True)[:6]
+        max_count = max((x.get("count", 0) for x in top), default=1)
+        margin_x  = 80
+        margin_y  = 16
+        bar_h     = max(10, (ch - 2 * margin_y) // len(top) - 8)
+        palette   = list(O["temas"].values())
+        chart_w   = cw - margin_x - 20
+
+        for i, item in enumerate(top):
+            count  = item.get("count", 0)
+            theme  = item.get("theme", "?")
+            color  = O["temas"].get(theme, _TEMA_DEFAULT)[0]
+            bar_w  = max(4, (count / max_count) * chart_w)
+            y      = margin_y + i * (bar_h + 8)
+
+            canvas.create_text(margin_x - 8, y + bar_h // 2, text=theme[:10],
+                               font=(THEME.get("font_family", "Segoe UI"), 9),
+                               fill=O["text_muted"], anchor="e")
+            canvas.create_rectangle(margin_x, y, margin_x + bar_w, y + bar_h,
+                                    fill=color, outline="")
+            canvas.create_text(margin_x + bar_w + 6, y + bar_h // 2,
+                               text=str(count),
+                               font=(THEME.get("font_family", "Segoe UI"), 9, "bold"),
+                               fill=O["text"], anchor="w")
+
+    def _desenhar_grafico_mes(self, dados: list[dict]):
+        canvas = self._stats_mes_canvas
+        canvas.delete("all")
+        cw = canvas.winfo_width()
+        ch = canvas.winfo_height()
+        if cw < 80 or ch < 80:
+            canvas.after(100, lambda: self._desenhar_grafico_mes(dados))
+            return
+
+        if not dados:
+            canvas.create_text(cw // 2, ch // 2, text="Sem dados",
+                               font=(THEME.get("font_family", "Segoe UI"), 11),
+                               fill=O["text_light"])
+            return
+
+        dados_rev = list(reversed(dados))[:12]
+        max_count = max((x.get("count", 0) for x in dados_rev), default=1)
+        margin_x  = 50
+        margin_y  = 20
+        chart_w   = cw - margin_x - 10
+        chart_h   = ch - 2 * margin_y
+        n         = len(dados_rev)
+        bar_w     = max(4, chart_w // max(n, 1) - 6)
+
+        for i, item in enumerate(dados_rev):
+            count    = item.get("count", 0)
+            month    = item.get("month", "?")[5:]
+            bar_h    = max(4, (count / max_count) * chart_h)
+            x        = margin_x + i * (bar_w + 6)
+            y        = ch - margin_y - bar_h
+
+            canvas.create_rectangle(x, y, x + bar_w, ch - margin_y,
+                                    fill=O["accent"], outline="", stipple="gray50")
+            canvas.create_rectangle(x, y, x + bar_w, ch - margin_y,
+                                    fill=O["accent"], outline="")
+            canvas.create_text(x + bar_w // 2, ch - margin_y + 10, text=month,
+                               font=(THEME.get("font_family", "Segoe UI"), 8),
+                               fill=O["text_muted"], anchor="n")
+            canvas.create_text(x + bar_w // 2, y - 6, text=str(count),
+                               font=(THEME.get("font_family", "Segoe UI"), 8, "bold"),
+                               fill=O["text"], anchor="s")
+
+    def _construir_area_filtros(self, parent):
+        card = ctk.CTkFrame(parent, fg_color=O["card_bg"],
+                            corner_radius=O["card_radius"],
+                            border_width=1, border_color=O["card_border"])
+        card.pack(fill="both", expand=True)
+
+        banner = ctk.CTkFrame(card, fg_color=O["accent_soft"],
+                              corner_radius=0, height=56)
+        banner.pack(fill="x"); banner.pack_propagate(False)
+        ctk.CTkLabel(banner, text=f"{ICONS['search']}  Filtros de Histórico",
+                     font=font(size=13, weight="bold"),
+                     text_color=O["accent"]).pack(side="left", padx=spacing("xl"))
+
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
+
+        row1 = ctk.CTkFrame(body, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 10))
+        row1.grid_columnconfigure((0, 1, 2), weight=1)
+
+        self._f_tema_filtro = FormField(row1, f"{ICONS['pin']}  Tema",
+                                         values=["Todos", "Geral", "Acadêmico", "Emocional",
+                                                 "Social", "Familiar", "Vocacional"],
+                                         initial="Todos")
+        self._f_tema_filtro.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+        self._f_data_inicio = FormField(row1, f"{ICONS['calendar']}  Data Início",
+                                         placeholder="YYYY-MM-DD", icon=ICONS["calendar"])
+        self._f_data_inicio.grid(row=0, column=1, sticky="ew", padx=6)
+
+        self._f_data_fim = FormField(row1, f"{ICONS['calendar']}  Data Fim",
+                                      placeholder="YYYY-MM-DD", icon=ICONS["calendar"])
+        self._f_data_fim.grid(row=0, column=2, sticky="ew", padx=(6, 0))
+
+        row2 = ctk.CTkFrame(body, fg_color="transparent")
+        row2.pack(fill="x", pady=(0, 10))
+        row2.grid_columnconfigure(0, weight=1)
+
+        self._f_busca_historico = FormField(row2, f"{ICONS['search']}  Buscar (título, tema, conteúdo)",
+                                             placeholder="Digite para buscar...")
+        self._f_busca_historico.grid(row=0, column=0, sticky="ew")
+
+        btn_row = ctk.CTkFrame(body, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(0, 10))
+        ctk.CTkButton(btn_row, text="Aplicar Filtros",
+                      command=self._aplicar_filtros,
+                      height=36, width=160, corner_radius=10,
+                      fg_color=O["accent"], hover_color=O["accent_hover"],
+                      text_color="white", font=font(size=12, weight="bold")).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(btn_row, text="Limpar Filtros",
+                      command=self._limpar_filtros,
+                      height=36, width=140, corner_radius=10,
+                      fg_color=O["divider"], hover_color=THEME["border"],
+                      text_color=THEME["text_muted"],
+                      border_width=1, border_color=O["card_border"],
+                      font=font(size=12)).pack(side="left")
+
+        self._filtros_info = ctk.CTkLabel(body, text="",
+                                           font=font(size=11),
+                                           text_color=O["text_light"])
+        self._filtros_info.pack(anchor="w")
+
+    def _aplicar_filtros(self):
+        tema        = self._f_tema_filtro.get()
+        data_inicio = self._f_data_inicio.get().strip()
+        data_fim    = self._f_data_fim.get().strip()
+        busca       = self._f_busca_historico.get().strip()
+        aluno_id    = (self._selected_student.get("id")
+                       if self._selected_student else None)
+
+        tema_param = tema if tema and tema != "Todos" else None
+
+        def fetch():
+            return self.controller_orientacoes.listar_orientacoes(
+                id_estudante=aluno_id, tema=tema_param,
+                date_from=data_inicio or None, date_to=data_fim or None,
+                search=busca or None,
+            )
+
+        def on_success(resultado):
+            if not self.winfo_exists():
+                return
+            self._renderizar(resultado)
+            data = resultado.get("data") or {}
+            ors  = data.get("orientations") or []
+            self._filtros_info.configure(
+                text=f"{len(ors)} orientação(ões) encontrada(s)"
+            )
+
+        def on_error(exc):
+            logger.error("Erro ao filtrar orientações: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
+
+    def _limpar_filtros(self):
+        self._f_tema_filtro.widget.set("Todos")
+        self._f_data_inicio.delete(0, "end")
+        self._f_data_fim.delete(0, "end")
+        self._f_busca_historico.delete(0, "end")
+        self._filtros_info.configure(text="")
+        self._carregar_dados()
+
     def _carregar_dados(self):
         def fetch():
             return self.controller_orientacoes.listar_orientacoes()
@@ -576,12 +1009,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         def on_error(exc):
             logger.error("Erro ao carregar orientações: %s", exc)
 
-        AsyncRunner.run(
-            task=fetch,
-            on_success=on_success,
-            on_error=on_error,
-            widget_ref=self,
-        )
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
 
     def _carregar_estudantes(self):
         def fetch():
@@ -596,15 +1025,10 @@ class OrientacoesFrame(ctk.CTkFrame):
         def on_error(exc):
             logger.error("Erro ao carregar estudantes: %s", exc)
 
-        AsyncRunner.run(
-            task=fetch,
-            on_success=on_success,
-            on_error=on_error,
-            widget_ref=self,
-        )
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
 
     def _renderizar(self, resultado):
-        # Limpa placeholder de histórico
         for w in self._area_historico.winfo_children():
             w.destroy()
 
@@ -613,17 +1037,16 @@ class OrientacoesFrame(ctk.CTkFrame):
             data = resultado.get("data") or {}
             orientacoes = data.get("orientations") or []
 
-        # Popula sidebar de estudantes com estudantes únicos do histórico —” O(n)
         estudantes_vistos: set = set()
         estudantes: list[dict] = []
         por_estudante: dict = {}
         for o in orientacoes:
-            sid = o.get("student_id") or o.get("student_name")
+            sid = o.get("student_id") or o.get("student", {}).get("id") or o.get("student_name")
             if sid not in estudantes_vistos:
                 estudantes_vistos.add(sid)
                 estudantes.append({
                     "id":     sid,
-                    "name":   o.get("student_name", "Estudante"),
+                    "name":   o.get("student_name") or o.get("student", {}).get("name", "Estudante"),
                     "course": o.get("student_course", ""),
                 })
                 por_estudante[sid] = []
@@ -632,14 +1055,14 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._todos_estudantes = estudantes
         self._todas_orientacoes = orientacoes
         self._por_estudante = por_estudante
-        # NÃO repopular sidebar aqui; a sidebar é gerenciada por _carregar_estudantes
-        # para garantir que todos os estudantes apareçam, não apenas os que têm orientações.
 
-        # Mostra todas se não há seleção
         if not orientacoes:
             EmptyState(
-                self._area_historico, icon=ICONS["chart"], title="Nenhuma orientação registrada",
-                subtitle=""
+                self._area_historico, icon=ICONS["chart"],
+                title="Nenhuma orientação registrada",
+                subtitle="Crie uma nova orientação para começar",
+                action_text=" + Nova Orientação",
+                action_command=lambda: self._mudar_tab("nova"),
             ).pack(pady=30)
         else:
             self._mostrar_orientacoes(orientacoes)
@@ -650,12 +1073,11 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         if not estudantes:
             EmptyState(
-                self._scroll_students, icon=ICONS["mood_bad"], title="Nenhum estudante",
-                subtitle=""
+                self._scroll_students, icon=ICONS["mood_bad"],
+                title="Nenhum estudante", subtitle=""
             ).pack(pady=20)
             return
 
-        # Item "Todos"
         todos_row = ctk.CTkFrame(self._scroll_students,
                                   fg_color=O["accent_soft"], corner_radius=10,
                                   cursor="hand2")
@@ -665,8 +1087,6 @@ class OrientacoesFrame(ctk.CTkFrame):
                      text_color=O["accent"]).pack(padx=spacing("md"), pady=spacing("sm"))
         bind_clickable(todos_row, lambda: self._mostrar_orientacoes(self._todas_orientacoes))
 
-        # Usa WidgetBatchBuilder para renderizar os cards de estudante em lotes,
-        # evitando bloqueio da UI com listas grandes.
         batch = WidgetBatchBuilder(parent=self._scroll_students, batch_size=20)
         for st in estudantes:
             batch.add(lambda st=st: self._criar_student_card(st))
@@ -689,9 +1109,10 @@ class OrientacoesFrame(ctk.CTkFrame):
     def _selecionar_estudante(self, student: dict, card_widget: StudentCard):
         if self._selected_card:
             self._selected_card.set_selected(False)
-        self._selected_card = card_widget
+        self._selected_card    = card_widget
         card_widget.set_selected(True)
         self._selected_student = student
+        self._atualizar_badge_estudante()
 
         sid = student.get("id")
         ors = self._por_estudante.get(sid, [])
@@ -719,56 +1140,270 @@ class OrientacoesFrame(ctk.CTkFrame):
             ).pack(fill="both", expand=True, pady=(0, 10)))
         batch.execute()
 
-        # Layout é recalculado naturalmente pelo Tkinter; removemos o
-        # update_idletasks() forçado que causava bloqueio da UI.
-
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  Ações
-    # ••••••••••••••••••••••••••••••••••••••••••
-    def _nova_orientacao(self):
-        self._mudar_tab("nova")
-
     def _salvar_orientacao(self):
-        titulo  = self.f_titulo.get().strip()
-        conteudo = self.f_conteudo.get().strip()
+        titulo    = self.f_titulo.get().strip()
+        conteudo  = self.f_conteudo.get().strip()
         if not titulo:
             self.f_titulo.set_error("Título é obrigatório")
             return
+
+        action_plan = [
+            {"text": item.get("text", ""), "done": bool(item.get("done", False))}
+            for item in self._action_plan_itens
+        ]
+
         dados = {
-            "title":        titulo,
-            "content":      conteudo,
-            "theme":        self.f_tema.get(),
-            "session_date": self.f_data.get().strip(),
-            "referral":     self.f_encaminhamento.get().strip(),
-            "notes":        self.f_obs.get().strip(),
-            "student_id":   (self._selected_student.get("id")
-                             if self._selected_student else None),
+            "title":                titulo,
+            "content":              conteudo,
+            "theme":                self.f_tema.get(),
+            "session_date":         self.f_data.get().strip(),
+            "referral":             self.f_encaminhamento.get().strip(),
+            "notes":                self.f_obs.get().strip(),
+            "motivational_message": self.f_mensagem.get().strip(),
+            "student_id":           (self._selected_student.get("id")
+                                     if self._selected_student else None),
+            "action_plan":          action_plan,
         }
 
         def save():
             if self._orientacao_editando_id is not None:
-                return self.controller_orientacoes.atualizar_orientacao(
+                res = self.controller_orientacoes.atualizar_orientacao(
                     self._orientacao_editando_id, dados
                 )
-            return self.controller_orientacoes.criar_orientacao(dados)
+                return res, self._orientacao_editando_id
+            res = self.controller_orientacoes.criar_orientacao(dados)
+            oid = res.get("data", {}).get("id") if isinstance(res, dict) else None
+            return res, oid
 
-        def on_ok(_):
-            self._orientacao_editando_id = None
+        def on_ok(result_oid):
+            resultado, oid = result_oid
+            if resultado.get("success") and oid:
+                novos_anexos = [
+                    a for a in self._anexos_selecionados
+                    if "caminho" in a and os.path.exists(a.get("caminho", ""))
+                ]
+                if novos_anexos:
+                    self._upload_anexos(oid, novos_anexos)
+            self._orientacao_editando_id  = None
+            self._anexos_existentes_ids.clear()
+            self._anexos_selecionados.clear()
+            self._action_plan_itens.clear()
             self._mudar_tab("historico")
             self._carregar_dados()
 
         def on_err(e):
-            messagebox.showerror("Erro", str(e))
+            self._show_error(str(e))
 
         AsyncRunner.run(task=save, on_success=on_ok,
                         on_error=on_err, widget_ref=self)
+
+    def _adicionar_anexo(self):
+        import tkinter.filedialog as fd
+        caminhos = fd.askopenfilenames(
+            title="Selecionar arquivos",
+            filetypes=[
+                ("Todos os arquivos", "*.*"),
+                ("Imagens", "*.jpg *.jpeg *.png *.gif *.bmp *.webp"),
+                ("Documentos", "*.pdf *.doc *.docx *.txt *.rtf *.odt"),
+                ("Planilhas", "*.xls *.xlsx *.csv *.ods"),
+                ("Compactados", "*.zip *.rar *.7z *.tar *.gz"),
+            ],
+        )
+        if not caminhos:
+            return
+        for caminho in caminhos:
+            tamanho = os.path.getsize(caminho)
+            if tamanho > 10 * 1024 * 1024:
+                self._show_error(f"Arquivo muito grande (>10MB): {os.path.basename(caminho)}")
+                continue
+            self._anexos_selecionados.append({
+                "caminho": caminho,
+                "nome":    os.path.basename(caminho),
+                "tamanho": tamanho,
+            })
+        self._renderizar_anexos_selecionados()
+
+    def _remover_anexo_selecionado(self, index: int):
+        if 0 <= index < len(self._anexos_selecionados):
+            self._anexos_selecionados.pop(index)
+            self._renderizar_anexos_selecionados()
+
+    def _renderizar_anexos_selecionados(self):
+        for w in self._anexos_lista.winfo_children():
+            w.destroy()
+        if not self._anexos_selecionados:
+            ctk.CTkLabel(self._anexos_lista, text="Nenhum anexo selecionado",
+                         font=font(size=11), text_color=O["text_light"]).pack(pady=8)
+            return
+        for i, anexo in enumerate(self._anexos_selecionados):
+            row = ctk.CTkFrame(self._anexos_lista, fg_color=O["input_bg"],
+                               corner_radius=8, border_width=1, border_color=O["input_border"])
+            row.pack(fill="x", pady=2)
+
+            icon_lbl = ctk.CTkLabel(row, text=self._get_attachment_icon(anexo["nome"]),
+                                    font=font(size=16), width=34)
+            icon_lbl.pack(side="left", padx=(8, 4), pady=6)
+
+            caminho = anexo.get("caminho")
+            ext = os.path.splitext(anexo["nome"])[1].lower()
+            if caminho and os.path.exists(caminho) and ext in {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}:
+                try:
+                    from PIL import Image as PILImage
+                    pil_img = PILImage.open(caminho)
+                    pil_img.thumbnail((28, 28))
+                    ctk_img = ctk.CTkImage(light_image=pil_img, size=(28, 28))
+                    icon_lbl.configure(image=ctk_img, text="")
+                    icon_lbl._img_ref = ctk_img
+                except Exception:
+                    pass
+
+            info = ctk.CTkFrame(row, fg_color="transparent")
+            info.pack(side="left", fill="x", expand=True, padx=4, pady=4)
+            ctk.CTkLabel(info, text=anexo["nome"],
+                         font=font(size=11, weight="bold"),
+                         text_color=O["text"], anchor="w").pack(anchor="w")
+            ctk.CTkLabel(info, text=self._formatar_tamanho(anexo["tamanho"]),
+                         font=font(size=10),
+                         text_color=O["text_light"], anchor="w").pack(anchor="w")
+
+            ctk.CTkButton(row, text=ICONS["close"],
+                          width=28, height=28, corner_radius=8,
+                          fg_color="transparent", hover_color=O["danger_soft"],
+                          text_color=O["danger"], font=font(size=14),
+                          command=lambda idx=i: self._remover_anexo_selecionado(idx)
+                          ).pack(side="right", padx=(0, 6))
+
+    def _upload_anexos(self, orientation_id: int, anexos: list[dict]):
+        usuario_id = getattr(self.master.master, "usuario_logado_id", None)
+        if not usuario_id:
+            app = self.winfo_toplevel()
+            usuario_id = getattr(app, "usuario_logado_id", None) or 1
+
+        def upload_task():
+            resultados = []
+            for anexo in anexos:
+                res = self.controller_orientacoes.adicionar_anexo(
+                    orientation_id, anexo["caminho"], usuario_id
+                )
+                resultados.append(res)
+            return resultados
+
+        def on_done(_):
+            if self.winfo_exists():
+                self._anexos_selecionados.clear()
+                self._renderizar_anexos_selecionados()
+
+        def on_error(e):
+            logger.warning("Erro no upload de anexos: %s", e)
+
+        AsyncRunner.run(task=upload_task, on_success=on_done,
+                        on_error=on_error, widget_ref=self)
+
+    def _formatar_tamanho(self, tamanho_bytes: int) -> str:
+        if not tamanho_bytes:
+            return "0 B"
+        unidades = ["B", "KB", "MB", "GB"]
+        i = 0
+        tamanho = float(tamanho_bytes)
+        while tamanho >= 1024 and i < len(unidades) - 1:
+            tamanho /= 1024
+            i += 1
+        return f"{tamanho:.1f} {unidades[i]}"
+
+    def _get_attachment_icon(self, filename: str) -> str:
+        ext = os.path.splitext(filename)[1].lower()
+        image_exts = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
+        pdf_exts   = {".pdf"}
+        if ext in image_exts:
+            return "▣"
+        if ext in pdf_exts:
+            return ICONS["pdf"]
+        doc_exts   = {".doc", ".docx", ".txt", ".rtf", ".odt"}
+        if ext in doc_exts:
+            return ICONS["file_text"]
+        sheet_exts = {".xls", ".xlsx", ".csv", ".ods"}
+        if ext in sheet_exts:
+            return ICONS["spreadsheet"]
+        zip_exts   = {".zip", ".rar", ".7z", ".tar", ".gz"}
+        if ext in zip_exts:
+            return ICONS["zip"]
+        return ICONS["attach"]
+
+    def _abrir_dialogo_templates(self):
+        templates = self.controller_orientacoes.get_presets()
+        if not templates:
+            self._show_error("Nenhum modelo disponível", title="Modelos")
+            return
+
+        modal = BaseModal(self, "Selecionar Modelo", 420, 320)
+        ctk.CTkLabel(modal, text=f"{ICONS['file_text']}  Modelos de Orientação",
+                     font=font(size=13, weight="bold"),
+                     text_color=O["text"]).pack(anchor="w", padx=spacing("xl"), pady=(spacing("xl"), 8))
+
+        scroll = ctk.CTkScrollableFrame(modal, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("sm"))
+
+        student_id = (self._selected_student.get("id")
+                      if self._selected_student else None)
+
+        def usar_template(chave):
+            res = self.controller_orientacoes.usar_template(chave, student_id)
+            if res:
+                self.f_titulo.insert(0, res.get("title", ""))
+                self.f_conteudo.insert("1.0", res.get("content", ""))
+                self.f_tema.widget.set(res.get("theme", "Geral"))
+            modal.destroy()
+
+        for chave, info in templates.items():
+            btn = ctk.CTkButton(
+                scroll, text=f"{ICONS['file_text']}  {info.get('label', chave)}",
+                command=lambda c=chave: usar_template(c),
+                height=40, corner_radius=10, anchor="w",
+                fg_color=O["accent_soft"], hover_color=O["accent"],
+                text_color=O["accent"], font=font(size=12, weight="bold"),
+            )
+            btn.pack(fill="x", pady=3)
+
+        ctk.CTkButton(modal, text="Cancelar", command=modal.destroy,
+                      height=36, width=120, corner_radius=10,
+                      fg_color=O["divider"], hover_color=THEME["border"],
+                      text_color=THEME["text_muted"],
+                      border_width=1, border_color=O["card_border"],
+                      font=font(size=12)).pack(pady=spacing("md"))
+
+    def _carregar_anexos_edicao(self, orientation_id: int):
+        def fetch():
+            return self.controller_orientacoes.listar_anexos(orientation_id)
+
+        def on_success(resultado):
+            if not self.winfo_exists():
+                return
+            anexos = resultado.get("data", []) if isinstance(resultado, dict) else []
+            for anexo in anexos:
+                self._anexos_selecionados.append({
+                    "file_id": anexo.get("id"),
+                    "nome":    anexo.get("file_name", "arquivo"),
+                    "tamanho": 0,
+                    "_existente": True,
+                })
+                self._anexos_existentes_ids.append(anexo.get("id"))
+            self._renderizar_anexos_selecionados()
+
+        def on_error(exc):
+            logger.error("Erro ao carregar anexos para edição: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
 
     def _ver_orientacao(self, o: dict):
         self._modal_detalhe(o)
 
     def _editar_orientacao(self, o: dict):
-        # Popula o form com os dados da orientação e abre a tab
         self._orientacao_editando_id = o.get("id")
+        self._anexos_existentes_ids.clear()
+        self._anexos_selecionados.clear()
+        self._action_plan_itens.clear()
+
         self.f_titulo.delete(0, "end")
         self.f_titulo.insert(0, o.get("title", ""))
         self.f_conteudo.delete("1.0", "end")
@@ -780,32 +1415,62 @@ class OrientacoesFrame(ctk.CTkFrame):
         self.f_encaminhamento.insert(0, o.get("referral", "") or "")
         self.f_obs.delete("1.0", "end")
         self.f_obs.insert("1.0", o.get("notes", "") or "")
+        self.f_mensagem.delete(0, "end")
+        self.f_mensagem.insert(0, o.get("motivational_message", "") or "")
+
+        ap = o.get("action_plan", [])
+        if isinstance(ap, list):
+            self._action_plan_itens = [{"text": t.get("text", ""), "done": bool(t.get("done", False))}
+                                       for t in ap if t.get("text")]
+        self._renderizar_plano_acao()
+
+        orientation_id = o.get("id")
+        if orientation_id:
+            self._carregar_anexos_edicao(orientation_id)
+
         self._mudar_tab("nova")
 
     def _duplicar_orientacao(self, oid):
-        logger.info("Duplicar orientação %s", oid)
+        def fetch():
+            return self.controller_orientacoes.duplicar_orientacao(oid)
+
+        def on_success(resultado):
+            if not self.winfo_exists():
+                return
+            msg = resultado.get("message", "Orientação duplicada")
+            if resultado.get("success"):
+                self._carregar_dados()
+            self._show_success(msg, duration=4000)
+
+        def on_error(exc):
+            self._show_error(str(exc))
+
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=self)
 
     def _excluir_orientacao(self, oid):
-        if not messagebox.askyesno("Confirmar", "Excluir esta orientação?"):
+        if not self._confirmar("Excluir esta orientação?"):
             return
 
-        def delete(): return self.controller_orientacoes.deletar_orientacao(oid)
-        def on_ok(_): self._carregar_dados()
-        def on_err(e): messagebox.showerror("Erro", str(e))
+        def delete():
+            return self.controller_orientacoes.deletar_orientacao(oid)
+
+        def on_ok(_):
+            self._carregar_dados()
+
+        def on_err(e):
+            self._show_error(str(e))
 
         AsyncRunner.run(task=delete, on_success=on_ok,
                         on_error=on_err, widget_ref=self)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  Modal de detalhe
-    # ••••••••••••••••••••••••••••••••••••••••••
     def _modal_detalhe(self, o: dict):
         modal = ctk.CTkToplevel(self)
         modal.title("Orientação")
         modal.configure(fg_color=O["card_bg"])
         modal.resizable(False, False)
 
-        w, h = 540, 480
+        w, h = 600, 680
         modal.update_idletasks()
         sx = modal.winfo_screenwidth()  // 2 - w // 2
         sy = modal.winfo_screenheight() // 2 - h // 2
@@ -816,7 +1481,6 @@ class OrientacoesFrame(ctk.CTkFrame):
         tema  = o.get("theme", "Geral")
         color, soft = O["temas"].get(tema, _TEMA_DEFAULT)
 
-        # Banner
         banner = ctk.CTkFrame(modal, fg_color=soft, corner_radius=0, height=70)
         banner.pack(fill="x"); banner.pack_propagate(False)
         bi = ctk.CTkFrame(banner, fg_color="transparent")
@@ -837,20 +1501,26 @@ class OrientacoesFrame(ctk.CTkFrame):
         chip.pack(anchor="w", pady=(3, 0))
         ctk.CTkLabel(chip, text=tema,
                      font=font(size=10, weight="bold"),
-                      text_color="#FFFFFF").pack(padx=spacing("sm"), pady=spacing("xs"))
+                       text_color=THEME["text_on_primary"]).pack(padx=spacing("sm"), pady=spacing("xs"))
 
-        # Corpo
+        student = o.get("student", {})
+        student_name = student.get("name", "") if isinstance(student, dict) else ""
+        if student_name:
+            ctk.CTkLabel(ts, text=f"{ICONS['users']}  {student_name}",
+                         font=font(size=10),
+                         text_color=O["text_muted"]).pack(anchor="w", pady=(2, 0))
+
         body = ctk.CTkScrollableFrame(modal, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
 
         for label, value in [
-            (f"{ICONS['calendar']}  Data",          (o.get("session_date") or "—")[:10]),
-            (f"{ICONS['pin']}  Tema",          tema),
-            (f"{ICONS['search']}—  Encaminhamento", o.get("referral") or "—"),
+            (f"{ICONS['calendar']}  Data",   (o.get("session_date") or "—")[:10]),
+            (f"{ICONS['pin']}  Tema",        tema),
+            (f"{ICONS['search']}  Encaminhamento", o.get("referral") or "—"),
         ]:
-            row = ctk.CTkFrame(body, fg_color="#FAFAFA", corner_radius=8)
+            row = ctk.CTkFrame(body, fg_color=THEME["bg_alt"], corner_radius=8)
             row.pack(fill="x", pady=3)
-            ctk.CTkLabel(row, text=label, width=160,
+            ctk.CTkLabel(row, text=label, width=170,
                          font=font(size=12),
                          text_color=O["text_muted"], anchor="w").pack(
                  side="left", padx=spacing("md"), pady=spacing("md"))
@@ -858,16 +1528,211 @@ class OrientacoesFrame(ctk.CTkFrame):
                          font=font(size=12, weight="bold"),
                          text_color=O["text"]).pack(side="left")
 
-        # Conteúdo completo
+        msg = o.get("motivational_message", "")
+        if msg:
+            ctk.CTkFrame(body, height=1, fg_color=O["divider"]).pack(fill="x", pady=(10, 8))
+            ctk.CTkLabel(body, text=f"{ICONS['heart']}  Mensagem Motivacional",
+                         font=font(size=12, weight="bold"),
+                         text_color=O["accent"]).pack(anchor="w", pady=(0, 4))
+            ctk.CTkLabel(body, text=msg,
+                         font=font(size=12),
+                         text_color=O["text"],
+                         wraplength=460, justify="left", anchor="w").pack(anchor="w", pady=(0, 8))
+
         ctk.CTkFrame(body, height=1, fg_color=O["divider"]).pack(fill="x", pady=(10, 8))
         ctk.CTkLabel(body, text=o.get("content", ""),
                      font=font(size=12),
                      text_color=O["text_muted"],
                      wraplength=460, justify="left", anchor="w").pack(anchor="w")
 
-        ctk.CTkButton(modal, text="Fechar", command=modal.destroy,
+        ap = o.get("action_plan", [])
+        if isinstance(ap, list) and ap:
+            ctk.CTkFrame(body, height=1, fg_color=O["divider"]).pack(fill="x", pady=(10, 8))
+            ctk.CTkLabel(body, text=f"{ICONS['check_circle']}  Plano de Ação",
+                         font=font(size=12, weight="bold"),
+                         text_color=O["text"]).pack(anchor="w", pady=(0, 6))
+            for t in ap:
+                item_text = t.get("text", "") if isinstance(t, dict) else str(t)
+                if item_text:
+                    prefix = f"{ICONS['check_circle']} " if (isinstance(t, dict) and t.get("done")) else f"{ICONS['circle']} "
+                    ctk.CTkLabel(body, text=f"{prefix}{item_text}",
+                                 font=font(size=12),
+                                 text_color=O["text_muted"],
+                                 wraplength=460, anchor="w").pack(anchor="w", pady=2)
+
+        orientation_id = o.get("id")
+        if orientation_id:
+            ctk.CTkFrame(body, height=1, fg_color=O["divider"]).pack(fill="x", pady=(10, 8))
+            ctk.CTkLabel(body, text=f"{ICONS['attach']}  Anexos",
+                         font=font(size=12, weight="bold"),
+                         text_color=O["text"]).pack(anchor="w", pady=(0, 6))
+            self._carregar_anexos_detalhe(body, orientation_id)
+
+        btn_row = ctk.CTkFrame(modal, fg_color="transparent")
+        btn_row.pack(pady=(0, 16))
+
+        ctk.CTkButton(btn_row, text=f"{ICONS['cross']}  Editar",
+                      command=lambda: (modal.destroy(), self._editar_orientacao(o)),
+                      height=38, corner_radius=10, width=120,
+                      fg_color=O["accent_soft"], hover_color=O["accent"],
+                      text_color=O["accent"],
+                      font=font(size=12, weight="bold")).pack(side="left", padx=(0, 8))
+
+        ctk.CTkButton(btn_row, text="Fechar", command=modal.destroy,
                       height=38, corner_radius=10, width=120,
                       fg_color=O["accent"], hover_color=O["accent_hover"],
                       text_color="white",
-                      font=font(size=13, weight="bold")).pack(pady=(0, 16))
+                      font=font(size=13, weight="bold")).pack(side="right")
+
+    def _carregar_anexos_detalhe(self, parent, orientation_id: int):
+        def fetch():
+            return self.controller_orientacoes.listar_anexos(orientation_id)
+
+        def on_success(resultado):
+            if not parent.winfo_exists():
+                return
+            for w in parent.winfo_children():
+                if hasattr(w, '_is_anexo_section') and w._is_anexo_section:
+                    w.destroy()
+            section = ctk.CTkFrame(parent, fg_color="transparent")
+            section._is_anexo_section = True
+            section.pack(fill="x", pady=(0, 4))
+
+            anexos = resultado.get("data", []) if isinstance(resultado, dict) else []
+            if not anexos:
+                ctk.CTkLabel(section, text="Nenhum anexo",
+                             font=font(size=11), text_color=O["text_light"]).pack(pady=4)
+                return
+
+            for anexo in anexos:
+                row = ctk.CTkFrame(section, fg_color=O["input_bg"],
+                                   corner_radius=8, border_width=1, border_color=O["input_border"])
+                row.pack(fill="x", pady=2)
+
+                icon_lbl = ctk.CTkLabel(row, text=self._get_attachment_icon(anexo.get("file_name", "")),
+                                        font=font(size=16), width=34)
+                icon_lbl.pack(side="left", padx=(8, 4), pady=6)
+
+                caminho = anexo.get("file")
+                nome_anexo = anexo.get("file_name", "")
+                ext = os.path.splitext(nome_anexo)[1].lower()
+                if caminho and os.path.exists(caminho) and ext in {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}:
+                    try:
+                        from PIL import Image as PILImage
+                        pil_img = PILImage.open(caminho)
+                        pil_img.thumbnail((28, 28))
+                        ctk_img = ctk.CTkImage(light_image=pil_img, size=(28, 28))
+                        icon_lbl.configure(image=ctk_img, text="")
+                        icon_lbl._img_ref = ctk_img
+                    except Exception:
+                        pass
+
+                info = ctk.CTkFrame(row, fg_color="transparent")
+                info.pack(side="left", fill="x", expand=True, padx=4, pady=4)
+                ctk.CTkLabel(info, text=nome_anexo,
+                             font=font(size=11, weight="bold"),
+                             text_color=O["text"], anchor="w").pack(anchor="w")
+
+                created = anexo.get("created_at", "")
+                created_str = str(created)[:19].replace("T", " ") if created else ""
+                ctk.CTkLabel(info, text=created_str,
+                             font=font(size=10),
+                             text_color=O["text_light"], anchor="w").pack(anchor="w")
+
+                acts = ctk.CTkFrame(row, fg_color="transparent")
+                acts.pack(side="right", padx=(0, 4))
+
+                ctk.CTkButton(acts, text=ICONS["download"],
+                              width=28, height=28, corner_radius=8,
+                              fg_color="transparent", hover_color=O["accent_soft"],
+                              text_color=O["accent"], font=font(size=14),
+                              command=lambda a=anexo: self._baixar_anexo(a)
+                              ).pack(side="left", padx=(0, 2))
+
+                ctk.CTkButton(acts, text=ICONS["delete"],
+                              width=28, height=28, corner_radius=8,
+                              fg_color="transparent", hover_color=O["danger_soft"],
+                              text_color=O["danger"], font=font(size=14),
+                              command=lambda aid=anexo.get("id"): self._excluir_anexo(aid, orientation_id)
+                              ).pack(side="left")
+
+        def on_error(exc):
+            logger.error("Erro ao carregar anexos: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success,
+                        on_error=on_error, widget_ref=parent)
+
+    def _baixar_anexo(self, anexo: dict):
+        caminho = anexo.get("file")
+        nome    = anexo.get("file_name", "arquivo")
+        if not caminho or not os.path.exists(caminho):
+            self._show_error("Arquivo não encontrado localmente.", title="Informação")
+            return
+        import tkinter.filedialog as fd
+        destino = fd.asksaveasfilename(
+            title="Salvar anexo", initialfile=nome,
+            filetypes=[("Todos os arquivos", "*.*")],
+        )
+        if destino:
+            try:
+                shutil.copy2(caminho, destino)
+                self._show_success(f"Arquivo salvo em:\n{destino}", duration=4000)
+            except Exception as e:
+                self._show_error(f"Falha ao salvar: {e}")
+
+    def _excluir_anexo(self, attachment_id: int, orientation_id: int):
+        if not self._confirmar("Excluir este anexo?"):
+            return
+
+        def delete():
+            return self.controller_orientacoes.deletar_anexo(attachment_id)
+
+        def on_ok(_):
+            if attachment_id in self._anexos_existentes_ids:
+                self._anexos_existentes_ids.remove(attachment_id)
+            self._anexos_selecionados = [
+                a for a in self._anexos_selecionados
+                if a.get("file_id") != attachment_id
+            ]
+            self._renderizar_anexos_selecionados()
+            self._carregar_dados()
+
+        def on_err(e):
+            self._show_error(str(e))
+
+        AsyncRunner.run(task=delete, on_success=on_ok,
+                        on_error=on_err, widget_ref=self)
+
+    def _confirmar(self, mensagem: str) -> bool:
+        modal = ctk.CTkToplevel(self)
+        modal.title("Confirmar")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+        w, h = 420, 200
+        sx = modal.winfo_screenwidth()  // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+        resultado = {"ok": False}
+        ctk.CTkLabel(modal, text=mensagem,
+                     font=themed_font("h4", "bold"),
+                     text_color=THEME["text"],
+                     wraplength=360, justify="center").pack(pady=(24, 16))
+        botoes = ctk.CTkFrame(modal, fg_color="transparent")
+        botoes.pack(pady=(0, 20))
+        ctk.CTkButton(botoes, text="Cancelar", width=110, height=36,
+                      fg_color=THEME["bg_alt"], hover_color=THEME["border"],
+                      text_color=THEME["text"],
+                      command=lambda: modal.destroy()).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(botoes, text="Confirmar", width=110, height=36,
+                      fg_color=THEME["primary"], hover_color=THEME["primary_hover"],
+                      text_color=THEME["text_on_primary"],
+                      command=lambda: self._confirmar_callback(modal, resultado)).pack(side="right")
+        modal.wait_window(modal)
+        return resultado.get("ok", False)
+
+    def _confirmar_callback(self, modal: ctk.CTkToplevel, resultado: dict):
+        resultado["ok"] = True
+        modal.destroy()
 

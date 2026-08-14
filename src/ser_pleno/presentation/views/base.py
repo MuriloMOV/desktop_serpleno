@@ -130,10 +130,50 @@ class BaseViewFrame(ctk.CTkScrollableFrame):
         try:
             _ErrorModal(self.winfo_toplevel(), message=message, title=title)
         except Exception:
-            # Fallback defensivo —” nunca deixa um erro silencioso nem
-            # trava a aplicação caso o modal não possa ser criado.
             import tkinter.messagebox as mb
             mb.showerror("Erro", message)
+
+    def _show_success(self, message: str, duration: int = 3000) -> None:
+        try:
+            from ser_pleno.presentation.components.ui_components import Toast
+            if hasattr(self, "_toast") and self._toast and self._toast.winfo_exists():
+                self._toast.destroy()
+            self._toast = Toast(self.winfo_toplevel(), message=message, status="success", duration=duration)
+        except Exception:
+            pass
+
+    def _confirmar(self, mensagem: str) -> bool:
+        modal = ctk.CTkToplevel(self)
+        modal.title("Confirmar")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+        w, h = 420, 200
+        sx = modal.winfo_screenwidth() // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+        resultado = {"ok": False}
+        ctk.CTkLabel(modal, text=mensagem,
+                     font=themed_font("h4", "bold"),
+                     text_color=THEME["text"],
+                     wraplength=360, justify="center").pack(pady=(24, 16))
+        botoes = ctk.CTkFrame(modal, fg_color="transparent")
+        botoes.pack(pady=(0, 20))
+        ctk.CTkButton(botoes, text="Cancelar", width=110, height=36,
+                      fg_color=THEME["bg_alt"], hover_color=THEME["border"],
+                      text_color=THEME["text"],
+                      command=lambda: modal.destroy()).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(botoes, text="Confirmar", width=110, height=36,
+                      fg_color=THEME["primary"], hover_color=THEME["primary_hover"],
+                      text_color=THEME["text_on_primary"],
+                      command=lambda: self._confirmar_callback(modal, resultado)).pack(side="right")
+        modal.wait_window(modal)
+        return resultado.get("ok", False)
+
+    def _confirmar_callback(self, modal: ctk.CTkToplevel, resultado: dict):
+        resultado["ok"] = True
+        modal.destroy()
 
     # ——————————————————————————————————————————————————————————————————————
     #  Stub —” views devem implementar

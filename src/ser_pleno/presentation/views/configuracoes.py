@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox, Menu
+from tkinter import Menu
 import os
 import json
 import logging
@@ -18,6 +18,7 @@ from ser_pleno.presentation.components.ui_components import (
     GhostButton,
     Badge,
     BaseModal,
+    Toast,
 )
 from ser_pleno.ui.components.icons import IconLabel, ICONS
 from ser_pleno.utils.async_runner import log_view_init_ms
@@ -337,15 +338,15 @@ class AlterarSenhaModal(FormModal):
             f.clear_state()
 
         if not atual or not nova or not confirm:
-            messagebox.showwarning("Atenção", "Preencha todos os campos.")
+            self._show_error("Preencha todos os campos.", title="Atenção")
             return
         if nova != confirm:
             self.f_confirmar_senha.set_error("As senhas não coincidem.")
-            messagebox.showerror("Erro", "As senhas não coincidem.")
+            self._show_error("As senhas não coincidem.")
             return
         if len(nova) < 6:
             self.f_nova_senha.set_error("Mínimo de 6 caracteres.")
-            messagebox.showwarning("Atenção", "A nova senha deve ter pelo menos 6 caracteres.")
+            self._show_error("A nova senha deve ter pelo menos 6 caracteres.", title="Atenção")
             return
 
         self._on_save(atual, nova)
@@ -361,7 +362,8 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
         self.controller_configuracoes = ConfiguracoesController()
-        self.base_path  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        from ser_pleno.config.paths import get_project_root
+        self.base_path  = get_project_root()
         self._images: dict[str, Any] = {}
 
         self.grid_columnconfigure(0, weight=1)
@@ -377,12 +379,15 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         if key in self._images:
             return self._images[key]
         path = os.path.join(self.base_path, "assets", "avatars", name)
+        if not os.path.exists(path):
+            return None
         try:
-            from PIL import Image
-            if os.path.exists(path):
-                img = ctk.CTkImage(light_image=Image.open(path), size=size)
-                self._images[key] = img
-                return img
+            def _load(p=path, s=size):
+                from PIL import Image
+                return ctk.CTkImage(light_image=Image.open(p), size=s)
+            def _on_ready(img, k=key):
+                self._images[k] = img
+            AsyncRunner.run(task=_load, on_success=_on_ready, widget_ref=self)
         except Exception as exc:
             logger.exception("Erro ao carregar imagem %s: %s", name, exc)
         return None
@@ -443,6 +448,13 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             font=themed_font("h2", "bold"))
         self.avatar_display.place(relx=0.5, rely=0.5, anchor="center")
 
+        if img is None:
+            def _refresh_avatar():
+                refreshed = self._load_image(avatar_name, (118, 118))
+                if refreshed and self.avatar_display.winfo_exists():
+                    self.avatar_display.configure(image=refreshed, text="")
+            self.after_idle(_refresh_avatar)
+
         # Nome e email
         user    = self.controller.usuario_logado or {}
         nome    = f"{user.get('first_name','')} {user.get('last_name','')}".strip() \
@@ -491,7 +503,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             files = []
 
         for i, filename in enumerate(files):
-            ctk.CTkButton(
+            btn = ctk.CTkButton(
                 self.grid_galeria,
                 text="",
                 image=self._load_image(filename, (52, 52)),
@@ -500,7 +512,19 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 hover_color=THEME["primary_soft"],
                 corner_radius=RADIUS["md"],
                 command=lambda fn=filename: self._select_avatar(fn),
-            ).grid(row=i // 4, column=i % 4, padx=spacing("xs"), pady=spacing("xs"))
+            )
+            btn._avatar_filename = filename
+            btn.grid(row=i // 4, column=i % 4, padx=spacing("xs"), pady=spacing("xs"))
+
+        self.after_idle(self._refresh_gallery_images)
+
+    def _refresh_gallery_images(self):
+        for btn in self.grid_galeria.winfo_children():
+            if isinstance(btn, ctk.CTkButton) and hasattr(btn, '_avatar_filename'):
+                filename = btn._avatar_filename
+                img = self._load_image(filename, (52, 52))
+                if img and btn.winfo_exists():
+                    btn.configure(image=img)
 
     def _toggle_gallery(self):
         if self.gallery_frame.winfo_ismapped():
@@ -591,12 +615,12 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             wraplength=420, justify="left",
         ).pack(anchor="w", padx=spacing("md"), pady=spacing("md"))
 
-    def _toggle_menu(self, kind: str):
+    def _toggle_menu(self, kind: str) -> None:
         if self._select_menu is not None:
             try:
                 self._select_menu.unpost()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha ao fechar menu: %s", exc)
             self._select_menu = None
             return
 
@@ -611,8 +635,8 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._select_menu = menu
         try:
             menu.tk_popup(btn.winfo_rootx(), btn.winfo_rooty() + btn.winfo_height())
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Falha ao exibir menu: %s", exc)
 
     def _choose(self, kind: str, value: str):
         if kind == "theme":
@@ -681,14 +705,14 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def _salvar_senha(self, senha_atual: str, nova_senha: str):
         res = self.controller_configuracoes.alterar_senha(senha_atual, nova_senha)
         if res.get("success"):
-            messagebox.showinfo("Sucesso", res.get("message", "Senha alterada com sucesso."))
+            self._show_success(res.get("message", "Senha alterada com sucesso."))
         else:
-            messagebox.showerror("Erro", res.get("message", "Falha ao alterar senha."))
+            self._show_error(res.get("message", "Falha ao alterar senha."))
 
-    def _encerrar_sessao(self):
-        if messagebox.askyesno("Confirmação", "Deseja encerrar a sessão atual?"):
+    def _encerrar_sessao(self) -> None:
+        if self._confirmar("Deseja encerrar a sessão atual?"):
             try:
                 self.winfo_toplevel().mostrar_login()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.exception("Falha ao encerrar sessão: %s", exc)
 

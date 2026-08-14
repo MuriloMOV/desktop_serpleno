@@ -1,7 +1,6 @@
 import logging
 import customtkinter as ctk
 from datetime import datetime, timedelta
-from tkinter import messagebox
 from ser_pleno.application.controllers.agenda import AgendaController
 from ser_pleno.repositories.agendamentos import AgendamentoRepository
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color, darken, lighten
@@ -14,6 +13,7 @@ from ser_pleno.presentation.components.ui_components import (
     SkeletonLoader,
 )
 from ser_pleno.ui.components.icons import IconButton, IconLabel, ICONS
+from ser_pleno.presentation.views.base import _ErrorModal
 
 logger = logging.getLogger(__name__)
 
@@ -229,7 +229,7 @@ class AppointmentModal(BaseModal):
 
         id_aluno = self.mapa_estudantes.get(nome)
         if not id_aluno:
-            messagebox.showerror("Erro", "Selecione um estudante válido.")
+            self._show_error("Selecione um estudante válido.")
             return
 
         dados = {
@@ -251,14 +251,14 @@ class AppointmentModal(BaseModal):
                 Toast(self._parent_window, "Agendamento salvo com sucesso", status="success", duration=2500)
                 self.destroy()
             else:
-                messagebox.showerror("Erro", str(res.get("message", "Erro ao salvar")))
+                self._show_error(str(res.get("message", "Erro ao salvar")))
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro inesperado: {e}")
+            self._show_error(f"Erro inesperado: {e}")
 
     def _delete(self):
         if not self.info:
             return
-        if messagebox.askyesno("Confirmar", "Deseja realmente remover este agendamento?"):
+        if self._confirmar("Deseja realmente remover este agendamento?"):
             try:
                 res = self.on_delete(self.info["id_agendamento"])
                 if res.get("success"):
@@ -270,14 +270,132 @@ class AppointmentModal(BaseModal):
                     Toast(self._parent_window, "Agendamento removido", status="success", duration=2500)
                     self.destroy()
                 else:
-                    messagebox.showerror("Erro", str(res.get("message", "Erro ao remover")))
+                    self._show_error(str(res.get("message", "Erro ao remover")))
             except Exception as e:
-                messagebox.showerror("Erro", f"Erro inesperado: {e}")
+                self._show_error(f"Erro inesperado: {e}")
 
     @staticmethod
     def _get_data_selecionada():
-        # Será sobrescrito pelo AgendaFrame via closure se necessário
         return datetime.now().strftime("%Y-%m-%d")
+
+
+class CalendarDayModal(BaseModal):
+    """Modal de agendamentos de um dia específico."""
+    def __init__(self, parent, data_str: str, agendamentos: list[dict],
+                 horarios_base: list[str], mapa_estudantes: dict[str, int],
+                 on_save, on_delete=None, on_success=None):
+        self._parent_window = parent.winfo_toplevel()
+        self.data_str = data_str
+        self.agendamentos = agendamentos
+        self.horarios_base = horarios_base
+        self.mapa_estudantes = mapa_estudantes
+        self.on_save = on_save
+        self.on_delete = on_delete
+        self.on_success = on_success
+        try:
+            dt = datetime.strptime(data_str, "%Y-%m-%d")
+            titulo = dt.strftime("%d/%m/%Y")
+        except Exception:
+            titulo = data_str
+        super().__init__(parent, title=f"Agendamentos do dia {titulo}", width=480, height=520)
+        self._build()
+
+    def _build(self):
+        container = ctk.CTkFrame(self, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(
+            container, text="Agendamentos do dia",
+            font=themed_font("h3", "bold"), text_color=THEME["text"]
+        ).pack(anchor="w", pady=(0, 12))
+
+        self.lista_frame = ctk.CTkScrollableFrame(
+            container, fg_color=THEME["bg_alt"], corner_radius=RADIUS["md"], height=260
+        )
+        self.lista_frame.pack(fill="x", pady=(0, 16))
+        self._render_lista()
+
+        PrimaryButton(
+            container, text="Novo Agendamento",
+            command=self._novo_agendamento, icon=ICONS["add"], width=200
+        ).pack(anchor="w")
+
+    def _render_lista(self):
+        for child in self.lista_frame.winfo_children():
+            child.destroy()
+
+        if not self.agendamentos:
+            EmptyState(
+                self.lista_frame, icon=ICONS["calendar"],
+                title="Nenhum agendamento",
+                subtitle="Clique em Novo Agendamento para criar"
+            ).pack(pady=20)
+            return
+
+        batch = WidgetBatchBuilder(parent=self.lista_frame, batch_size=20)
+        for agt in self.agendamentos:
+            def _mk(agt=agt):
+                return lambda: self._criar_item_lista(agt)
+            batch.add(_mk())
+        batch.execute()
+
+    def _criar_item_lista(self, agt):
+        row = ctk.CTkFrame(
+            self.lista_frame, fg_color=THEME["surface"],
+            corner_radius=RADIUS["sm"], border_width=1, border_color=THEME["border"]
+        )
+        row.pack(fill="x", pady=4, padx=4)
+
+        nome = agt.get("nome", "")
+        hora = agt.get("data_hora")
+        hora_str = hora.strftime("%H:%M") if hasattr(hora, "strftime") else str(hora)
+        status = agt.get("status", "")
+
+        ctk.CTkLabel(row, text=f"{hora_str} — {nome}", font=themed_font("body", "bold"),
+                     text_color=THEME["text"]).pack(side="left", padx=14, pady=10)
+
+        ctk.CTkLabel(row, text=status, font=themed_font("overline"),
+                     text_color=THEME["text_muted"]).pack(side="right", padx=14, pady=10)
+
+        bind_clickable(row, lambda a=agt: self._abrir_edicao(a))
+
+    def _abrir_edicao(self, agt):
+        if agt.get("data_hora") and hasattr(agt["data_hora"], "strftime"):
+            hora = agt["data_hora"].strftime("%H:%M")
+        else:
+            hora = ""
+        modal = AppointmentModal(
+            self, hora, agt,
+            horarios_base=self.horarios_base,
+            mapa_estudantes=self.mapa_estudantes,
+            on_save=self.on_save,
+            on_delete=self.on_delete,
+            on_success=self._refresh_and_close,
+        )
+        modal._get_data_selecionada = lambda: self.data_str
+
+    def _novo_agendamento(self):
+        if not self.horarios_base:
+            self._show_error("Nenhum horário configurado. Adicione horários na gestão de grade.", title="Info")
+            return
+        primeiro_horario = self.horarios_base[0]
+        modal = AppointmentModal(
+            self, primeiro_horario, None,
+            horarios_base=self.horarios_base,
+            mapa_estudantes=self.mapa_estudantes,
+            on_save=self.on_save,
+            on_delete=self.on_delete,
+            on_success=self._refresh_and_close,
+        )
+        modal._get_data_selecionada = lambda: self.data_str
+
+    def _refresh_and_close(self):
+        if callable(getattr(self, "on_success", None)):
+            try:
+                self.on_success()
+            except Exception:
+                pass
+        self.destroy()
 
 
 class GradeManagementModal(BaseModal):
@@ -349,7 +467,7 @@ class GradeManagementModal(BaseModal):
     def _adicionar(self):
         horario = self.entry_novo.get().strip()
         if len(horario) < 5 or horario[2] != ":":
-            messagebox.showerror("Erro", "Formato de horário inválido. Use HH:MM.")
+            self._show_error("Formato de horário inválido. Use HH:MM.")
             return
         try:
             res = self.controller_agenda.adicionar_horario_disponibilidade(horario)
@@ -362,12 +480,12 @@ class GradeManagementModal(BaseModal):
                     except Exception:
                         pass
             else:
-                messagebox.showerror("Erro", str(res.get("message", "Erro ao adicionar horário")))
+                self._show_error(str(res.get("message", "Erro ao adicionar horário")))
         except Exception as e:
-            messagebox.showerror("Erro", f"Erro inesperado: {e}")
+            self._show_error(f"Erro inesperado: {e}")
 
     def _remover(self, horario):
-        if messagebox.askyesno("Confirmar", f"Deseja realmente remover o horário {horario}?"):
+        if self._confirmar(f"Deseja realmente remover o horário {horario}?"):
             try:
                 res = self.controller_agenda.remover_horario_disponibilidade(horario)
                 if res.get("success"):
@@ -378,9 +496,9 @@ class GradeManagementModal(BaseModal):
                         except Exception:
                             pass
                 else:
-                    messagebox.showerror("Erro", str(res.get("message", "Erro ao remover horário")))
+                    self._show_error(str(res.get("message", "Erro ao remover horário")))
             except Exception as e:
-                messagebox.showerror("Erro", f"Erro inesperado: {e}")
+                self._show_error(f"Erro inesperado: {e}")
 
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -397,20 +515,23 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         self.repo_agendamento = AgendamentoRepository()
 
         self.data_selecionada = datetime.now()
+        self.ano_calendario = self.data_selecionada.year
+        self.mes_calendario = self.data_selecionada.month
         self.horarios_base: list[str] = []
         self.mapa_estudantes: dict[str, int] = {}
+        self.mapa_agendamentos_mes: dict[str, list[dict]] = {}
 
         self.grid_columnconfigure(0, weight=1)
 
         self._criar_cabecalho()
         self._criar_container_agenda_dia()
         self._criar_container_proxima_semana()
+        self._criar_calendario_mensal()
 
-        # Mostra skeletons imediatamente; dados reais chegam via async
         self._mostrar_skeletons_grid(self.container_grid)
         self._mostrar_skeletons_grid(self.container_semana)
+        self._mostrar_skeleton_calendario()
 
-        # Carrega dados em background para não travar a UI na abertura
         self.after_idle(self.refresh_all_async)
         log_view_init_ms("agenda", self._t0, widget_ref=self)
 
@@ -419,7 +540,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
     # ——————————————————————————————————————————————————————————————————————
 
     def refresh_all_async(self):
-        """Carrega horários, estudantes e grids em background."""
+        """Carrega horários, estudantes, grids e calendário em background."""
         def fetch():
             self._carregar_horarios_base()
             self._carregar_estudantes()
@@ -427,17 +548,20 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             agendamentos_dia = self.controller_agenda.listar_agendamentos(data=data_str)
             proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
             agendamentos_prox = self.controller_agenda.listar_agendamentos(data=proxima_semana_str)
-            return data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox
+            ano_mes = self.controller_agenda.listar_agendamentos_mes(self.ano_calendario, self.mes_calendario)
+            return data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox, ano_mes
 
         def on_success(result):
             if not self.winfo_exists():
                 return
-            data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox = result
+            data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox, ano_mes = result
             mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
             mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
             self._renderizar_grid(self.container_grid, mapa_dia)
             self._renderizar_grid(self.container_semana, mapa_prox)
             self._atualizar_subtitulo_proxima_semana()
+            self._processar_agendamentos_mes(ano_mes)
+            self._renderizar_calendario(self.ano_calendario, self.mes_calendario)
 
         def on_error(exc):
             logger.error("AgendaFrame.refresh_all_async: ERRO = %s", exc)
@@ -457,6 +581,18 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             def _mk(idx=idx):
                 return lambda: SkeletonLoader(container, width=220, height=100, variant="card").grid(
                     row=idx // 4, column=idx % 4, padx=6, pady=6, sticky="nsew"
+                )
+            batch.add(_mk())
+        batch.execute()
+
+    def _mostrar_skeleton_calendario(self):
+        for w in self.container_calendario.winfo_children():
+            w.destroy()
+        batch = WidgetBatchBuilder(parent=self.container_calendario, batch_size=20)
+        for idx in range(6):
+            def _mk(idx=idx):
+                return lambda: SkeletonLoader(self.container_calendario, width=120, height=80, variant="card").grid(
+                    row=idx // 7 + 1, column=idx % 7, padx=4, pady=4, sticky="nsew"
                 )
             batch.add(_mk())
         batch.execute()
@@ -495,6 +631,194 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             self._atualizar_subtitulo_proxima_semana()
         except Exception as e:
             logger.error("AgendaFrame.load_grid_data: ERRO = %s", e, exc_info=True)
+
+    # ——————————————————————————————————————————————————————————————————————
+    #  Calendário mensal
+    # ——————————————————————————————————————————————————————————————————————
+
+    def _criar_calendario_mensal(self):
+        card = Card(self)
+        card.pack(fill="x", padx=SPACING["page_x"], pady=10)
+
+        header = ctk.CTkFrame(card.body, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            header, text="Calendário do Mês",
+            font=themed_font("h4", "bold"), text_color=THEME["text"]
+        ).pack(side="left")
+
+        self.lbl_mes_calendario = ctk.CTkLabel(
+            header, text="", font=themed_font("body_sm"), text_color=THEME["text_muted"]
+        )
+        self.lbl_mes_calendario.pack(side="left", padx=(10, 0))
+
+        nav = ctk.CTkFrame(header, fg_color=THEME["bg_alt"], corner_radius=RADIUS["button"])
+        nav.pack(side="right")
+
+        btn_prev = ctk.CTkButton(
+            nav, text=ICONS["arrow_left"], width=30, height=30,
+            fg_color="transparent", hover_color=THEME["bg"],
+            text_color=THEME["text_secondary"], corner_radius=RADIUS["sm"],
+            font=themed_font("body", "bold"),
+            command=lambda: self._alterar_mes_calendario(-1)
+        )
+        btn_prev.pack(side="left", padx=2, pady=2)
+
+        btn_next = ctk.CTkButton(
+            nav, text=ICONS["arrow_right"], width=30, height=30,
+            fg_color="transparent", hover_color=THEME["bg"],
+            text_color=THEME["text_secondary"], corner_radius=RADIUS["sm"],
+            font=themed_font("body", "bold"),
+            command=lambda: self._alterar_mes_calendario(1)
+        )
+        btn_next.pack(side="left", padx=2, pady=2)
+
+        self.container_calendario = ctk.CTkFrame(card.body, fg_color="transparent")
+        self.container_calendario.pack(fill="x", pady=(0, 12))
+        for i in range(7):
+            self.container_calendario.columnconfigure(i, weight=1, uniform="cal")
+
+    def _renderizar_calendario(self, ano: int, mes: int):
+        for w in self.container_calendario.winfo_children():
+            w.destroy()
+
+        nomes_meses = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        ]
+        self.lbl_mes_calendario.configure(text=f"{nomes_meses[mes - 1]} {ano}")
+
+        dias_semana = ["D", "S", "T", "Q", "Q", "S", "S"]
+        for i, nome in enumerate(dias_semana):
+            lbl = ctk.CTkLabel(
+                self.container_calendario, text=nome,
+                font=themed_font("overline", "bold"), text_color=THEME["text_muted"]
+            )
+            lbl.grid(row=0, column=i, padx=4, pady=(0, 4), sticky="nsew")
+
+        primeiro_dia = datetime(ano, mes, 1)
+        dias_no_mes = (datetime(ano, mes % 12 + 1, 1) - timedelta(days=1)).day if mes < 12 else (datetime(ano + 1, 1, 1) - timedelta(days=1)).day
+        inicio_semana = primeiro_dia.weekday()
+
+        hoje = datetime.now()
+        hoje_str = hoje.strftime("%Y-%m-%d")
+
+        batch = WidgetBatchBuilder(parent=self.container_calendario, batch_size=20)
+        idx = 0
+
+        for i in range(inicio_semana):
+            dia_ant = datetime(ano, mes, 1) - timedelta(days=inicio_semana - i)
+            def _mk(d=dia_ant):
+                return lambda: ctk.CTkLabel(
+                    self.container_calendario, text=str(d.day),
+                    font=themed_font("body"), text_color=THEME["text_disabled"]
+                ).grid(row=idx // 7 + 1, column=idx % 7, padx=4, pady=4, sticky="nsew")
+            batch.add(_mk())
+            idx += 1
+
+        for dia in range(1, dias_no_mes + 1):
+            data_str = f"{ano}-{mes:02d}-{dia:02d}"
+            agendamentos = self.mapa_agendamentos_mes.get(data_str, [])
+            e_hoje = data_str == hoje_str
+
+            def _mk(d=dia, ds=data_str, apts=agendamentos, hoje_flag=e_hoje):
+                return lambda: self._criar_celula_calendario(d, ds, apts, hoje_flag)
+            batch.add(_mk())
+            idx += 1
+
+        restantes = (7 - (idx % 7)) % 7
+        for i in range(restantes):
+            dia_prox = datetime(ano, mes, dias_no_mes) + timedelta(days=i + 1)
+            def _mk(d=dia_prox):
+                return lambda: ctk.CTkLabel(
+                    self.container_calendario, text=str(d.day),
+                    font=themed_font("body"), text_color=THEME["text_disabled"]
+                ).grid(row=idx // 7 + 1, column=idx % 7, padx=4, pady=4, sticky="nsew")
+            batch.add(_mk())
+            idx += 1
+
+        batch.execute()
+
+    def _criar_celula_calendario(self, dia: int, data_str: str, agendamentos: list[dict], hoje_flag: bool):
+        cor = THEME["primary"] if agendamentos else THEME["success"]
+        frame = ctk.CTkFrame(
+            self.container_calendario,
+            corner_radius=RADIUS["sm"],
+            border_width=1 if hoje_flag else 0,
+            border_color=THEME["primary"] if hoje_flag else "transparent",
+            fg_color=blend_color(cor, 0.10) if agendamentos else THEME["surface"],
+        )
+        frame.grid(row=0, column=0, padx=4, pady=4, sticky="nsew")
+
+        lbl = ctk.CTkLabel(
+            frame, text=str(dia),
+            font=themed_font("body", "bold"),
+            text_color=THEME["primary"] if hoje_flag else THEME["text"]
+        )
+        lbl.pack(anchor="nw", padx=6, pady=(6, 0))
+
+        if agendamentos:
+            qtd = len(agendamentos)
+            txt = f"{qtd} atend." if qtd > 1 else "1 atend."
+            ctk.CTkLabel(
+                frame, text=txt,
+                font=themed_font("overline"), text_color=cor
+            ).pack(anchor="sw", padx=6, pady=(0, 6))
+
+        bind_clickable(frame, lambda ds=data_str: self._abrir_modal_dia(ds))
+
+    def _processar_agendamentos_mes(self, result):
+        self.mapa_agendamentos_mes = {}
+        if isinstance(result, dict) and result.get("success"):
+            for agt in result.get("data", []):
+                data_hora = agt.get("data_hora")
+                if data_hora and hasattr(data_hora, "strftime"):
+                    data_str = data_hora.strftime("%Y-%m-%d")
+                elif data_hora:
+                    data_str = str(data_hora)[:10]
+                else:
+                    continue
+                self.mapa_agendamentos_mes.setdefault(data_str, []).append(agt)
+
+    def _carregar_calendario_async(self, ano: int, mes: int):
+        def fetch():
+            return self.controller_agenda.listar_agendamentos_mes(ano, mes)
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            self._processar_agendamentos_mes(result)
+            self._renderizar_calendario(ano, mes)
+
+        def on_error(exc):
+            logger.error("AgendaFrame._carregar_calendario_async: ERRO = %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
+
+    def _abrir_modal_dia(self, data_str: str):
+        agendamentos = self.mapa_agendamentos_mes.get(data_str, [])
+        CalendarDayModal(
+            self, data_str, agendamentos,
+            horarios_base=self.horarios_base,
+            mapa_estudantes=self.mapa_estudantes,
+            on_save=self._salvar_agendamento,
+            on_delete=self.remover_agendamento,
+            on_success=self.refresh_all,
+        )
+
+    def _alterar_mes_calendario(self, delta: int):
+        mes = self.mes_calendario + delta
+        ano = self.ano_calendario
+        if mes > 12:
+            mes = 1
+            ano += 1
+        elif mes < 1:
+            mes = 12
+            ano -= 1
+        self.ano_calendario = ano
+        self.mes_calendario = mes
+        self._carregar_calendario_async(ano, mes)
 
     # ——————————————————————————————————————————————————————————————————————
     #  Grid de agendamentos
@@ -656,4 +980,51 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
     def remover_agendamento(self, id_agendamento: int):
         return self.controller_agenda.deletar_agendamento(id_agendamento)
+
+    def _show_error(self, message: str, title: str = "Não foi possível concluir") -> None:
+        try:
+            _ErrorModal(self.winfo_toplevel(), message=message, title=title)
+        except Exception:
+            pass
+
+    def _show_success(self, message: str, duration: int = 3000) -> None:
+        try:
+            if hasattr(self, "_toast") and self._toast and self._toast.winfo_exists():
+                self._toast.destroy()
+            self._toast = Toast(self.winfo_toplevel(), message=message, status="success", duration=duration)
+        except Exception:
+            pass
+
+    def _confirmar(self, mensagem: str) -> bool:
+        modal = ctk.CTkToplevel(self)
+        modal.title("Confirmar")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+        w, h = 420, 200
+        sx = modal.winfo_screenwidth() // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+        resultado = {"ok": False}
+        ctk.CTkLabel(modal, text=mensagem,
+                     font=themed_font("h4", "bold"),
+                     text_color=THEME["text"],
+                     wraplength=360, justify="center").pack(pady=(24, 16))
+        botoes = ctk.CTkFrame(modal, fg_color="transparent")
+        botoes.pack(pady=(0, 20))
+        ctk.CTkButton(botoes, text="Cancelar", width=110, height=36,
+                      fg_color=THEME["bg_alt"], hover_color=THEME["border"],
+                      text_color=THEME["text"],
+                      command=lambda: modal.destroy()).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(botoes, text="Confirmar", width=110, height=36,
+                      fg_color=THEME["primary"], hover_color=THEME["primary_hover"],
+                      text_color=THEME["text_on_primary"],
+                      command=lambda: self._confirmar_callback(modal, resultado)).pack(side="right")
+        modal.wait_window(modal)
+        return resultado.get("ok", False)
+
+    def _confirmar_callback(self, modal: ctk.CTkToplevel, resultado: dict):
+        resultado["ok"] = True
+        modal.destroy()
 

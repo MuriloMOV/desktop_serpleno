@@ -235,8 +235,8 @@ class KPICard(ctk.CTkFrame):
                          text_color=THEME["text_muted"]).pack(side="left", padx=(6, 0), pady=(4, 0))
 
         if trend:
-            trend_up = trend.strip().startswith(("+", "â†‘", "–²"))
-            trend_down = trend.strip().startswith(("-", "â†“", "–¼"))
+            trend_up = trend.strip().startswith(("+", "↑", "²"))
+            trend_down = trend.strip().startswith(("-", "↓", "¼"))
             trend_color = THEME["success"] if trend_up else (THEME["danger"] if trend_down else THEME["text_muted"])
             ctk.CTkLabel(txt, text=trend, font=themed_font(self._size_cfg["sub"], "bold"),
                          text_color=trend_color).pack(anchor="w", pady=(4, 0))
@@ -480,7 +480,7 @@ class PrimaryButton(ctk.CTkButton):
     def set_loading(self, loading: bool):
         self._loading = loading
         if loading:
-            self.configure(text="â³", state="disabled")
+            self.configure(text="▶", state="disabled")
             self._animate_loading()
         else:
             display = f"{self._icon}  {self._text}" if self._icon and self._text else (self._icon or self._text)
@@ -490,7 +490,7 @@ class PrimaryButton(ctk.CTkButton):
         if not self._loading or not self.winfo_exists():
             return
         current = self.cget("text")
-        self.configure(text="âŒ›" if current == "â³" else "â³")
+        self.configure(text="⏳" if current == "▶" else "▶")
         self.after(280, self._animate_loading)
 
 
@@ -598,7 +598,7 @@ class InputField(ctk.CTkFrame):
             fg_color="transparent",
             border_width=0,
             font=themed_font("body"),
-            show="—¢" if self._password else "",
+            show="●" if self._password else "",
             height=36,
         )
         self.entry.pack(side="left", fill="both", expand=True, padx=(0, 14))
@@ -796,7 +796,7 @@ class Toast(ctk.CTkFrame):
         ind.pack(side="left", padx=(0, 14), pady=6)
         ind.pack_propagate(False)
 
-        icon_lbl = ctk.CTkLabel(inner, text=icons.get(status, "â„¹"), font=themed_font("h3"),
+        icon_lbl = ctk.CTkLabel(inner, text=icons.get(status, "ℹ"), font=themed_font("h3"),
                                  text_color=c)
         icon_lbl.pack(side="left", padx=(0, 10))
 
@@ -998,20 +998,20 @@ class Dropdown(ctk.CTkOptionMenu):
     """Menu de opções estilizado com largura fixa."""
 
     def __init__(self, parent, values: list[str], initial: str = "", width: int = 180, **kwargs):
+        kwargs.setdefault("fg_color", THEME["bg_alt"])
+        kwargs.setdefault("button_color", THEME["border"])
+        kwargs.setdefault("button_hover_color", THEME["border_strong"])
+        kwargs.setdefault("dropdown_fg_color", THEME["surface"])
+        kwargs.setdefault("dropdown_hover_color", THEME["bg_alt"])
+        kwargs.setdefault("dropdown_text_color", THEME["text"])
+        kwargs.setdefault("dropdown_font", themed_font("body"))
+        kwargs.setdefault("font", themed_font("body"))
+        kwargs.setdefault("width", width)
+        kwargs.setdefault("height", 36)
+        kwargs.setdefault("corner_radius", RADIUS["input"])
         super().__init__(
             parent,
             values=values,
-            fg_color=THEME["bg_alt"],
-            button_color=THEME["border"],
-            button_hover_color=THEME["border_strong"],
-            dropdown_fg_color=THEME["surface"],
-            dropdown_hover_color=THEME["bg_alt"],
-            dropdown_text_color=THEME["text"],
-            dropdown_font=themed_font("body"),
-            font=themed_font("body"),
-            width=width,
-            height=36,
-            corner_radius=RADIUS["input"],
             **kwargs,
         )
         if initial and initial in values:
@@ -1150,9 +1150,9 @@ def _bind_clickable_recursive(widget, on_click):
     """Bind mouse/keyboard events em widget e todos os descendentes não-interativos."""
     if isinstance(widget, _CLICKABLE_EXCLUDE):
         return
-    widget.bind("<Button-1>", lambda e: on_click())
-    widget.bind("<Return>", lambda e: on_click())
-    widget.bind("<space>", lambda e: on_click())
+    widget.bind("<Button-1>", lambda *args: on_click())
+    widget.bind("<Return>", lambda *args: on_click())
+    widget.bind("<space>", lambda *args: on_click())
     for child in widget.winfo_children():
         _bind_clickable_recursive(child, on_click)
 

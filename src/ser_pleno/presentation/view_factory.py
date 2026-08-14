@@ -11,6 +11,16 @@ from ser_pleno.application.controllers.relatorio import RelatorioController
 from ser_pleno.application.controllers.comunicacao import ComunicacaoController
 from ser_pleno.application.controllers.orientacoes import OrientacoesController
 from ser_pleno.application.controllers.configuracoes import ConfiguracoesController
+from ser_pleno.application.controllers.metas import MetasController
+from ser_pleno.application.controllers.alertas import AlertasController
+from ser_pleno.application.controllers.analytics import AnalyticsController
+from ser_pleno.application.controllers.audit_logs import AuditLogsController
+from ser_pleno.application.controllers.compartilhamento_dados import CompartilhamentoDadosController
+from ser_pleno.application.controllers.pedidos_ajuda import PedidosAjudaController
+from ser_pleno.application.controllers.autenticacao import AutenticacaoController
+from ser_pleno.application.controllers.avisos import AvisosController
+from ser_pleno.application.controllers.notificacoes import NotificacoesController
+from ser_pleno.application.controllers.report_template import ReportTemplateController
 from ser_pleno.presentation.views.dashboard import DashboardFrame
 from ser_pleno.presentation.views.estudantes import EstudantesFrame
 from ser_pleno.presentation.views.agenda import AgendaFrame
@@ -19,9 +29,17 @@ from ser_pleno.presentation.views.triagem import TriagemFrame
 from ser_pleno.presentation.views.relatorio import RelatorioFrame
 from ser_pleno.presentation.views.comunicacao import ComunicacaoFrame
 from ser_pleno.presentation.views.orientacoes import OrientacoesFrame
-from ser_pleno.application.controllers.avisos import AvisosController
-from ser_pleno.presentation.views.avisos import AvisosFrame
 from ser_pleno.presentation.views.configuracoes import ConfiguracoesFrame
+from ser_pleno.presentation.views.metas import MetasFrame
+from ser_pleno.presentation.views.alertas import AlertasFrame
+from ser_pleno.presentation.views.analytics import AnalyticsFrame
+from ser_pleno.presentation.views.audit_logs import AuditLogsFrame
+from ser_pleno.presentation.views.compartilhamento import CompartilhamentoDadosFrame
+from ser_pleno.presentation.views.pedidos_ajuda import PedidosAjudaFrame
+from ser_pleno.presentation.views.login import LoginFrame
+from ser_pleno.presentation.views.avisos import AvisosFrame
+from ser_pleno.presentation.views.notificacoes import NotificacoesFrame
+from ser_pleno.presentation.views.report_template import ReportTemplateFrame
 
 
 class ViewFactory:
@@ -39,7 +57,16 @@ class ViewFactory:
             "comunicacao": ComunicacaoFrame,
             "orientacoes": OrientacoesFrame,
             "avisos": AvisosFrame,
+            "notificacoes": NotificacoesFrame,
             "configuracoes": ConfiguracoesFrame,
+            "metas": MetasFrame,
+            "alertas": AlertasFrame,
+            "analytics": AnalyticsFrame,
+            "audit_logs": AuditLogsFrame,
+            "compartilhamento": CompartilhamentoDadosFrame,
+            "pedidos_ajuda": PedidosAjudaFrame,
+            "login": LoginFrame,
+            "report_template": ReportTemplateFrame,
         }
         self._controllers = {
             "dashboard": DashboardController,
@@ -51,7 +78,16 @@ class ViewFactory:
             "comunicacao": ComunicacaoController,
             "orientacoes": OrientacoesController,
             "avisos": AvisosController,
+            "notificacoes": NotificacoesController,
             "configuracoes": ConfiguracoesController,
+            "metas": MetasController,
+            "alertas": AlertasController,
+            "analytics": AnalyticsController,
+            "audit_logs": AuditLogsController,
+            "compartilhamento": CompartilhamentoDadosController,
+            "pedidos_ajuda": PedidosAjudaController,
+            "login": AutenticacaoController,
+            "report_template": ReportTemplateController,
         }
 
     def _get_auth_service(self):

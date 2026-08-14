@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+import time
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox
 import datetime
 import html
-import threading
 import logging
 from typing import Any
 
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import extend_theme, spacing
-from ser_pleno.ui.components.icons import ICONS, IconLabel
-from ser_pleno.presentation.components.ui_components import BaseModal, Card
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.presentation.components.ui_components import BaseModal, Card, PrimaryButton, GhostButton, Dropdown, Toast
+from ser_pleno.presentation.views.base import BaseViewFrame
 from ser_pleno.utils.async_runner import log_view_init_ms, AsyncRunner
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
@@ -23,8 +23,8 @@ logger = logging.getLogger("apps.desktop")
 #  Design tokens —” herdando do THEME global
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 Q = extend_theme(THEME, {
-    "input_border":     "#E5E7EB",
-    "text_light":       "#9CA3AF",
+    "input_border":     THEME["border"],
+    "text_light":       THEME["text_muted"],
     "danger_hover":     "#B91C1C",
     "block_bg":         "#F5F3FF",
     "block_border":     "#C7D2FE",
@@ -104,7 +104,7 @@ class FormField(ctk.CTkFrame):
                 fg_color=Q["input_bg"], border_width=0,
                 button_color=Q["accent"],
                 button_hover_color=Q["accent_hover"],
-                dropdown_fg_color="#FFFFFF",
+                dropdown_fg_color=THEME["surface"],
                 dropdown_text_color=Q["text"],
                 font=font(size=13),
                 height=height or 38,
@@ -173,7 +173,7 @@ class FormField(ctk.CTkFrame):
 
     def _on_focus_in(self, _=None):
         self._box.configure(border_color=Q["input_focus"],
-                            fg_color="#FFFFFF")
+                            fg_color=THEME["surface"])
         self._label.configure(text_color=Q["accent"])
 
     def _on_focus_out(self, _=None):
@@ -250,7 +250,7 @@ class PublicacaoModal(BaseModal):
 
     def _build_form(self, parent):
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent",
-                                        scrollbar_button_color="#D1D5DB")
+                                        scrollbar_button_color=THEME["border_strong"])
         scroll.pack(fill="both", expand=True, padx=spacing("xl"), pady=spacing("md"))
 
         self.f_titulo   = FormField(scroll, f"{ICONS['chart']}Título", placeholder="Título da publicação")
@@ -329,7 +329,7 @@ class PublicacaoModal(BaseModal):
             blk_btns, text="Resetar",
             command=lambda: self._on_reset_blocks("single", []),
             height=34, corner_radius=9, width=100,
-            fg_color=Q["divider"], hover_color="#E5E7EB",
+            fg_color=Q["divider"], hover_color=THEME["border"],
             text_color=Q["text_muted"],
             font=font(size=12),
         ).pack(side="left")
@@ -342,7 +342,7 @@ class PublicacaoModal(BaseModal):
         ctk.CTkButton(
             footer, text="Cancelar", command=self._fechar,
             height=38, width=120, corner_radius=10,
-            fg_color=Q["divider"], hover_color="#E5E7EB",
+            fg_color=Q["divider"], hover_color=THEME["border"],
             text_color=Q["text_muted"],
             border_width=1, border_color=Q["card_border"],
             font=font(size=12),
@@ -505,7 +505,7 @@ class PublicacaoModal(BaseModal):
                 payload["horario_evento"] = he
 
         if not payload["titulo"] or (payload["layout"] == "single" and not payload["conteudo"]):
-            messagebox.showwarning("Atenção", "Preencha título e conteúdo.")
+            self._show_error("Preencha título e conteúdo.", title="Atenção")
             return
 
         self._btn_publicar.configure(state="disabled")
@@ -519,7 +519,7 @@ class PublicacaoModal(BaseModal):
     def _on_publish_error(self, err):
         try: self._btn_publicar.configure(state="normal")
         except Exception: pass
-        messagebox.showerror("Erro", f"{err.get('message') if isinstance(err, dict) else err}")
+        self._show_error(f"{err.get('message') if isinstance(err, dict) else err}")
 
     # —— Blocos ————————————————————————————————————————————————————————————————
     def _on_add_block(self):
@@ -601,7 +601,7 @@ class PublicacaoModal(BaseModal):
                                    fg_color=Q["input_bg"],
                                    button_color=Q["accent"],
                                    button_hover_color=Q["accent_hover"],
-                                   dropdown_fg_color="#FFFFFF",
+                                   dropdown_fg_color=THEME["surface"],
                                    dropdown_text_color=Q["text"],
                                    font=font(size=12))
             comb.pack(anchor="w", pady=(2, 8))
@@ -707,19 +707,19 @@ class PublicacaoModal(BaseModal):
             except Exception:
                 cols = 1
             blocks = self._collect_blocks()
-            wrap = tk.Frame(self._prev_blocks, bg="#F8F7FF")
+            wrap = tk.Frame(self._prev_blocks, bg=THEME["surface"])
             wrap.pack(fill="both", padx=spacing("xs"))
             for i in range(min(cols, 4)):
                 b = blocks[i] if i < len(blocks) else {}
-                f = tk.Frame(wrap, bg="white", bd=1, relief="flat",
-                             highlightthickness=1, highlightbackground="#E5E7EB")
+                f = tk.Frame(wrap, bg=THEME["surface"], bd=1, relief="flat",
+                             highlightthickness=1, highlightbackground=THEME["border"])
                 f.grid(row=0, column=i, padx=spacing("xs"), pady=spacing("xs"), sticky="n")
                 tk.Label(f, text=b.get("titulo", f"Bloco {i+1}"),
                          font=("Segoe UI", 9, "bold"),
-                         bg="white", fg="#111827", anchor="w").pack(
+                         bg=THEME["surface"], fg=THEME["text"], anchor="w").pack(
                     fill="x", padx=spacing("sm"), pady=(spacing("sm"), spacing("xs")))
                 tk.Label(f, text=b.get("conteudo", ""),
-                         font=("Segoe UI", 8), bg="white", fg="#6B7280",
+                         font=("Segoe UI", 8), bg=THEME["surface"], fg=THEME["text_muted"],
                          justify="left", wraplength=160).pack(
                     fill="both", padx=spacing("sm"), pady=(0, spacing("md")))
                 wrap.grid_columnconfigure(i, weight=1)
@@ -728,76 +728,181 @@ class PublicacaoModal(BaseModal):
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  QuadroAvisosFrame —“ frame principal
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-class AvisosFrame(ctk.CTkFrame):
-    def __init__(self, master, controller):
-        import time as _time
-        self._t0 = _time.perf_counter()
-        super().__init__(master, fg_color=Q["page_bg"])
-        self.controller = controller
-        self.app = getattr(controller, 'app', None)
-        self.pack(fill="both", expand=True)
+class AvisosFrame(BaseViewFrame):
+    def __init__(self, parent, controller):
+        self._t0 = time.perf_counter()
 
+        usuario_logado = getattr(controller, "usuario_logado", None) or getattr(
+            getattr(controller, "app", None), "usuario_logado", None
+        )
+        is_admin = bool(
+            usuario_logado
+            and (usuario_logado.get("is_superuser") or usuario_logado.get("is_staff"))
+        )
+
+        actions = []
+        if is_admin:
+            actions.append(
+                PrimaryButton(
+                    parent,
+                    text=f"{ICONS['add']}  Nova Publicação",
+                    command=self._abrir_modal_novo,
+                    height=36,
+                    width=180,
+                )
+            )
+
+        super().__init__(
+            parent,
+            controller=controller,
+            title="Mural de Avisos",
+            subtitle="Comunicados e publicações da instituição",
+            actions=actions,
+            auto_header=True,
+        )
+
+        self.controller = controller
+        self.app = getattr(controller, "app", None)
+        self.usuario_logado = usuario_logado
+        self.is_admin = is_admin
         self.posts: list[dict[str, Any]] = []
         self.editing_post: dict[str, Any] | None = None
         self._modal: PublicacaoModal | None = None
+        self._filtro_busca: str | None = None
+        self._filtro_categoria: str | None = None
 
-        self.lista = ctk.CTkScrollableFrame(
-            self, fg_color="transparent",
-            scrollbar_button_color="#C7D2FE",
-            scrollbar_button_hover_color="#A5B4FC",
-        )
-        self.lista.pack(fill="both", expand=True, padx=spacing("xl"), pady=(0, spacing("xl")))
-
-        self.carregar_avisos_async()
+        self._build_filtros()
+        self._build_lista()
+        self.load_data()
         log_view_init_ms("avisos", self._t0, widget_ref=self)
 
-    # —— Cabeçalho —————————————————————————————————————————————————————————————
-    def _build_header(self):
-        raise NotImplementedError
+    def _is_admin(self) -> bool:
+        return self.is_admin
 
-    # —— Thread helper ——————————————————————————————————————————————————————————
-    def _run_in_thread(self, fn, callback=None, err_callback=None):
-        def _worker():
-            try:
-                res = fn()
-                if callback:
-                    AsyncRunner.run(
-                        task=lambda: res,
-                        on_success=callback,
-                        on_error=err_callback,
-                        widget_ref=self,
-                    )
-            except Exception as e:
-                logger.exception("Erro em thread: %s", e)
-                if err_callback:
-                    AsyncRunner.run(
-                        task=lambda: (_ for _ in ()).throw(e),
-                        on_success=lambda _: None,
-                        on_error=err_callback,
-                        widget_ref=self,
-                    )
-                else:
-                    AsyncRunner.run(
-                        task=lambda: (_ for _ in ()).throw(e),
-                        on_success=lambda _: None,
-                        on_error=lambda exc: messagebox.showerror("Erro", str(exc)),
-                        widget_ref=self,
-                    )
-        threading.Thread(target=_worker, daemon=True).start()
+    # —— Filtros ——————————————————————————————————————————————————————————————
+    def _build_filtros(self):
+        card = Card(self, auto_body=False)
+        card.pack(fill="x", padx=spacing("xl"), pady=(spacing("lg"), spacing("sm")))
+
+        header = ctk.CTkFrame(card, fg_color="transparent")
+        header.pack(fill="x", padx=SPACING["card_pad"], pady=(SPACING["card_pad"], 0))
+        ctk.CTkLabel(
+            header,
+            text=f"{ICONS['search']}  Filtros",
+            font=font(size=12, weight="bold"),
+            text_color=Q["text"],
+        ).pack(side="left")
+
+        btn_row = ctk.CTkFrame(card, fg_color="transparent")
+        btn_row.pack(fill="x", padx=SPACING["card_pad"], pady=(spacing("xs"), SPACING["card_pad"]))
+
+        GhostButton(
+            btn_row,
+            text="Limpar filtros",
+            command=self._limpar_filtros,
+            height=32,
+            width=120,
+        ).pack(side="right")
+
+        body = ctk.CTkFrame(card, fg_color="transparent")
+        body.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"]))
+        body.grid_columnconfigure((0, 1, 2), weight=1)
+
+        opt_style = dict(
+            button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"],
+            text_color=THEME["text"],
+            dropdown_fg_color=THEME["surface"],
+            dropdown_text_color=THEME["text"],
+            height=32,
+            corner_radius=RADIUS["button"],
+            font=font(size=12),
+        )
+
+        ctk.CTkLabel(
+            body, text="Buscar", font=font(size=11, weight="bold"), text_color=Q["text_muted"]
+        ).grid(row=0, column=0, sticky="w", pady=(0, 4))
+        self.f_busca = ctk.CTkEntry(
+            body,
+            placeholder_text="Título, conteúdo ou autor...",
+            fg_color=THEME["bg_alt"],
+            border_width=1,
+            border_color=THEME["border"],
+            font=font(size=12),
+            text_color=THEME["text"],
+            height=32,
+        )
+        self.f_busca.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+        self.f_busca.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
+
+        ctk.CTkLabel(
+            body, text="Categoria", font=font(size=11, weight="bold"), text_color=Q["text_muted"]
+        ).grid(row=0, column=1, sticky="w", pady=(0, 4))
+        self.f_categoria = Dropdown(
+            body,
+            values=["Todas", "informativo", "aviso", "aula", "urgente", "evento"],
+            initial="Todas",
+            command=lambda _: self._aplicar_filtros_auto(),
+            **opt_style,
+        )
+        self.f_categoria.grid(row=1, column=1, sticky="ew", padx=6)
+
+        ctk.CTkLabel(
+            body, text="Publicado em", font=font(size=11, weight="bold"), text_color=Q["text_muted"]
+        ).grid(row=0, column=2, sticky="w", pady=(0, 4))
+        self.f_data = ctk.CTkEntry(
+            body,
+            placeholder_text="YYYY-MM-DD",
+            fg_color=THEME["bg_alt"],
+            border_width=1,
+            border_color=THEME["border"],
+            font=font(size=12),
+            text_color=THEME["text"],
+            height=32,
+        )
+        self.f_data.grid(row=1, column=2, sticky="ew", padx=(6, 0))
+        self.f_data.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
+
+    def _limpar_filtros(self):
+        self.f_busca.delete(0, "end")
+        self.f_categoria.set("Todas")
+        self.f_data.delete(0, "end")
+        self.carregar_avisos_async()
+
+    def _aplicar_filtros_auto(self):
+        self.carregar_avisos_async(
+            busca=self.f_busca.get().strip() or None,
+            categoria=self.f_categoria.get() if self.f_categoria.get() != "Todas" else None,
+        )
+
+    # —— Lista ————————————————————————————————————————————————————————————————
+    def _build_lista(self):
+        self.lista = ctk.CTkFrame(self, fg_color="transparent")
+        self.lista.pack(fill="both", expand=True, padx=spacing("xl"), pady=(0, spacing("xl")))
+
+    def load_data(self):
+        self.carregar_avisos_async()
 
     # —— Carregar ———————————————————————————————————————————————————————————————
-    def carregar_avisos_async(self):
+    def carregar_avisos_async(self, busca=None, categoria=None):
         self._limpar_lista()
-        ctk.CTkLabel(self.lista,
-                      text=f"{ICONS['hourglass']}  Carregando publicações...",
-                     font=font(size=13),
-                     text_color=Q["text_muted"]).pack(pady=20)
+        self._filtro_busca = busca
+        self._filtro_categoria = categoria
 
-        self._run_in_thread(
-            self.controller.get_service().listar_mensagens,
-            callback=self._on_load_success,
-            err_callback=self._on_load_error,
+        loading_lbl = ctk.CTkLabel(
+            self.lista,
+            text=f"{ICONS['hourglass']}  Carregando publicações...",
+            font=font(size=13),
+            text_color=Q["text_muted"],
         )
+        loading_lbl.pack(pady=20)
+
+        def _fetch():
+            return self.controller.get_service().listar_mensagens(
+                busca=busca, pagina=1, categoria=categoria
+            )
+
+        self._load_async(_fetch, self._on_load_success, self._on_load_error)
 
     def _limpar_lista(self):
         try:
@@ -813,145 +918,199 @@ class AvisosFrame(ctk.CTkFrame):
         self.posts = posts
 
         if not posts:
-            ctk.CTkLabel(self.lista,
-                          text=f"{ICONS['empty']}  Nenhuma publicação encontrada",
-                         font=font(size=13),
-                         text_color=Q["text_muted"]).pack(pady=30)
+            ctk.CTkLabel(
+                self.lista,
+                text=f"{ICONS['empty']}  Nenhuma publicação encontrada",
+                font=font(size=13),
+                text_color=Q["text_muted"],
+            ).pack(pady=30)
             return
 
         batch = WidgetBatchBuilder(parent=self, batch_size=20)
         for post in reversed(posts):
             if not isinstance(post, dict):
                 continue
-            batch.add(lambda post=post: self._criar_card(
-                post.get("id"),
-                post.get("titulo")    or post.get("title")      or "(sem título)",
-                post.get("conteudo")  or post.get("content")    or "",
-                post.get("autor")     or post.get("author")     or "Sistema",
-                post.get("publicado_em") or post.get("created_at") or "",
-                post.get("categoria") or post.get("category")   or "informativo",
-            ))
+            batch.add(
+                lambda post=post: self._criar_card(
+                    post.get("id"),
+                    post.get("titulo") or post.get("title") or "(sem título)",
+                    post.get("conteudo") or post.get("content") or "",
+                    post.get("autor") or post.get("author") or "Sistema",
+                    post.get("publicado_em") or post.get("created_at") or "",
+                    post.get("categoria") or post.get("category") or "informativo",
+                )
+            )
         batch.execute()
 
     def _on_load_error(self, e):
         self._limpar_lista()
-        ctk.CTkLabel(self.lista,
-                      text=f"{ICONS['bolt']}   Erro ao carregar avisos: {e}",
-                     font=font(size=12),
-                     text_color=Q["danger"]).pack(pady=20)
+        ctk.CTkLabel(
+            self.lista,
+            text=f"{ICONS['bolt']}   Erro ao carregar avisos: {e}",
+            font=font(size=12),
+            text_color=Q["danger"],
+        ).pack(pady=20)
 
     def _parse_posts(self, res) -> list[dict[str, Any]]:
         if isinstance(res, dict):
-            if res.get("success") is False: return []
-            if "data" in res and isinstance(res["data"], list): return res["data"]
-            if res.get("id"): return [res]
+            if res.get("success") is False:
+                return []
+            if "data" in res and isinstance(res["data"], list):
+                return res["data"]
+            if res.get("id"):
+                return [res]
         if isinstance(res, list):
             return res
         return []
+
+    # —— Helpers ——————————————————————————————————————————————————————————————
+    @staticmethod
+    def _formatar_data(data_str: str) -> str:
+        if not data_str:
+            return ""
+        try:
+            dt = datetime.datetime.fromisoformat(data_str.replace("Z", "+00:00"))
+            return dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            return data_str
 
     # —— Card de aviso ——————————————————————————————————————————————————————————
     def _criar_card(self, aviso_id, titulo, descricao, autor, data, categoria="informativo"):
         card = Card(self.lista)
         card.pack(fill="x", pady=(0, 12))
 
-        # Barra lateral colorida
         color, _ = Q["cat"].get(categoria, _CAT_DEFAULT)
         body = card.body
         body.pack_configure(padx=(0, spacing("lg")), pady=spacing("md"))
-        ctk.CTkFrame(body, width=4, corner_radius=0,
-                     fg_color=color).pack(side="left", fill="y")
+        ctk.CTkFrame(body, width=4, corner_radius=0, fg_color=color).pack(
+            side="left", fill="y"
+        )
 
         content = ctk.CTkFrame(body, fg_color="transparent")
         content.pack(side="left", fill="both", expand=True, padx=(4, 0))
 
-        # Topo: chip + título + ações
         top = ctk.CTkFrame(content, fg_color="transparent")
         top.pack(fill="x", pady=(0, spacing("item_gap")))
 
-        chip_frame = ctk.CTkFrame(top, fg_color=Q["cat"].get(categoria, _CAT_DEFAULT)[1],
-                                  corner_radius=6)
+        chip_frame = ctk.CTkFrame(
+            top, fg_color=Q["cat"].get(categoria, _CAT_DEFAULT)[1], corner_radius=6
+        )
         chip_frame.pack(side="left", padx=(0, spacing("md")))
-        ctk.CTkLabel(chip_frame, text=categoria.capitalize(),
-                     font=font(size=10, weight="bold"),
-                     text_color=color).pack(padx=spacing("sm"), pady=spacing("xs"))
+        ctk.CTkLabel(
+            chip_frame,
+            text=categoria.capitalize(),
+            font=font(size=10, weight="bold"),
+            text_color=color,
+        ).pack(padx=spacing("sm"), pady=spacing("xs"))
 
-        ctk.CTkLabel(top, text=escape_html(titulo or ""),
-                     font=font(size=14, weight="bold"),
-                     text_color=Q["text"]).pack(side="left")
+        ctk.CTkLabel(
+            top,
+            text=escape_html(titulo or ""),
+            font=font(size=14, weight="bold"),
+            text_color=Q["text"],
+        ).pack(side="left")
 
-        # Botões de ação
         acts = ctk.CTkFrame(top, fg_color="transparent")
         acts.pack(side="right")
 
         ctk.CTkButton(
-            acts, text=f"{ICONS['edit']}  Editar",
+            acts,
+            text=f"{ICONS['edit']}  Editar",
             command=lambda i=aviso_id: self._on_edit(i),
-            height=30, width=90, corner_radius=8,
-            fg_color=Q["accent_soft"], hover_color=Q["accent"],
+            height=30,
+            width=90,
+            corner_radius=8,
+            fg_color=Q["accent_soft"],
+            hover_color=Q["accent"],
             text_color=Q["accent"],
             font=font(size=11, weight="bold"),
         ).pack(side="left", padx=(0, 6))
 
-        ctk.CTkButton(
-            acts, text=f"{ICONS['delete']}  Excluir",
-            command=lambda i=aviso_id: self._on_delete(i),
-            height=30, width=90, corner_radius=8,
-            fg_color=Q["danger_soft"], hover_color=Q["danger_hover"],
-            text_color=Q["danger"],
-            font=font(size=11, weight="bold"),
-        ).pack(side="left")
+        if self.is_admin:
+            ctk.CTkButton(
+                acts,
+                text=f"{ICONS['delete']}  Excluir",
+                command=lambda i=aviso_id: self._on_delete(i),
+                height=30,
+                width=90,
+                corner_radius=8,
+                fg_color=Q["danger_soft"],
+                hover_color=Q["danger_hover"],
+                text_color=Q["danger"],
+                font=font(size=11, weight="bold"),
+            ).pack(side="left")
 
-        # Conteúdo
         if descricao:
-            ctk.CTkLabel(content,
-                         text=escape_html(descricao or ""),
-                         wraplength=820, justify="left",
-                         font=font(size=12),
-                         text_color=Q["text_muted"],
-                         anchor="w").pack(anchor="w", pady=(0, 10))
+            ctk.CTkLabel(
+                content,
+                text=escape_html(descricao or ""),
+                wraplength=820,
+                justify="left",
+                font=font(size=12),
+                text_color=Q["text_muted"],
+                anchor="w",
+            ).pack(anchor="w", pady=(0, 10))
 
-        # Rodapé do card
-        ctk.CTkFrame(content, height=1, fg_color=Q["divider"]).pack(fill="x", pady=(0, 8))
+        ctk.CTkFrame(content, height=1, fg_color=Q["divider"]).pack(
+            fill="x", pady=(0, 8)
+        )
 
         footer_row = ctk.CTkFrame(content, fg_color="transparent")
         footer_row.pack(fill="x")
 
-        for icon, val in [(ICONS["view"], autor), (ICONS["chart"], data)]:
+        data_formatada = self._formatar_data(data)
+        for icon, val in [(ICONS["view"], autor), (ICONS["chart"], data_formatada)]:
             if val:
                 lbl_row = ctk.CTkFrame(footer_row, fg_color="transparent")
                 lbl_row.pack(side="left", padx=(0, 16))
-                ctk.CTkLabel(lbl_row, text=f"{icon}  {escape_html(val)}",
-                             font=font(size=11),
-                             text_color=Q["text_light"]).pack(side="left")
+                ctk.CTkLabel(
+                    lbl_row,
+                    text=f"{icon}  {escape_html(val)}",
+                    font=font(size=11),
+                    text_color=Q["text_light"],
+                ).pack(side="left")
 
     # —— Editar / Excluir ———————————————————————————————————————————————————————
     def _on_edit(self, post_id):
-        def _fetch(): return self.controller.get_service().obter_mensagem(post_id)
-        def _on_res(res):
+        def _fetch():
+            return self.controller.get_service().obter_mensagem(post_id)
+
+        def _on_success(res):
             if isinstance(res, dict) and res.get("success") is False:
-                messagebox.showerror("Erro", str(res.get("message", "")))
+                self._show_error(str(res.get("message", "")))
                 return
             data = res.get("data", res) if isinstance(res, dict) else res
             if not isinstance(data, dict):
-                messagebox.showerror("Erro", "Resposta inválida do servidor.")
+                self._show_error("Resposta inválida do servidor.")
                 return
             self.editing_post = data
             self._abrir_modal_edicao(data)
-        def _on_err(e): messagebox.showerror("Erro", str(e))
-        self._run_in_thread(_fetch, callback=_on_res, err_callback=_on_err)
+
+        def _on_error(e):
+            self._show_error(str(e))
+
+        self._load_async(_fetch, _on_success, _on_error)
 
     def _on_delete(self, post_id):
-        if not messagebox.askyesno("Confirmação",
-                                   "Excluir esta publicação permanentemente?"):
+        if not self.is_admin:
+            self._show_error("Apenas administradores podem excluir publicações.", title="Acesso negado")
             return
-        def _on_ok(_): self.carregar_avisos_async()
-        def _on_fail(e):
-            messagebox.showerror("Erro ao excluir",
-                                 f"{e.get('message') if isinstance(e, dict) else e}")
-        self._run_in_thread(
-            lambda: self.controller.get_service().deletar_mensagem(post_id),
-            callback=_on_ok, err_callback=_on_fail,
-        )
+        if not self._confirmar("Excluir esta publicação permanentemente?"):
+            return
+
+        def _fetch():
+            return self.controller.get_service().deletar_mensagem(post_id)
+
+        def _on_success(_):
+            self.carregar_avisos_async()
+
+        def _on_error(e):
+            self._show_error(
+                f"{e.get('message') if isinstance(e, dict) else e}",
+                title="Erro ao excluir",
+            )
+
+        self._load_async(_fetch, _on_success, _on_error)
 
     # —— Modal ——————————————————————————————————————————————————————————————————
     def _abrir_modal_novo(self):
@@ -963,8 +1122,10 @@ class AvisosFrame(ctk.CTkFrame):
 
     def _open_modal(self, populate_data: dict[str, Any] | None = None):
         if self._modal is not None:
-            try: self._modal.close()
-            except Exception: pass
+            try:
+                self._modal.close()
+            except Exception:
+                pass
 
         self._modal = PublicacaoModal(
             self,
@@ -978,22 +1139,24 @@ class AvisosFrame(ctk.CTkFrame):
     def _on_modal_publish(self, payload, on_success, on_error):
         def _send():
             if self.editing_post and self.editing_post.get("id"):
-                return self.controller.get_service().atualizar_mensagem(self.editing_post["id"], payload)
+                return self.controller.get_service().atualizar_mensagem(
+                    self.editing_post["id"], payload
+                )
             return self.controller.get_service().criar_mensagem(payload)
 
         def _cb(res):
             if isinstance(res, dict) and res.get("success") is False:
                 on_error(res)
-                messagebox.showerror("Erro", str(res.get("message", "")))
+                self._show_error(str(res.get("message", "")))
                 return
             on_success(res)
             self.carregar_avisos_async()
 
         def _err(e):
             on_error({"success": False, "message": str(e)})
-            messagebox.showerror("Erro", str(e))
+            self._show_error(str(e))
 
-        self._run_in_thread(_send, callback=_cb, err_callback=_err)
+        self._load_async(_send, _cb, _err)
 
     def _on_modal_cancel(self):
         self._modal = None

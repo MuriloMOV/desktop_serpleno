@@ -247,15 +247,18 @@ class LoginFrame(ctk.CTkFrame):
         self.canvas.place(relwidth=1, relheight=1)
 
         self._criar_bolhas()
-        self._pre_generate_gradients()
+        self._schedule_lazy_gradient_preload()
         self._criar_music_toggle()
-        # Card arredondado desenhado no canvas via PIL
-        card_img = self._criar_imagem_card()
+        card_img = None
+        try:
+            card_img = self._criar_imagem_card()
+            self._card_img_id = self.canvas.create_image(
+                0, 0, anchor="nw", image=card_img, tags="card_img"
+            )
+            self.canvas.image_card = card_img
+        except Exception:
+            pass
         self._card_img = card_img
-        self._card_img_id = self.canvas.create_image(
-            0, 0, anchor="nw", image=card_img, tags="card_img"
-        )
-        self.canvas.image_card = card_img
         self._criar_card_login()
 
         self.bind("<Configure>", self._on_configure)
@@ -428,23 +431,33 @@ class LoginFrame(ctk.CTkFrame):
             widget_ref=self,
         )
 
-    def _pre_generate_gradients(self) -> None:
-        """Pré-gera gradientes para tamanhos comuns em background."""
+    def _schedule_lazy_gradient_preload(self) -> None:
         common_sizes = [(1024, 768), (1280, 720), (800, 600)]
-        for w, h in common_sizes:
+        self._lazy_gradient_sizes = common_sizes
+        self._lazy_gradient_index = 0
+        self.after_idle(self._generate_next_gradient)
 
-            def _gen(size=(w, h)):
-                return self._generate_gradient_pil(*size)
+    def _generate_next_gradient(self):
+        if self._lazy_gradient_index >= len(self._lazy_gradient_sizes):
+            return
+        if not self._alive or not self.winfo_exists():
+            return
 
+        w, h = self._lazy_gradient_sizes[self._lazy_gradient_index]
+        key = (w, h)
+        if key not in self._gradient_cache:
+            def _gen():
+                return self._generate_gradient_pil(w, h)
             def _on_ready(pil_img, size=(w, h)):
                 if not self._alive or not self.winfo_exists():
                     return
                 photo = ImageTk.PhotoImage(pil_img)
                 self._gradient_cache[size] = photo
-
-            from ser_pleno.utils.async_runner import AsyncRunner
-
             AsyncRunner.run(task=_gen, on_success=_on_ready, widget_ref=self)
+
+        self._lazy_gradient_index += 1
+        if self._lazy_gradient_index < len(self._lazy_gradient_sizes):
+            self.after_idle(self._generate_next_gradient)
 
     def _elevar_elementos(self):
         for b in self.bolhas:

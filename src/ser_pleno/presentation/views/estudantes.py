@@ -2,6 +2,8 @@ import logging
 import customtkinter as ctk
 from datetime import datetime
 from ser_pleno.application.controllers.estudantes import EstudantesController
+from ser_pleno.application.controllers.orientacoes import OrientacoesController
+from ser_pleno.application.controllers.agenda import AgendaController
 from ser_pleno.utils.async_runner import AsyncRunner
 
 from ser_pleno.ui.theme import (
@@ -12,20 +14,15 @@ from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
     Card, PrimaryButton, DangerButton, GhostButton, Avatar,
     Divider, Badge, Pill, Tabs, ClickableFrame, bind_clickable,
-    SkeletonLoader,
+    SkeletonLoader, EmptyState, Toast, BaseModal,
 )
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 from ser_pleno.utils.async_runner import log_view_init_ms
+from ser_pleno.infrastructure.db.query_helpers import fetch_one
 
 
-
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  Componente: campo de entrada inline
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  Componente: campo de entrada inline
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class _Field(ctk.CTkFrame):
     def __init__(self, parent, label: str, placeholder: str = "",
                  icon: str = "", password: bool = False, helper: str = ""):
@@ -82,20 +79,20 @@ class _Field(ctk.CTkFrame):
         self._err.configure(text="", text_color=THEME["text_secondary"])
 
 
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  EstudantesFrame
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class EstudantesFrame(ctk.CTkFrame):
     def __init__(self, parent, controller):
         import time as _time
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
-        self.controller        = controller
-        self.controller_estudantes = EstudantesController()
+        self.controller = controller
+        self.controller_estudantes = EstudantesController(auth_service=getattr(controller, 'auth_service', None))
+        self.controller_orientacoes = OrientacoesController(auth_service=getattr(controller, 'auth_service', None))
+        self.controller_agenda = AgendaController(auth_service=getattr(controller, 'auth_service', None))
         self._todos_estudantes: list = []
         self._selecionado: dict | None = None
-        self._item_widgets: dict = {}   # id → frame widget
+        self._item_widgets: dict = {}
         self._filter_after_id = None
+        self._current_user_role: str | None = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -106,9 +103,30 @@ class EstudantesFrame(ctk.CTkFrame):
         self.load_data()
         log_view_init_ms("estudantes", self._t0, widget_ref=self)
 
-    # ••••••••••••••••••••••••••••••••••
-    #  Toolbar de ações
-    # ••••••••••••••••••••••••••••••••••
+    def _get_current_user_role(self) -> str | None:
+        if self._current_user_role is not None:
+            return self._current_user_role
+        try:
+            auth_service = getattr(self.controller, 'auth_service', None)
+            if not auth_service or not getattr(auth_service, 'user', None):
+                return None
+            user_id = auth_service.user.get("id")
+            if not user_id:
+                return None
+            row = fetch_one(
+                "SELECT role FROM user_profile WHERE user_id = %s AND is_active_profile = 1",
+                (user_id,),
+            )
+            role = row.get("role") if row else None
+            self._current_user_role = role
+            return role
+        except Exception:
+            return None
+
+    def _is_sensitive_field_visible(self) -> bool:
+        role = self._get_current_user_role()
+        return role in ("psicologo", "admin")
+
     def _criar_toolbar_acoes(self):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.grid(row=0, column=0, sticky="ew", padx=SPACING["page_x"], pady=(SPACING["page_y"], 4))
@@ -122,9 +140,6 @@ class EstudantesFrame(ctk.CTkFrame):
             height=40, width=168,
         ).pack()
 
-    # ••••••••••••••••••••••••••••••••••
-    #  LAYOUT PRINCIPAL
-    # ••••••••••••••••••••••••••••••••••
     def _criar_conteudo(self):
         wrap = ctk.CTkFrame(self, fg_color="transparent")
         wrap.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=SPACING["section_gap"])
@@ -134,9 +149,6 @@ class EstudantesFrame(ctk.CTkFrame):
         self._criar_sidebar(wrap)
         self._criar_painel_detalhes(wrap)
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  SIDEBAR —“ lista de estudantes
-    # ••••••••••••••••••••••••••••••••••••••
     def _criar_sidebar(self, parent):
         sidebar = Card(parent, width=300)
         sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, SPACING["grid_gap"]))
@@ -144,7 +156,6 @@ class EstudantesFrame(ctk.CTkFrame):
         sidebar.grid_rowconfigure(2, weight=1)
         sidebar.grid_columnconfigure(0, weight=1)
 
-        # —— Busca —————————————————————————————————————————————————
         search_wrap = ctk.CTkFrame(sidebar, fg_color=THEME["bg_alt"], corner_radius=RADIUS["input"])
         search_wrap.grid(row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["page_y"], SPACING["item_gap"]))
 
@@ -164,7 +175,6 @@ class EstudantesFrame(ctk.CTkFrame):
         self.entry_busca.pack(side="left", fill="x", expand=True, padx=(4, 8))
         self.entry_busca.bind("<KeyRelease>", self._filtrar)
 
-        # —— Filtros ———————————————————————————————————————————————
         f_row = ctk.CTkFrame(sidebar, fg_color="transparent")
         f_row.grid(row=1, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
         f_row.grid_columnconfigure((0, 1), weight=1)
@@ -196,12 +206,10 @@ class EstudantesFrame(ctk.CTkFrame):
         )
         self.f_aten.grid(row=0, column=1, sticky="ew", padx=(4, 0))
 
-        # Divider
         ctk.CTkFrame(sidebar, height=1, fg_color=THEME["divider"]).grid(
             row=1, column=0, sticky="sew", padx=0, pady=(40, 0)
         )
 
-        # —— Lista —————————————————————————————————————————————————
         self.scroll_list = ctk.CTkScrollableFrame(
             sidebar, fg_color="transparent",
             scrollbar_button_color=THEME["border_strong"],
@@ -209,7 +217,6 @@ class EstudantesFrame(ctk.CTkFrame):
         )
         self.scroll_list.grid(row=2, column=0, sticky="nsew")
 
-        # Contador
         self.lbl_count = ctk.CTkLabel(
             sidebar, text="0 estudantes",
             font=themed_font("caption"),
@@ -217,20 +224,15 @@ class EstudantesFrame(ctk.CTkFrame):
         )
         self.lbl_count.grid(row=3, column=0, pady=(4, 10))
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  PAINEL DE DETALHES
-    # ••••••••••••••••••••••••••••••••••••••
     def _criar_painel_detalhes(self, parent):
         panel = Card(parent, auto_body=False)
         panel.grid(row=0, column=1, sticky="nsew")
         panel.grid_rowconfigure(2, weight=1)
         panel.grid_columnconfigure(0, weight=1)
 
-        # —— Hero do estudante ——————————————————————————————————————
         hero = ctk.CTkFrame(panel, fg_color="transparent")
         hero.grid(row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["page_y"], 0))
 
-        # Avatar grande
         self._av_slot = ctk.CTkFrame(hero, width=60, height=60, fg_color="transparent")
         self._av_slot.pack(side="left", padx=(0, 16))
         self._av_slot.pack_propagate(False)
@@ -238,7 +240,6 @@ class EstudantesFrame(ctk.CTkFrame):
         _av.pack(expand=True)
         self._hero_av = _av
 
-        # Nome + curso
         meta = ctk.CTkFrame(hero, fg_color="transparent")
         meta.pack(side="left", fill="both", expand=True)
 
@@ -250,13 +251,12 @@ class EstudantesFrame(ctk.CTkFrame):
         self.lbl_nome_det.pack(anchor="w")
 
         self.lbl_curso_det = ctk.CTkLabel(
-            meta, text="—”",
+            meta, text="—",
             font=themed_font("body"),
             text_color=THEME["text_secondary"],
         )
         self.lbl_curso_det.pack(anchor="w", pady=(2, 0))
 
-        # Botões de ação
         actions = ctk.CTkFrame(hero, fg_color="transparent")
         actions.pack(side="right", anchor="n")
 
@@ -276,11 +276,45 @@ class EstudantesFrame(ctk.CTkFrame):
             height=36, width=100,
         ).pack(side="left")
 
+        self.btn_bloquear = PrimaryButton(
+            actions, text=f"{ICONS['lock']}  Bloquear",
+            command=self._bloquear_minigames,
+            height=36, width=110,
+            fg_color=THEME["danger_soft"],
+            hover_color=THEME["danger"],
+            text_color=THEME["danger"],
+        )
+        self.btn_bloquear.pack(side="left", padx=(8, 0))
+
+        self.btn_desbloquear = PrimaryButton(
+            actions, text=f"{ICONS['check']}  Desbloquear",
+            command=self._desbloquear_minigames,
+            height=36, width=110,
+            fg_color=THEME["success_soft"],
+            hover_color=THEME["success"],
+            text_color=THEME["success"],
+        )
+
+        self.btn_suspicious = GhostButton(
+            actions, text=f"{ICONS['bolt']}  Verificar Suspeita",
+            command=self._verificar_comportamento_suspeito,
+            height=36, width=140,
+            text_color=THEME["warning"],
+        )
+        self.btn_suspicious.pack(side="left", padx=(8, 0))
+
+        self.btn_log = GhostButton(
+            actions, text=f"{ICONS['clock']}  Log",
+            command=self._mostrar_log_bloqueio,
+            height=36, width=80,
+            text_color=THEME["text_secondary"],
+        )
+        self.btn_log.pack(side="left", padx=(8, 0))
+
         ctk.CTkFrame(panel, height=1, fg_color=THEME["divider"]).grid(
             row=1, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["section_gap"], 0)
         )
 
-        # —— Tabs ——————————————————————————————————————————————————
         self.tabs = ctk.CTkTabview(
             panel,
             fg_color="transparent",
@@ -301,7 +335,6 @@ class EstudantesFrame(ctk.CTkFrame):
         self._construir_tab_intervencoes()
         self._construir_tab_agenda()
 
-        # —— Status bar na base ————————————————————————————————————
         self.status_bar = ctk.CTkFrame(
             panel, fg_color=THEME["success_soft"],
             corner_radius=0,
@@ -328,21 +361,49 @@ class EstudantesFrame(ctk.CTkFrame):
         )
         self.lbl_status_det.pack(side="left")
 
-    # —— Tab: Perfil —————————————————————————————————————————————————————————
     def _construir_tab_perfil(self):
         grid = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
         grid.pack(fill="both", expand=True, pady=SPACING["item_gap"])
         grid.grid_columnconfigure((0, 1), weight=1)
 
         cfg = [
-            ("Contato",       "--", ICONS["chart"], 0, 0, "card_email"),
-            ("Idade",         "--", ICONS["cake"], 0, 1, "card_idade"),
-            ("Curso / Turma", "--", ICONS["group"], 1, 0, "card_curso"),
-            ("Laudo Médico",  "--", ICONS["file"], 1, 1, "card_laudo"),
+            ("Contato",               "--", ICONS["chart"], 0, 0, "card_email"),
+            ("Telefone",              "--", ICONS["location"], 0, 1, "card_phone"),
+            ("Idade",                 "--", ICONS["cake"], 1, 0, "card_idade"),
+            ("Curso / Turma",         "--", ICONS["group"], 1, 1, "card_curso"),
+            ("Professor Responsável", "--", ICONS["user"], 2, 0, "card_professor"),
+            ("Status",                "--", ICONS["check"], 2, 1, "card_status"),
+            ("Laudo Médico",          "--", ICONS["file"], 3, 0, "card_laudo"),
+            ("Nível de Prioridade",   "--", ICONS["bolt"], 3, 1, "card_prioridade"),
         ]
         for label, value, icon, r, c, attr in cfg:
             lbl = self._info_box(grid, label, value, icon, r, c)
             setattr(self, attr, lbl)
+
+        if self._is_sensitive_field_visible():
+            extra = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
+            extra.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
+            extra.grid_columnconfigure((0, 1), weight=1)
+
+            at = self._info_box(extra, "Motivo da Atenção", "—", ICONS["alert"], 0, 0)
+            setattr(self, "card_atencao", at)
+
+            gn = self._info_box(extra, "Observações Gerais", "—", ICONS["file"], 0, 1)
+            setattr(self, "card_obs", gn)
+
+        ctk.CTkFrame(self.tab_perfil, height=1, fg_color=THEME["divider"]).pack(
+            fill="x", padx=SPACING["card_pad"], pady=SPACING["item_gap"]
+        )
+
+        em_frame = ctk.CTkFrame(self.tab_perfil, fg_color="transparent")
+        em_frame.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
+        em_frame.grid_columnconfigure((0, 1), weight=1)
+
+        ec = self._info_box(em_frame, "Contato de Emergência", "—", ICONS["alert"], 0, 0)
+        setattr(self, "card_emergency_contact", ec)
+
+        ep = self._info_box(em_frame, "Telefone de Emergência", "—", ICONS["phone"], 0, 1)
+        setattr(self, "card_emergency_phone", ep)
 
     def _info_box(self, parent, label: str, value: str, icon: str,
                   r: int, c: int) -> ctk.CTkLabel:
@@ -361,7 +422,6 @@ class EstudantesFrame(ctk.CTkFrame):
         hdr = ctk.CTkFrame(inner, fg_color="transparent")
         hdr.pack(fill="x", pady=(0, 6))
 
-        # Ícone em pill
         icon_bg = ctk.CTkFrame(hdr, fg_color=THEME["primary_soft"],
                                corner_radius=RADIUS["sm"], width=28, height=28)
         icon_bg.pack(side="left", padx=(0, 8))
@@ -383,7 +443,6 @@ class EstudantesFrame(ctk.CTkFrame):
         val_lbl.pack(anchor="w")
         return val_lbl
 
-    # —— Tab: Intervenções ———————————————————————————————————————————————————
     def _construir_tab_intervencoes(self):
         self.tab_int_inner = ctk.CTkScrollableFrame(
             self.tab_intervencoes, fg_color="transparent",
@@ -399,7 +458,6 @@ class EstudantesFrame(ctk.CTkFrame):
             text_color=THEME["text_secondary"],
         ).pack(pady=30)
 
-    # —— Tab: Agenda —————————————————————————————————————————————————————————
     def _construir_tab_agenda(self):
         self.tab_ag_inner = ctk.CTkScrollableFrame(
             self.tab_agenda, fg_color="transparent",
@@ -415,9 +473,6 @@ class EstudantesFrame(ctk.CTkFrame):
             text_color=THEME["text_secondary"],
         ).pack(pady=30)
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  Dados
-    # ••••••••••••••••••••••••••••••••••••••
     def load_data(self):
         def fetch():
             return self.controller_estudantes.listar_estudantes()
@@ -426,8 +481,7 @@ class EstudantesFrame(ctk.CTkFrame):
             self.render_list(result)
 
         def on_error(exc):
-            import tkinter.messagebox as mb
-            mb.showerror("Erro", f"Falha ao carregar estudantes.\n{exc}")
+            self._show_error(f"Falha ao carregar estudantes.\n{exc}")
             self._set_status_erro()
 
         AsyncRunner.run(
@@ -456,7 +510,6 @@ class EstudantesFrame(ctk.CTkFrame):
             self._todos_estudantes = students
             self._renderizar_estudantes(students)
 
-        # Pequeno delay para o skeleton aparecer antes da renderização
         self.after(60, apply)
 
     def _renderizar_estudantes(self, lista: list):
@@ -494,6 +547,7 @@ class EstudantesFrame(ctk.CTkFrame):
         nome    = st.get("name", "??")
         curso   = st.get("course", "Sem curso")
         atenção = st.get("requires_attention", False)
+        laudo   = st.get("has_medical_report", False)
         sid     = st.get("id", nome)
 
         row = ctk.CTkFrame(
@@ -510,36 +564,43 @@ class EstudantesFrame(ctk.CTkFrame):
         inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
         inner.grid_columnconfigure(1, weight=1)
 
-        # Avatar
         av_color = get_avatar_color(nome)
         av = Avatar(inner, initials=nome[:2], size=40, color=av_color)
         av.grid(row=0, column=0, rowspan=2, padx=(0, 10), sticky="ns")
 
-        # Nome
         ctk.CTkLabel(
             inner, text=nome,
             font=themed_font("body", "bold"),
             text_color=THEME["text"], anchor="w",
         ).grid(row=0, column=1, sticky="w")
 
-        # Curso
         ctk.CTkLabel(
             inner, text=curso,
             font=themed_font("caption"),
             text_color=THEME["text_secondary"], anchor="w",
         ).grid(row=1, column=1, sticky="w")
 
-        # Badge de atenção
-        if atenção:
-            badge = ctk.CTkFrame(inner, fg_color=THEME["danger_soft"], corner_radius=RADIUS["sm"])
-            badge.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+        ind = ctk.CTkFrame(inner, fg_color="transparent")
+        ind.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+
+        if laudo:
+            laudo_badge = ctk.CTkFrame(ind, fg_color=THEME["primary_soft"], corner_radius=RADIUS["sm"])
+            laudo_badge.pack(side="left", padx=(0, 3))
             ctk.CTkLabel(
-                badge, text=f"{ICONS['bolt']} ",
+                laudo_badge, text=f"{ICONS['file']} ",
+                font=themed_font("caption"),
+                text_color=THEME["primary"],
+            ).pack(padx=spacing("xs"), pady=spacing("xs"))
+
+        if atenção:
+            ate_badge = ctk.CTkFrame(ind, fg_color=THEME["danger_soft"], corner_radius=RADIUS["sm"])
+            ate_badge.pack(side="left")
+            ctk.CTkLabel(
+                ate_badge, text=f"{ICONS['bolt']} ",
                 font=themed_font("caption"),
                 text_color=THEME["danger"],
-            ).pack(padx=spacing("sm"), pady=spacing("xs"))
+            ).pack(padx=spacing("xs"), pady=spacing("xs"))
 
-        # Hover e seleção
         row.bind("<Enter>", lambda e, r=row: r.configure(fg_color=THEME["primary_soft"])
                  if self._selecionado != st else None)
         row.bind("<Leave>", lambda e, r=row, s=st: r.configure(
@@ -548,9 +609,6 @@ class EstudantesFrame(ctk.CTkFrame):
 
         self._item_widgets[sid] = row
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  Filtros
-    # ••••••••••••••••••••••••••••••••••••••
     def _filtrar(self, _=None):
         if self._filter_after_id:
             self.after_cancel(self._filter_after_id)
@@ -573,18 +631,21 @@ class EstudantesFrame(ctk.CTkFrame):
         filtrados = [s for s in self._todos_estudantes if ok(s)]
         self._renderizar_estudantes(filtrados)
 
-    # Alias legado
     def filtrar_estudantes(self, termo: str):
         if hasattr(self, "entry_busca"):
             self.entry_busca.delete(0, "end")
             self.entry_busca.insert(0, termo)
         self._aplicar_filtros()
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  Selecionar estudante
-    # ••••••••••••••••••••••••••••••••••••••
+    def _set_status_erro(self):
+        self.status_bar.configure(fg_color=THEME["danger_soft"])
+        self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["danger"])
+        self.lbl_status_det.configure(
+            text="Erro ao carregar dados",
+            text_color=THEME["danger"],
+        )
+
     def selecionar_estudante(self, st: dict, widget=None):
-        # Limpa seleção anterior
         for w in self.scroll_list.winfo_children():
             w.configure(fg_color=THEME["bg_alt"])
         if widget:
@@ -594,8 +655,8 @@ class EstudantesFrame(ctk.CTkFrame):
         nome   = st.get("name", "N/A")
         curso  = st.get("course", "Sem curso")
         atenção = st.get("requires_attention", False)
+        sid = st.get("id")
 
-        # Atualiza avatar hero
         av_color = get_avatar_color(nome)
         for w in self._av_slot.winfo_children():
             w.destroy()
@@ -605,20 +666,86 @@ class EstudantesFrame(ctk.CTkFrame):
         self.lbl_nome_det.configure(text=nome)
         self.lbl_curso_det.configure(text=curso)
 
-        # Info boxes
-        if self.card_email:
-            self.card_email.configure(text=st.get("contact", "—”"))
-        if self.card_idade:
-            self.card_idade.configure(text=f"{st.get('age', '—”')} anos")
-        if self.card_curso:
-            self.card_curso.configure(text=curso)
-        if self.card_laudo:
-            self.card_laudo.configure(
-                text=f"{ICONS['check']}  Sim" if st.get("has_medical_report") else f"{ICONS['cross']}  Não",
-                text_color=THEME["success"] if st.get("has_medical_report") else THEME["text_secondary"],
-            )
+        def apply_detail(detail):
+            if not self.winfo_exists():
+                return
+            if not detail or not detail.get("success"):
+                return
+            d = detail.get("data") or {}
 
-        # Status bar
+            if hasattr(self, "card_email"):
+                self.card_email.configure(text=d.get("contact") or st.get("contact", "—"))
+            if hasattr(self, "card_phone"):
+                self.card_phone.configure(text=d.get("phone") or "—")
+            if hasattr(self, "card_idade"):
+                self.card_idade.configure(text=f"{d.get('age') or st.get('age') or '—'} anos")
+            if hasattr(self, "card_curso"):
+                self.card_curso.configure(text=d.get("course") or curso)
+            if hasattr(self, "card_professor"):
+                self.card_professor.configure(text=d.get("professor_responsavel") or "—")
+            if hasattr(self, "card_status"):
+                self.card_status.configure(text=d.get("status") or "—")
+            if hasattr(self, "card_laudo"):
+                self.card_laudo.configure(
+                    text=f"{ICONS['check']}  Sim" if d.get("has_medical_report") else f"{ICONS['cross']}  Não",
+                    text_color=THEME["success"] if d.get("has_medical_report") else THEME["text_secondary"],
+                )
+            if hasattr(self, "card_prioridade"):
+                self.card_prioridade.configure(text=str(d.get("priority_level") or 0))
+            if hasattr(self, "card_atencao") and self._is_sensitive_field_visible():
+                self.card_atencao.configure(text=d.get("attention_reason") or "—")
+            if hasattr(self, "card_obs") and self._is_sensitive_field_visible():
+                self.card_obs.configure(text=d.get("general_notes") or "—")
+            if hasattr(self, "card_emergency_contact"):
+                self.card_emergency_contact.configure(text=d.get("emergency_contact") or "—")
+            if hasattr(self, "card_emergency_phone"):
+                self.card_emergency_phone.configure(text=d.get("emergency_phone") or "—")
+
+            if d.get("minigame_blocked"):
+                self.status_bar.configure(fg_color=THEME["danger_soft"])
+                self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["danger"])
+                self.lbl_status_det.configure(
+                    text="Minigames bloqueados",
+                    text_color=THEME["danger"],
+                )
+                self.btn_bloquear.pack_forget()
+                self.btn_desbloquear.pack(side="left", padx=(8, 0))
+            else:
+                if atenção:
+                    self.status_bar.configure(fg_color=THEME["danger_soft"])
+                    self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["danger"])
+                    self.lbl_status_det.configure(
+                        text="Requer atendimento prioritário",
+                        text_color=THEME["danger"],
+                    )
+                else:
+                    self.status_bar.configure(fg_color=THEME["success_soft"])
+                    self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["success"])
+                    self.lbl_status_det.configure(
+                        text="Sem alertas — situação normal",
+                        text_color=THEME["success"],
+                    )
+                self.btn_desbloquear.pack_forget()
+                self.btn_bloquear.pack(side="left", padx=(8, 0))
+
+        def fetch_detail():
+            return self.controller_estudantes.obter_estudante(sid)
+
+        def on_detail_success(res):
+            apply_detail(res)
+            self._carregar_aba_intervencoes(sid)
+            self._carregar_aba_agenda(sid)
+
+        def on_detail_error(exc):
+            logging.error(f"Falha ao obter detalhes do estudante: {exc}")
+
+        AsyncRunner.run(
+            task=fetch_detail,
+            on_success=on_detail_success,
+            on_error=on_detail_error,
+            widget_ref=self,
+        )
+
         if atenção:
             self.status_bar.configure(fg_color=THEME["danger_soft"])
             self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["danger"])
@@ -630,17 +757,176 @@ class EstudantesFrame(ctk.CTkFrame):
             self.status_bar.configure(fg_color=THEME["success_soft"])
             self.lbl_status_icon.configure(text=ICONS["status_dot"], text_color=THEME["success"])
             self.lbl_status_det.configure(
-                text="Sem alertas —” situação normal",
+                text="Sem alertas — situação normal",
                 text_color=THEME["success"],
             )
 
-    # ••••••••••••••••••••••••••••••••••••••
-    # •••••••••••••••••••••••••••••••••••••••
-    #  Ações do estudante selecionado
-    # •••••••••••••••••••••••••••••••••••••••
+        self.btn_desbloquear.pack_forget()
+        self.btn_bloquear.pack(side="left", padx=(8, 0))
+
+    def _carregar_aba_intervencoes(self, student_id: int):
+        for w in self.tab_int_inner.winfo_children():
+            w.destroy()
+
+        def fetch():
+            return self.controller_orientacoes.listar_orientacoes(id_estudante=student_id)
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
+            orientacoes = []
+            if isinstance(res, dict):
+                data = res.get("data") or {}
+                orientacoes = data.get("orientations") or []
+
+            if not orientacoes:
+                EmptyState(
+                    self.tab_int_inner, icon=ICONS["mood_bad"], title="Nenhuma intervenção registrada",
+                    subtitle="As orientações aparecerão aqui"
+                ).pack(pady=24)
+                return
+
+            batch = WidgetBatchBuilder(parent=self.tab_int_inner, batch_size=20)
+            for ori in orientacoes:
+                batch.add(lambda o=ori: self._criar_item_intervencao(o))
+            batch.execute()
+
+        def on_error(exc):
+            if not self.winfo_exists():
+                return
+            ctk.CTkLabel(
+                self.tab_int_inner,
+                text="Erro ao carregar intervenções",
+                font=themed_font("body"),
+                text_color=THEME["danger"],
+            ).pack(pady=30)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _criar_item_intervencao(self, ori: dict):
+        row = ctk.CTkFrame(
+            self.tab_int_inner,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        row.pack(fill="x", pady=spacing("xs"), padx=spacing("xs"))
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
+        inner.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            inner, text=ori.get("title", "Sem título"),
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            inner, text=ori.get("theme", ""),
+            font=themed_font("caption"),
+            text_color=THEME["text_secondary"], anchor="w",
+        ).grid(row=1, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            inner, text=ori.get("session_date") or "—",
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"], anchor="e",
+        ).grid(row=0, column=1, sticky="e")
+
+    def _carregar_aba_agenda(self, student_id: int):
+        for w in self.tab_ag_inner.winfo_children():
+            w.destroy()
+
+        def fetch():
+            return self.controller_agenda.listar_agendamentos()
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
+            agendamentos = []
+            if isinstance(res, list):
+                agendamentos = [a for a in res if a.get("id_aluno") == student_id]
+
+            if not agendamentos:
+                EmptyState(
+                    self.tab_ag_inner, icon=ICONS["calendar"], title="Nenhum agendamento encontrado",
+                    subtitle="Os agendamentos aparecerão aqui"
+                ).pack(pady=24)
+                return
+
+            batch = WidgetBatchBuilder(parent=self.tab_ag_inner, batch_size=20)
+            for ag in agendamentos:
+                batch.add(lambda a=ag: self._criar_item_agenda(a))
+            batch.execute()
+
+        def on_error(exc):
+            if not self.winfo_exists():
+                return
+            ctk.CTkLabel(
+                self.tab_ag_inner,
+                text="Erro ao carregar agenda",
+                font=themed_font("body"),
+                text_color=THEME["danger"],
+            ).pack(pady=30)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _criar_item_agenda(self, ag: dict):
+        row = ctk.CTkFrame(
+            self.tab_ag_inner,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        row.pack(fill="x", pady=spacing("xs"), padx=spacing("xs"))
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
+        inner.grid_columnconfigure(1, weight=1)
+
+        data_hora = ag.get("data_hora")
+        data_str = data_hora.strftime("%d/%m/%Y %H:%M") if hasattr(data_hora, "strftime") else str(data_hora or "—")
+
+        ctk.CTkLabel(
+            inner, text=ag.get("nome", "Agendamento"),
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"], anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            inner, text=data_str,
+            font=themed_font("caption"),
+            text_color=THEME["text_secondary"], anchor="w",
+        ).grid(row=1, column=0, sticky="w")
+
+        status = ag.get("status", "")
+        status_colors = {
+            "agendado": THEME["primary"],
+            "confirmado": THEME["primary"],
+            "concluido": THEME["success"],
+            "cancelado": THEME["danger"],
+            "cancelado": THEME["danger"],
+        }
+        st_color = status_colors.get(status, THEME["text_muted"])
+        st_lbl = ctk.CTkLabel(
+            inner, text=status or "—",
+            font=themed_font("caption", "bold"),
+            text_color=st_color, anchor="e",
+        )
+        st_lbl.grid(row=0, column=1, sticky="e")
+
     def _editar_estudante(self):
         if not getattr(self, "_selecionado", None):
-            messagebox.showinfo("Atenção", "Selecione um estudante primeiro.")
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
             return
         st = self._selecionado
         modal = ctk.CTkToplevel(self)
@@ -648,7 +934,7 @@ class EstudantesFrame(ctk.CTkFrame):
         modal.configure(fg_color=THEME["surface"])
         modal.resizable(False, False)
 
-        w, h = 560, 680
+        w, h = 620, 780
         sx = modal.winfo_screenwidth()  // 2 - w // 2
         sy = modal.winfo_screenheight() // 2 - h // 2
         modal.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -662,44 +948,148 @@ class EstudantesFrame(ctk.CTkFrame):
                      font=themed_font("h2", "bold"),
                      text_color=THEME["text"]).pack(anchor="w", pady=(0, 16))
 
-        entry_nome = ctk.CTkEntry(card, placeholder_text="Nome completo")
-        entry_nome.insert(0, st.get("name", ""))
-        entry_nome.pack(fill="x", pady=(0, 10))
+        scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
 
-        entry_email = ctk.CTkEntry(card, placeholder_text="E-mail")
-        entry_email.insert(0, st.get("contact", ""))
-        entry_email.pack(fill="x", pady=(0, 10))
+        en_nome = _Field(scroll, "Nome Completo", "Ex: Ana Silva", icon=ICONS["user"],
+                         helper="Nome completo do estudante")
+        en_nome.pack(fill="x", pady=(0, 12))
+        en_nome.entry.insert(0, st.get("name", ""))
 
-        entry_curso = ctk.CTkEntry(card, placeholder_text="Curso/Turma")
-        entry_curso.insert(0, st.get("course", ""))
-        entry_curso.pack(fill="x", pady=(0, 10))
+        en_email = _Field(scroll, "Email de Contato", "email@exemplo.com", icon=ICONS["chart"],
+                          helper="Email institucional ou pessoal")
+        en_email.pack(fill="x", pady=(0, 12))
+        en_email.entry.insert(0, st.get("contact", ""))
 
-        entry_idade = ctk.CTkEntry(card, placeholder_text="Idade")
-        entry_idade.insert(0, str(st.get("age", "")))
-        entry_idade.pack(fill="x", pady=(0, 10))
+        row_mid = ctk.CTkFrame(scroll, fg_color="transparent")
+        row_mid.pack(fill="x", pady=(0, 12))
+        row_mid.grid_columnconfigure((0, 1), weight=1)
+
+        en_curso = _Field(row_mid, "Curso / Turma", "Ex: Psicologia", icon=ICONS["group"])
+        en_curso.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+        en_curso.entry.insert(0, st.get("course", ""))
+
+        en_idade = _Field(row_mid, "Idade", "Ex: 22", icon=ICONS["cake"])
+        en_idade.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+        en_idade.entry.insert(0, str(st.get("age", "")))
+
+        en_phone = _Field(scroll, "Telefone", "(00) 00000-0000", icon=ICONS["location"])
+        en_phone.pack(fill="x", pady=(0, 12))
+        en_phone.entry.insert(0, st.get("phone", ""))
+
+        en_emergency_contact = _Field(scroll, "Contato de Emergência", "Nome do contato", icon=ICONS["alert"])
+        en_emergency_contact.pack(fill="x", pady=(0, 12))
+        en_emergency_contact.entry.insert(0, st.get("emergency_contact", ""))
+
+        en_emergency_phone = _Field(scroll, "Telefone de Emergência", "(00) 00000-0000", icon=ICONS["location"])
+        en_emergency_phone.pack(fill="x", pady=(0, 12))
+        en_emergency_phone.entry.insert(0, st.get("emergency_phone", ""))
+
+        en_professor = _Field(scroll, "Professor Responsável", "Ex: Dr. Silva", icon=ICONS["user"])
+        en_professor.pack(fill="x", pady=(0, 12))
+        en_professor.entry.insert(0, st.get("professor_responsavel", ""))
+
+        row_pri = ctk.CTkFrame(scroll, fg_color="transparent")
+        row_pri.pack(fill="x", pady=(0, 12))
+        row_pri.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(row_pri, text="Status",
+                     font=font(size=12),
+                     text_color=THEME["text_secondary"], anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 4))
+        self._edit_status = ctk.CTkOptionMenu(
+            row_pri,
+            values=["ativo", "inativo", "trancado"],
+            fg_color=THEME["input_bg"],
+            button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"],
+            height=40, corner_radius=RADIUS["input"],
+        )
+        self._edit_status.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+        self._edit_status.set(st.get("status", "ativo"))
+
+        ctk.CTkLabel(row_pri, text="Nível de Prioridade",
+                     font=font(size=12),
+                     text_color=THEME["text_secondary"], anchor="w").grid(row=0, column=1, sticky="w", pady=(0, 4))
+        self._edit_priority = ctk.CTkEntry(
+            row_pri,
+            fg_color=THEME["input_bg"],
+            border_width=1,
+            border_color=THEME["input_border"],
+            text_color=THEME["text"],
+            font=font(size=13),
+            height=40,
+        )
+        self._edit_priority.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self._edit_priority.insert(0, str(st.get("priority_level", 0)))
+
+        sw_frame = ctk.CTkFrame(scroll, fg_color=THEME["bg_alt"],
+                                corner_radius=RADIUS["lg"], border_width=1,
+                                border_color=THEME["border"])
+        sw_frame.pack(fill="x", pady=(0, 16))
 
         var_laudo = ctk.StringVar(value="Sim" if st.get("has_medical_report") else "Não")
-        ctk.CTkSwitch(card, text="Possui laudo médico",
-                      variable=var_laudo, onvalue="Sim", offvalue="Não").pack(anchor="w", pady=(0, 10))
+        ctk.CTkSwitch(sw_frame, text="Possui laudo médico",
+                      variable=var_laudo, onvalue="Sim", offvalue="Não",
+                      fg_color=THEME["border"],
+                      progress_color=THEME["primary"],
+                      button_color=THEME["surface"],
+                      button_hover_color=THEME["bg_alt"]).pack(anchor="w", padx=SPACING["card_pad"], pady=(10, 0))
+
+        ctk.CTkFrame(sw_frame, height=1, fg_color=THEME["divider"]).pack(fill="x", pady=10)
+
+        var_aten = ctk.StringVar(value="Sim" if st.get("requires_attention") else "Não")
+        ctk.CTkSwitch(sw_frame, text="Requer atendimento prioritário",
+                      variable=var_aten, onvalue="Sim", offvalue="Não",
+                      fg_color=THEME["border"],
+                      progress_color=THEME["danger"],
+                      button_color=THEME["surface"],
+                      button_hover_color=THEME["bg_alt"]).pack(anchor="w", padx=SPACING["card_pad"], pady=(0, 10))
+
+        if self._is_sensitive_field_visible():
+            en_atencao = _Field(scroll, "Motivo da Atenção", "Descreva o motivo", icon=ICONS["alert"])
+            en_atencao.pack(fill="x", pady=(0, 12))
+            en_atencao.entry.insert(0, st.get("attention_reason", ""))
+
+            en_obs = _Field(scroll, "Observações Gerais", "Anotações gerais", icon=ICONS["file"])
+            en_obs.pack(fill="x", pady=(0, 12))
+            en_obs.entry.insert(0, st.get("general_notes", ""))
+        else:
+            en_atencao = None
+            en_obs = None
 
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", pady=(16, 0))
 
         def _salvar():
             dados = {
-                "name": entry_nome.get().strip(),
-                "contact": entry_email.get().strip(),
-                "course": entry_curso.get().strip(),
-                "age": entry_idade.get().strip(),
+                "name": en_nome.get().strip(),
+                "contact": en_email.get().strip(),
+                "course": en_curso.get().strip(),
+                "age": en_idade.get().strip(),
+                "phone": en_phone.get().strip(),
+                "emergency_contact": en_emergency_contact.get().strip(),
+                "emergency_phone": en_emergency_phone.get().strip(),
+                "professor_responsavel": en_professor.get().strip(),
+                "status": self._edit_status.get(),
+                "priority_level": int(self._edit_priority.get() or 0),
                 "has_medical_report": var_laudo.get() == "Sim",
+                "requires_attention": var_aten.get() == "Sim",
             }
+            if en_atencao is not None:
+                dados["attention_reason"] = en_atencao.get().strip()
+            if en_obs is not None:
+                dados["general_notes"] = en_obs.get().strip()
+
             try:
                 res = self.controller_estudantes.atualizar_estudante(st.get("id"), dados)
-                messagebox.showinfo("Sucesso", "Estudante atualizado com sucesso.")
-                modal.destroy()
-                self._carregar_estudantes()
+                if res.get("success"):
+                    self._show_success("Estudante atualizado com sucesso.")
+                    modal.destroy()
+                    self.load_data()
+                else:
+                    self._show_error(res.get("error", "Falha ao atualizar estudante."))
             except Exception as e:
-                messagebox.showerror("Erro", f"Falha ao atualizar estudante.\n{e}")
+                self._show_error(f"Falha ao atualizar estudante.\n{e}")
 
         ctk.CTkButton(footer, text="Cancelar", command=modal.destroy,
                       width=110, height=36, corner_radius=10,
@@ -712,35 +1102,35 @@ class EstudantesFrame(ctk.CTkFrame):
 
     def _excluir_estudante(self):
         if not getattr(self, "_selecionado", None):
-            messagebox.showinfo("Atenção", "Selecione um estudante primeiro.")
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
             return
         st = self._selecionado
-        if not messagebox.askyesno("Confirmar", f'Excluir o estudante "{st.get("name")}"?'):
+        if not self._confirmar(f'Excluir o estudante "{st.get("name")}"?'):
             return
         try:
-            self.controller_estudantes.deletar_estudante(st.get("id"))
-            messagebox.showinfo("Sucesso", "Estudante excluído.")
-            self._selecionado = None
-            self._carregar_estudantes()
+            res = self.controller_estudantes.deletar_estudante(st.get("id"))
+            if res.get("success"):
+                self._show_success("Estudante excluído.")
+                self._selecionado = None
+                self.load_data()
+            else:
+                self._show_error(res.get("error", "Falha ao excluir estudante."))
         except Exception as e:
-            messagebox.showerror("Erro", f"Falha ao excluir estudante.\n{e}")
+            self._show_error(f"Falha ao excluir estudante.\n{e}")
 
-    #  MODAL: Novo Estudante
-    # ••••••••••••••••••••••••••••••••••••••
     def novo_estudante_click(self):
         modal = ctk.CTkToplevel(self)
         modal.title("Novo Estudante")
         modal.configure(fg_color=THEME["surface"])
         modal.resizable(False, False)
 
-        w, h = 560, 680
+        w, h = 620, 780
         sx = modal.winfo_screenwidth()  // 2 - w // 2
         sy = modal.winfo_screenheight() // 2 - h // 2
         modal.geometry(f"{w}x{h}+{sx}+{sy}")
         modal.transient(self.winfo_toplevel())
         modal.grab_set()
 
-        # —— Banner de topo ——————————————————————————————————————————
         banner = ctk.CTkFrame(modal, fg_color=THEME["primary_soft"],
                               corner_radius=0, height=72)
         banner.pack(fill="x")
@@ -765,19 +1155,21 @@ class EstudantesFrame(ctk.CTkFrame):
                      font=themed_font("caption"),
                      text_color=THEME["text_secondary"]).pack(anchor="w")
 
-        # —— Corpo ———————————————————————————————————————————————————
         body = ctk.CTkFrame(modal, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=20)
 
-        en_nome = _Field(body, "Nome Completo", "Ex: Ana Silva", icon=ICONS["user"],
+        scroll = ctk.CTkScrollableFrame(body, fg_color="transparent")
+        scroll.pack(fill="both", expand=True)
+
+        en_nome = _Field(scroll, "Nome Completo", "Ex: Ana Silva", icon=ICONS["user"],
                          helper="Nome completo do estudante")
         en_nome.pack(fill="x", pady=(0, 12))
 
-        en_email = _Field(body, "Email de Contato", "email@exemplo.com", icon=ICONS["chart"],
+        en_email = _Field(scroll, "Email de Contato", "email@exemplo.com", icon=ICONS["chart"],
                           helper="Email institucional ou pessoal")
         en_email.pack(fill="x", pady=(0, 12))
 
-        row_mid = ctk.CTkFrame(body, fg_color="transparent")
+        row_mid = ctk.CTkFrame(scroll, fg_color="transparent")
         row_mid.pack(fill="x", pady=(0, 12))
         row_mid.grid_columnconfigure((0, 1), weight=1)
 
@@ -786,8 +1178,52 @@ class EstudantesFrame(ctk.CTkFrame):
         en_idade = _Field(row_mid, "Idade", "Ex: 22", icon=ICONS["cake"])
         en_idade.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-        # Switches
-        sw_frame = ctk.CTkFrame(body, fg_color=THEME["bg_alt"],
+        en_phone = _Field(scroll, "Telefone", "(00) 00000-0000", icon=ICONS["location"])
+        en_phone.pack(fill="x", pady=(0, 12))
+
+        en_emergency_contact = _Field(scroll, "Contato de Emergência", "Nome do contato", icon=ICONS["alert"])
+        en_emergency_contact.pack(fill="x", pady=(0, 12))
+
+        en_emergency_phone = _Field(scroll, "Telefone de Emergência", "(00) 00000-0000", icon=ICONS["location"])
+        en_emergency_phone.pack(fill="x", pady=(0, 12))
+
+        en_professor = _Field(scroll, "Professor Responsável", "Ex: Dr. Silva", icon=ICONS["user"])
+        en_professor.pack(fill="x", pady=(0, 12))
+
+        row_pri = ctk.CTkFrame(scroll, fg_color="transparent")
+        row_pri.pack(fill="x", pady=(0, 12))
+        row_pri.grid_columnconfigure((0, 1), weight=1)
+
+        ctk.CTkLabel(row_pri, text="Status",
+                     font=font(size=12),
+                     text_color=THEME["text_secondary"], anchor="w").grid(row=0, column=0, sticky="w", pady=(0, 4))
+        self._new_status = ctk.CTkOptionMenu(
+            row_pri,
+            values=["ativo", "inativo", "trancado"],
+            fg_color=THEME["input_bg"],
+            button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"],
+            height=40, corner_radius=RADIUS["input"],
+        )
+        self._new_status.grid(row=1, column=0, sticky="ew", padx=(0, 8))
+        self._new_status.set("ativo")
+
+        ctk.CTkLabel(row_pri, text="Nível de Prioridade",
+                     font=font(size=12),
+                     text_color=THEME["text_secondary"], anchor="w").grid(row=0, column=1, sticky="w", pady=(0, 4))
+        self._new_priority = ctk.CTkEntry(
+            row_pri,
+            fg_color=THEME["input_bg"],
+            border_width=1,
+            border_color=THEME["input_border"],
+            text_color=THEME["text"],
+            font=font(size=13),
+            height=40,
+        )
+        self._new_priority.grid(row=1, column=1, sticky="ew", padx=(8, 0))
+        self._new_priority.insert(0, "0")
+
+        sw_frame = ctk.CTkFrame(scroll, fg_color=THEME["bg_alt"],
                                 corner_radius=RADIUS["lg"], border_width=1,
                                 border_color=THEME["border"])
         sw_frame.pack(fill="x", pady=(0, 16))
@@ -802,7 +1238,6 @@ class EstudantesFrame(ctk.CTkFrame):
             "Estudante necessita de atenção especial", THEME["danger"]
         )
 
-        # —— Rodapé ——————————————————————————————————————————————————
         ctk.CTkFrame(modal, height=1, fg_color=THEME["divider"]).pack(fill="x")
 
         footer = ctk.CTkFrame(modal, fg_color="transparent", height=64)
@@ -828,11 +1263,19 @@ class EstudantesFrame(ctk.CTkFrame):
                 "requires_attention":  sw_aten.get(),
                 "course":              en_curso.get().strip(),
                 "age":                 en_idade.get().strip(),
+                "phone":               en_phone.get().strip(),
+                "emergency_contact":   en_emergency_contact.get().strip(),
+                "emergency_phone":     en_emergency_phone.get().strip(),
+                "professor_responsavel": en_professor.get().strip(),
+                "status":              self._new_status.get(),
+                "priority_level":      int(self._new_priority.get() or 0),
             }
             res = self.controller_estudantes.criar_estudante(dados)
             if res.get("success"):
                 modal.destroy()
                 self.load_data()
+            else:
+                self._show_error(res.get("error", "Falha ao criar estudante."))
 
         PrimaryButton(
             footer, text=f"{ICONS['check']}  Salvar Estudante",
@@ -872,7 +1315,269 @@ class EstudantesFrame(ctk.CTkFrame):
         sw.pack(side="right")
         return sw
 
-    # Aliases legados
+    def _bloquear_minigames(self):
+        if not getattr(self, "_selecionado", None):
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
+            return
+        st = self._selecionado
+        modal = ctk.CTkToplevel(self)
+        modal.title("Bloquear Minigames")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+
+        w, h = 480, 260
+        sx = modal.winfo_screenwidth()  // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+
+        card = ctk.CTkFrame(modal, fg_color=THEME["surface"], corner_radius=RADIUS["lg"])
+        card.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(card, text=f"Bloquear minigames — {st.get('name')}",
+                     font=themed_font("h3", "bold"),
+                     text_color=THEME["text"]).pack(anchor="w", pady=(0, 12))
+
+        ctk.CTkLabel(card, text="Motivo do bloqueio",
+                     font=themed_font("body"),
+                     text_color=THEME["text_secondary"], anchor="w").pack(anchor="w", pady=(0, 4))
+
+        entry_motivo = ctk.CTkEntry(
+            card,
+            placeholder_text="Informe o motivo",
+            fg_color=THEME["input_bg"],
+            border_width=1,
+            border_color=THEME["input_border"],
+            text_color=THEME["text"],
+            font=themed_font("body"),
+            height=40,
+        )
+        entry_motivo.pack(fill="x", pady=(0, 16))
+
+        footer = ctk.CTkFrame(card, fg_color="transparent")
+        footer.pack(fill="x", pady=(8, 0))
+
+        def confirmar():
+            motivo = entry_motivo.get().strip()
+            if not motivo:
+                self._show_error("Informe o motivo do bloqueio.", title="Atenção")
+                return
+            try:
+                res = self.controller_estudantes.bloquear_minigames(st.get("id"), motivo)
+                if res.get("success"):
+                    self._show_success("Minigames bloqueados com sucesso.")
+                    modal.destroy()
+                    self.load_data()
+                else:
+                    self._show_error(res.get("error", "Falha ao bloquear minigames."))
+            except Exception as e:
+                self._show_error(f"Falha ao bloquear minigames.\n{e}")
+
+        ctk.CTkButton(footer, text="Cancelar", command=modal.destroy,
+                      width=110, height=36, corner_radius=10,
+                      fg_color=THEME["divider"], hover_color=THEME["border"],
+                      text_color=THEME["text_muted"]).pack(side="left", padx=(0, 8))
+        ctk.CTkButton(footer, text=f"{ICONS['block']}  Bloquear",
+                      command=confirmar, width=140, height=36, corner_radius=10,
+                      fg_color=THEME["danger"], hover_color=THEME["danger"],
+                      text_color="white", font=themed_font("button", "bold")).pack(side="right")
+
+    def _desbloquear_minigames(self):
+        if not getattr(self, "_selecionado", None):
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
+            return
+        st = self._selecionado
+        if not self._confirmar(f"Desbloquear minigames para \"{st.get('name')}\"?"):
+            return
+        try:
+            res = self.controller_estudantes.desbloquear_minigames(st.get("id"))
+            if res.get("success"):
+                self._show_success("Minigames desbloqueados com sucesso.")
+                self.load_data()
+            else:
+                self._show_error(res.get("error", "Falha ao desbloquear minigames."))
+        except Exception as e:
+            self._show_error(f"Falha ao desbloquear minigames.\n{e}")
+
+    def _verificar_comportamento_suspeito(self):
+        if not getattr(self, "_selecionado", None):
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
+            return
+        st = self._selecionado
+        sid = st.get("id")
+
+        def fetch():
+            return self.controller_estudantes.verificar_comportamento_suspeito(sid)
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
+            if not res or not res.get("success"):
+                self._show_error("Falha ao verificar comportamento suspeito.")
+                return
+            suspicious = res.get("suspicious", False)
+            data = res.get("data") or {}
+            reasons = data.get("reasons", [])
+            if suspicious:
+                msg = "Comportamento suspeito detectado:\n\n" + "\n".join(f"- {r}" for r in reasons)
+                self._show_error(msg, title="Comportamento Suspeito")
+            else:
+                self._show_success("Nenhum comportamento suspeito detectado.", duration=3000)
+
+        def on_error(exc):
+            self._show_error(f"Falha ao verificar comportamento suspeito.\n{exc}")
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _mostrar_log_bloqueio(self):
+        if not getattr(self, "_selecionado", None):
+            self._show_error("Selecione um estudante primeiro.", title="Atenção")
+            return
+        st = self._selecionado
+        sid = st.get("id")
+
+        modal = ctk.CTkToplevel(self)
+        modal.title(f"Log de Bloqueio — {st.get('name')}")
+        modal.configure(fg_color=THEME["surface"])
+        modal.resizable(False, False)
+
+        w, h = 560, 420
+        sx = modal.winfo_screenwidth()  // 2 - w // 2
+        sy = modal.winfo_screenheight() // 2 - h // 2
+        modal.geometry(f"{w}x{h}+{sx}+{sy}")
+        modal.transient(self.winfo_toplevel())
+        modal.grab_set()
+
+        card = ctk.CTkFrame(modal, fg_color=THEME["surface"], corner_radius=RADIUS["lg"])
+        card.pack(fill="both", expand=True, padx=24, pady=24)
+
+        ctk.CTkLabel(card, text="Histórico de Bloqueio de Minigames",
+                     font=themed_font("h3", "bold"),
+                     text_color=THEME["text"]).pack(anchor="w", pady=(0, 12))
+
+        scroll = ctk.CTkScrollableFrame(
+            card, fg_color="transparent",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
+        )
+        scroll.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(
+            scroll,
+            text="Carregando...",
+            font=themed_font("body"),
+            text_color=THEME["text_secondary"],
+        ).pack(pady=30)
+
+        def fetch():
+            return self.controller_estudantes.obter_log_bloqueio(sid)
+
+        def on_success(res):
+            if not self.winfo_exists() or not modal.winfo_exists():
+                return
+            for w in scroll.winfo_children():
+                w.destroy()
+
+            logs = []
+            if isinstance(res, dict):
+                data = res.get("data") or []
+                logs = data if isinstance(data, list) else []
+
+            if not logs:
+                EmptyState(
+                    scroll, icon=ICONS["history"], title="Nenhum registro encontrado",
+                    subtitle="O histórico de bloqueios aparecerá aqui"
+                ).pack(pady=24)
+                return
+
+            batch = WidgetBatchBuilder(parent=scroll, batch_size=20)
+            for log in logs:
+                batch.add(lambda l=log, p=scroll: self._criar_item_log(p, l))
+            batch.execute()
+
+        def on_error(exc):
+            if not self.winfo_exists() or not modal.winfo_exists():
+                return
+            for w in scroll.winfo_children():
+                w.destroy()
+            ctk.CTkLabel(
+                scroll,
+                text="Erro ao carregar log de bloqueio",
+                font=themed_font("body"),
+                text_color=THEME["danger"],
+            ).pack(pady=30)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _criar_item_log(self, parent, log: dict):
+        row = ctk.CTkFrame(
+            parent,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        row.pack(fill="x", pady=spacing("xs"), padx=spacing("xs"))
+
+        inner = ctk.CTkFrame(row, fg_color="transparent")
+        inner.pack(fill="x", padx=spacing("md"), pady=spacing("md"))
+        inner.grid_columnconfigure(1, weight=1)
+
+        acao = log.get("action", "")
+        acao_display = {
+            "block": "Bloqueio",
+            "unblock": "Desbloqueio",
+            "alert": "Alerta",
+        }.get(acao, acao)
+
+        acao_colors = {
+            "block": THEME["danger"],
+            "unblock": THEME["success"],
+            "alert": THEME["warning"],
+        }
+        ac_color = acao_colors.get(acao, THEME["text_muted"])
+
+        ctk.CTkLabel(
+            inner, text=acao_display,
+            font=themed_font("body", "bold"),
+            text_color=ac_color, anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            inner, text=log.get("reason") or "—",
+            font=themed_font("caption"),
+            text_color=THEME["text_secondary"], anchor="w",
+        ).grid(row=1, column=0, sticky="w")
+
+        by = log.get("performed_by") or ("Sistema" if log.get("auto_detected") else "—")
+        ctk.CTkLabel(
+            inner, text=by,
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"], anchor="e",
+        ).grid(row=0, column=1, sticky="e")
+
+        created = log.get("created_at", "")
+        if created:
+            try:
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
+                created = dt.strftime("%d/%m/%Y %H:%M")
+            except Exception:
+                pass
+        ctk.CTkLabel(
+            inner, text=created,
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"], anchor="e",
+        ).grid(row=1, column=1, sticky="e")
+
     def criar_cabecalho(self):
         pass
 
@@ -887,4 +1592,3 @@ class EstudantesFrame(ctk.CTkFrame):
 
     def criar_info_box(self, parent, label, value, icon, r, c):
         return self._info_box(parent, label, value, icon, r, c)
-

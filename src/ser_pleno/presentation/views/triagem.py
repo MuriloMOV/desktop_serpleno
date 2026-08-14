@@ -6,17 +6,18 @@ from ser_pleno.ui.theme import (
 )
 from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.presentation.components.ui_components import (
-    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState, Avatar
+    Card, PrimaryButton, GhostButton, Divider, KPICard, BaseModal, EmptyState, Avatar, Toast
 )
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.application.controllers.triagem import TriagemController
+from ser_pleno.application.controllers.estudantes import EstudantesController
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
-from tkinter import messagebox
+import json
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  Design tokens —“ mapeamentos semânticos específicos da triagem
+#  Design tokens — mapeamentos semânticos específicos da triagem
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 
 _PRIORITY_CFG = {
@@ -31,13 +32,11 @@ _STATUS_CFG = {
     "Concluída":    (THEME["success"],     THEME["success_soft"]),
     "Cancelada":    (THEME["text_muted"],  THEME["bg_alt"]),
 }
-_COL_HEADERS = ["Estudante", "Data", "Prioridade", "Status", "Ações"]
-_COL_WEIGHTS = [3, 2, 2, 2, 1]
+_COL_HEADERS = ["Estudante", "Formulário", "Data", "Prioridade", "Status", "Ações"]
+_COL_WEIGHTS = [3, 3, 2, 2, 2, 1]
 
 
 # Helpers
-# Avatares usam utils.avatar_utils.get_avatar_color centralizado.
-
 
 def _chip(parent, text: str, color: str, soft: str) -> ctk.CTkFrame:
     f = ctk.CTkFrame(parent, fg_color=soft, corner_radius=RADIUS["xs"])
@@ -47,11 +46,6 @@ def _chip(parent, text: str, color: str, soft: str) -> ctk.CTkFrame:
     return f
 
 
-
-
-
-# ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
-#  Campo de entrada leve
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Campo de entrada leve
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
@@ -94,18 +88,24 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                          scrollbar_button_hover_color=THEME["primary"])
         self.controller = controller
         self.controller_triagem = TriagemController()
+        self.controller_estudantes = EstudantesController()
         self.data_master = []
+        self._estudantes = []
+        self._formularios = []
+        self._perguntas_widgets = {}
 
         self._criar_toolbar_acoes()
         self._criar_kpis()
         self._criar_filtros()
         self._criar_tabela()
         self._carregar_triagens()
+        self._carregar_estudantes()
+        self._carregar_formularios()
         log_view_init_ms("triagem", self._t0, widget_ref=self)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  CABEÇALHO
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def _criar_toolbar_acoes(self):
         bar = ctk.CTkFrame(self, fg_color="transparent")
         bar.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["page_y"], SPACING["label_gap"]))
@@ -116,29 +116,26 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             height=40, corner_radius=RADIUS["button"], width=160,
         ).pack(side="right")
 
-    # ••••••••••••••••••••••••••••••••••
-    #  KPIs
-    # ••••••••••••••••••••••••••••••••••••••••••
-    def _criar_kpis(self):
-        total     = len(self.data_master)
-        pendentes = sum(1 for d in self.data_master if d["status"] == "Pendente")
-        concluidas= sum(1 for d in self.data_master if d["status"] == "Concluída")
-        alta_p    = sum(1 for d in self.data_master
-                        if d["priority"] in ("Alta", "Urgente"))
+        GhostButton(
+            bar, text=f"{ICONS['list']}  Formulários",
+            command=self._modal_listar_formularios,
+            height=40, corner_radius=RADIUS["button"], width=160,
+        ).pack(side="right", padx=(0, SPACING["icon_gap"]))
 
+    # •••••••••••••••••••••••••••••••••••••••••••
+    #  KPIs
+    # •••••••••••••••••••••••••••••••••••••••••••
+    def _criar_kpis(self):
+        self._kpi_widgets = []
         row = ctk.CTkFrame(self, fg_color="transparent")
         row.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
 
         kpis = [
-            ("Total de Triagens", str(total),     ICONS["chart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "Registros"),
-
-            ("Pendentes",         str(pendentes),  ICONS["hourglass"], THEME["kpi_amber"], THEME["kpi_amber_soft"], "Aguardando"),
-
-            ("Concluídas",        str(concluidas), ICONS["check"], THEME["kpi_green"], THEME["kpi_green_soft"], "Finalizadas"),
-
-            ("Alta Prioridade",   str(alta_p),     f"{ICONS['bolt']} ", THEME["kpi_red"],   THEME["kpi_red_soft"],   "Urgente ou Alta"),
+            ("Total de Triagens", "0", ICONS["chart"], THEME["kpi_blue"],  THEME["kpi_blue_soft"],  "Registros"),
+            ("Pendentes",         "0", ICONS["hourglass"], THEME["kpi_amber"], THEME["kpi_amber_soft"], "Aguardando"),
+            ("Concluídas",        "0", ICONS["check"], THEME["kpi_green"], THEME["kpi_green_soft"], "Finalizadas"),
+            ("Alta Prioridade",   "0", f"{ICONS['bolt']} ", THEME["kpi_red"],   THEME["kpi_red_soft"],   "Urgente ou Alta"),
         ]
-        self._kpi_widgets = []
         for i, (title, val, icon, accent, soft, sub) in enumerate(kpis):
             row.grid_columnconfigure(i, weight=1)
             card = KPICard(
@@ -148,9 +145,20 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             card.grid(row=0, column=i, sticky="ew", padx=SPACING["icon_gap"] // 2)
             self._kpi_widgets.append(card._value_label if hasattr(card, "_value_label") else None)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    def _atualizar_kpis(self, data_list: list):
+        total     = len(data_list)
+        pendentes = sum(1 for d in data_list if d["status"] == "Pendente")
+        concluidas= sum(1 for d in data_list if d["status"] == "Concluída")
+        alta_p    = sum(1 for d in data_list
+                        if d["priority"] in ("Alta", "Urgente"))
+        valores = [str(total), str(pendentes), str(concluidas), str(alta_p)]
+        for lbl, val in zip(self._kpi_widgets, valores):
+            if lbl is not None:
+                lbl.configure(text=val)
+
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  FILTROS
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def _criar_filtros(self):
         card = Card(self, auto_body=False)
         card.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["section_gap"], 0))
@@ -165,7 +173,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
 
         row = ctk.CTkFrame(card, fg_color="transparent")
         row.pack(fill="x", padx=SPACING["card_pad"], pady=SPACING["item_gap"])
-        for i in range(4):
+        for i in range(5):
             row.grid_columnconfigure(i, weight=1)
 
         opt_style = dict(
@@ -179,13 +187,22 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             font=themed_font("body"),
         )
 
+        self.filtro_busca = ctk.CTkEntry(
+            row, placeholder_text="Buscar estudante ou formulário...",
+            fg_color=THEME["input_bg"], border_width=1,
+            border_color=THEME["input_border"],
+            text_color=THEME["text"], placeholder_text_color=THEME["text_muted"],
+            font=themed_font("body"), height=38,
+        )
+        self.filtro_busca.grid(row=0, column=0, sticky="ew", padx=(0, SPACING["icon_gap"] // 2))
+
         self.filtro_status = ctk.CTkOptionMenu(
             row,
             values=["Todos", "Pendente", "Em Andamento", "Concluída", "Cancelada"],
             command=lambda _: self.aplicar_filtros(),
             **opt_style,
         )
-        self.filtro_status.grid(row=0, column=0, sticky="ew", padx=(0, SPACING["icon_gap"] // 2))
+        self.filtro_status.grid(row=0, column=1, sticky="ew", padx=SPACING["icon_gap"] // 2)
 
         self.filtro_prioridade = ctk.CTkOptionMenu(
             row,
@@ -193,13 +210,13 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             command=lambda _: self.aplicar_filtros(),
             **opt_style,
         )
-        self.filtro_prioridade.grid(row=0, column=1, sticky="ew", padx=SPACING["icon_gap"] // 2)
+        self.filtro_prioridade.grid(row=0, column=2, sticky="ew", padx=SPACING["icon_gap"] // 2)
 
         self.data_inicial = _DateField(row, "Data inicial  dd/mm/aaaa")
-        self.data_inicial.grid(row=0, column=2, sticky="ew", padx=SPACING["icon_gap"] // 2)
+        self.data_inicial.grid(row=0, column=3, sticky="ew", padx=SPACING["icon_gap"] // 2)
 
         self.data_final = _DateField(row, "Data final  dd/mm/aaaa")
-        self.data_final.grid(row=0, column=3, sticky="ew", padx=(SPACING["icon_gap"] // 2, 0))
+        self.data_final.grid(row=0, column=4, sticky="ew", padx=(SPACING["icon_gap"] // 2, 0))
 
         # Botões
         btn_row = ctk.CTkFrame(card, fg_color="transparent")
@@ -216,9 +233,9 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             height=34, corner_radius=RADIUS["button"], width=140,
         ).pack(side="right")
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  TABELA
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def _criar_tabela(self):
         card = Card(self, auto_body=False)
         card.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(SPACING["section_gap"], SPACING["page_y"]))
@@ -296,8 +313,9 @@ class TriagemFrame(ctk.CTkScrollableFrame):
 
         nome     = item["student"]
         av_color = get_avatar_color(nome)
+        form_nome = item.get("form_name", "—")
 
-        # Col 0 —“ Estudante (avatar + nome)
+        # Col 0 — Estudante (avatar + nome)
         name_cell = ctk.CTkFrame(row, fg_color="transparent")
         name_cell.grid(row=0, column=0, sticky="w", padx=(SPACING["icon_gap"], 0), pady=SPACING["item_gap"])
         av = Avatar(name_cell, initials=nome[:2], size=34, color=av_color)
@@ -306,27 +324,33 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                      font=themed_font("body", "bold"),
                      text_color=THEME["text"]).pack(side="left")
 
-        # Col 1 —“ Data
-        ctk.CTkLabel(row, text=item["date"],
+        # Col 1 — Formulário
+        ctk.CTkLabel(row, text=form_nome,
                      font=themed_font("body_sm"),
                      text_color=THEME["text_secondary"]).grid(
             row=0, column=1, sticky="w", padx=SPACING["icon_gap"])
 
-        # Col 2 —“ Prioridade (chip)
+        # Col 2 — Data
+        ctk.CTkLabel(row, text=item["date"],
+                     font=themed_font("body_sm"),
+                     text_color=THEME["text_secondary"]).grid(
+            row=0, column=2, sticky="w", padx=SPACING["icon_gap"])
+
+        # Col 3 — Prioridade (chip)
         p_color, p_soft = _PRIORITY_CFG.get(item["priority"],
                                              (THEME["text_secondary"], THEME["divider"]))
         chip_p = _chip(row, item["priority"], p_color, p_soft)
-        chip_p.grid(row=0, column=2, sticky="w", padx=SPACING["icon_gap"], pady=SPACING["item_gap"])
+        chip_p.grid(row=0, column=3, sticky="w", padx=SPACING["icon_gap"], pady=SPACING["item_gap"])
 
-        # Col 3 —“ Status (chip)
+        # Col 4 — Status (chip)
         s_color, s_soft = _STATUS_CFG.get(item["status"],
                                             (THEME["text_secondary"], THEME["divider"]))
         chip_s = _chip(row, item["status"], s_color, s_soft)
-        chip_s.grid(row=0, column=3, sticky="w", padx=SPACING["icon_gap"], pady=SPACING["item_gap"])
+        chip_s.grid(row=0, column=4, sticky="w", padx=SPACING["icon_gap"], pady=SPACING["item_gap"])
 
-        # Col 4 —“ Ações
+        # Col 5 — Ações
         acts = ctk.CTkFrame(row, fg_color="transparent")
-        acts.grid(row=0, column=4, sticky="e", padx=(0, SPACING["icon_gap"]), pady=SPACING["icon_gap"])
+        acts.grid(row=0, column=5, sticky="e", padx=(0, SPACING["icon_gap"]), pady=SPACING["icon_gap"])
         for icon, cmd, tip in [(ICONS["view"], lambda s=item: self._ver_detalhe(s), "Ver detalhe"),
                                 (ICONS["edit"], lambda s=item: self._editar(s), "Editar"),
                                 (ICONS["delete"], lambda s=item: self._excluir_triagem(s), "Excluir")]:
@@ -338,43 +362,51 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                 command=cmd,
             ).pack(side="left", padx=SPACING["label_gap"] // 2)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  Filtros
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def aplicar_filtros(self):
         st = self.filtro_status.get()
         pr = self.filtro_prioridade.get()
+        busca = self.filtro_busca.get().strip()
         filtered = [
             d for d in self.data_master
             if (st == "Todos"  or d["status"]   == st) and
-               (pr == "Todas"  or d["priority"] == pr)
+               (pr == "Todas"  or d["priority"] == pr) and
+               (not busca or busca.lower() in d["student"].lower() or busca.lower() in d.get("form_name", "").lower())
         ]
+        self._atualizar_kpis(filtered)
         self.renderizar_tabela(filtered)
 
     def limpar_filtros(self):
+        self.filtro_busca.delete(0, "end")
         self.filtro_status.set("Todos")
         self.filtro_prioridade.set("Todas")
         self.data_inicial.delete(0, "end")
         self.data_final.delete(0, "end")
+        self._atualizar_kpis(self.data_master)
         self.renderizar_tabela(self.data_master)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  Ações de linha
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def _excluir_triagem(self, item: dict):
+        nome = item.get("student", "este item")
+        if not self._confirmar(f"Deseja excluir a triagem de {nome}?"):
+            return
         def _task():
             return self.controller_triagem.deletar_triagem(item.get("id"))
         def _on_ok(_):
             self._carregar_triagens()
         def _on_err(e):
-            messagebox.showerror("Erro", f"Falha ao excluir triagem.\n{e}")
+            self._show_error(f"Falha ao excluir triagem.\n{e}")
         AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
 
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     #  MODAL: Nova Triagem
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
     def abrir_nova_triagem(self):
-        modal = BaseModal(self, title="Nova Triagem", width=520, height=580)
+        modal = BaseModal(self, title="Nova Triagem", width=560, height=720)
         modal.configure(fg_color=THEME["surface_elevated"])
 
         # Banner
@@ -401,7 +433,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                      font=themed_font("body_sm"),
                      text_color=THEME["text_secondary"]).pack(anchor="w")
 
-        # Corpo
+        # Corpo scrollável
         body = ctk.CTkFrame(modal, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["section_gap"])
 
@@ -430,8 +462,31 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             en.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
             return en
 
-        en_nome  = field(body, "Nome do Estudante", "Ex: Ana Silva", ICONS["view"])
-        en_data  = field(body, "Data da Triagem",   "dd/mm/aaaa",   ICONS["calendar"])
+        estudantes_map = {f"{e.get('nome', '')} ({e.get('id_aluno', '')})": e.get("id_aluno") for e in self._estudantes}
+        estudantes_lista = sorted(estudantes_map.keys()) if estudantes_map else ["Nenhum estudante encontrado"]
+
+        om_estudante = ctk.CTkOptionMenu(
+            body, values=estudantes_lista,
+            fg_color=THEME["primary_soft"], button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"], text_color=THEME["primary"],
+            dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+            height=40, corner_radius=RADIUS["input"], font=themed_font("body"),
+        )
+        om_estudante.pack(fill="x", pady=(0, SPACING["item_gap"]))
+
+        formularios_map = {f.get("name", ""): f.get("id") for f in self._formularios if f.get("is_active")}
+        formularios_lista = sorted(formularios_map.keys()) if formularios_map else ["Nenhum formulário ativo"]
+
+        om_formulario = ctk.CTkOptionMenu(
+            body, values=formularios_lista,
+            fg_color=THEME["primary_soft"], button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"], text_color=THEME["primary"],
+            dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+            height=40, corner_radius=RADIUS["input"], font=themed_font("body"),
+        )
+        om_formulario.pack(fill="x", pady=(0, SPACING["item_gap"]))
+
+        en_data = field(body, "Data da Triagem", "dd/mm/aaaa", ICONS["calendar"])
 
         opt_style = dict(
             fg_color=THEME["primary_soft"], button_color=THEME["primary"],
@@ -460,6 +515,69 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             **opt_style)
         om_status.grid(row=1, column=1, sticky="ew", padx=(SPACING["icon_gap"] // 2, 0))
 
+        lbl_perguntas = ctk.CTkLabel(body, text="Perguntas do Formulário",
+                                     font=themed_font("body", "bold"),
+                                     text_color=THEME["text"])
+        lbl_perguntas.pack(anchor="w", pady=(SPACING["item_gap"], SPACING["label_gap"]))
+
+        perguntas_scroll = ctk.CTkScrollableFrame(body, fg_color="transparent", height=180)
+        perguntas_scroll.pack(fill="x", pady=(0, SPACING["item_gap"]))
+        self._perguntas_widgets = {}
+
+        def renderizar_perguntas(nome_formulario: str):
+            for w in perguntas_scroll.winfo_children():
+                w.destroy()
+            self._perguntas_widgets.clear()
+            formulario = next((f for f in self._formularios if f.get("name") == nome_formulario and f.get("is_active")), None)
+            if not formulario:
+                return
+            questions = formulario.get("questions", [])
+            if isinstance(questions, str):
+                try:
+                    questions = json.loads(questions)
+                except json.JSONDecodeError:
+                    questions = []
+            for q in questions:
+                qid = q.get("id") or q.get("text", "pergunta")
+                qtext = q.get("text", "Pergunta")
+                qtype = q.get("type", "text")
+                wrap = ctk.CTkFrame(perguntas_scroll, fg_color="transparent")
+                wrap.pack(fill="x", pady=(0, SPACING["item_gap"]))
+                ctk.CTkLabel(wrap, text=qtext,
+                             font=themed_font("body"),
+                             text_color=THEME["text_secondary"], anchor="w").pack(fill="x", pady=(0, SPACING["label_gap"]))
+                box = ctk.CTkFrame(wrap, fg_color=THEME["input_bg"],
+                                   corner_radius=RADIUS["input"], border_width=1,
+                                   border_color=THEME["input_border"])
+                box.pack(fill="x")
+                if qtype == "select":
+                    opts = q.get("options", [])
+                    if isinstance(opts, str):
+                        opts = [opts]
+                    widget = ctk.CTkOptionMenu(
+                        box, values=opts if opts else ["Opção 1"],
+                        fg_color=THEME["input_bg"], button_color=THEME["primary"],
+                        button_hover_color=THEME["primary_hover"], text_color=THEME["text"],
+                        dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+                        height=36, corner_radius=RADIUS["input"], font=themed_font("body"),
+                    )
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                elif qtype == "textarea":
+                    widget = ctk.CTkTextbox(box, height=80, corner_radius=RADIUS["input"],
+                                            border_width=0, fg_color=THEME["input_bg"],
+                                            text_color=THEME["text"], font=themed_font("body"))
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                else:
+                    widget = ctk.CTkEntry(box, placeholder_text="Resposta...",
+                                          fg_color=THEME["input_bg"], border_width=0,
+                                          text_color=THEME["text"],
+                                          placeholder_text_color=THEME["text_muted"],
+                                          font=themed_font("body"), height=36)
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                self._perguntas_widgets[qid] = widget
+
+        om_formulario.configure(command=lambda selected: renderizar_perguntas(selected))
+
         en_obs = ctk.CTkTextbox(body, height=80, corner_radius=RADIUS["input"],
                                 border_width=1, border_color=THEME["input_border"],
                                 fg_color=THEME["input_bg"], text_color=THEME["text"],
@@ -479,15 +597,34 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         ).pack(side="left", pady=SPACING["item_gap"])
 
         def salvar():
-            nome = en_nome.get().strip()
-            data = en_data.get().strip()
-            if not nome:
+            estudante_key = om_estudante.get()
+            formulario_nome = om_formulario.get()
+            nome = estudantes_map.get(estudante_key, "")
+            student_id = nome if isinstance(nome, int) else None
+            if not student_id:
+                self._show_error("Selecione um estudante válido.", title="Atenção")
                 return
+            form_id = formularios_map.get(formulario_nome)
+            if not form_id:
+                self._show_error("Selecione um formulário válido.", title="Atenção")
+                return
+            data = en_data.get().strip()
+            responses = {}
+            for qid, widget in self._perguntas_widgets.items():
+                if isinstance(widget, ctk.CTkTextbox):
+                    responses[qid] = widget.get("0.0", "end").strip()
+                elif isinstance(widget, ctk.CTkOptionMenu):
+                    responses[qid] = widget.get()
+                else:
+                    responses[qid] = widget.get().strip()
             novo = {
-                "student_name": nome,
+                "student_id": student_id,
+                "form_id": form_id,
                 "scheduled_date": data or "—",
                 "priority": om_prioridade.get(),
                 "status": om_status.get(),
+                "responses": json.dumps(responses),
+                "observations": en_obs.get("0.0", "end").strip(),
             }
             def _task():
                 return self.controller_triagem.criar_triagem(novo)
@@ -495,7 +632,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                 modal.destroy()
                 self._carregar_triagens()
             def _on_err(e):
-                messagebox.showerror("Erro", f"Falha ao salvar triagem.\n{e}")
+                self._show_error(f"Falha ao salvar triagem.\n{e}")
             AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
 
         PrimaryButton(
@@ -503,12 +640,12 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             height=38, width=140, corner_radius=RADIUS["button"],
         ).pack(side="right", pady=SPACING["item_gap"])
 
-    # ••••••••••••••••••••••••••••••••••••••••••
-    #  MODAL: Detalhe
-    # ••••••••••••••••••••••••••••••••••••••••••
+    # •••••••••••••••••••••••••••••••••••••••••••
+    #  MODAL: Editar Triagem
+    # •••••••••••••••••••••••••••••••••••••••••••
     def _modal_editar_triagem(self, item: dict):
         triagem_id = item.get("id")
-        modal = BaseModal(self, title="Editar Triagem", width=520, height=580)
+        modal = BaseModal(self, title="Editar Triagem", width=560, height=720)
         modal.configure(fg_color=THEME["surface_elevated"])
 
         banner = ctk.CTkFrame(modal, fg_color=THEME["primary_soft"],
@@ -537,6 +674,30 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         body = ctk.CTkFrame(modal, fg_color="transparent")
         body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["section_gap"])
 
+        estudantes_map = {f"{e.get('nome', '')} ({e.get('id_aluno', '')})": e.get("id_aluno") for e in self._estudantes}
+        estudantes_lista = sorted(estudantes_map.keys()) if estudantes_map else ["Nenhum estudante encontrado"]
+
+        om_estudante = ctk.CTkOptionMenu(
+            body, values=estudantes_lista,
+            fg_color=THEME["primary_soft"], button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"], text_color=THEME["primary"],
+            dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+            height=40, corner_radius=RADIUS["input"], font=themed_font("body"),
+        )
+        om_estudante.pack(fill="x", pady=(0, SPACING["item_gap"]))
+
+        formularios_map = {f.get("name", ""): f.get("id") for f in self._formularios if f.get("is_active")}
+        formularios_lista = sorted(formularios_map.keys()) if formularios_map else ["Nenhum formulário ativo"]
+
+        om_formulario = ctk.CTkOptionMenu(
+            body, values=formularios_lista,
+            fg_color=THEME["primary_soft"], button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"], text_color=THEME["primary"],
+            dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+            height=40, corner_radius=RADIUS["input"], font=themed_font("body"),
+        )
+        om_formulario.pack(fill="x", pady=(0, SPACING["item_gap"]))
+
         def field(parent, label, placeholder, icon=""):
             wrap = ctk.CTkFrame(parent, fg_color="transparent")
             wrap.pack(fill="x", pady=(0, SPACING["item_gap"]))
@@ -562,8 +723,6 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             en.bind("<FocusOut>", lambda e: box.configure(border_color=THEME["input_border"]))
             return en
 
-        en_nome  = field(body, "Nome do Estudante", "Ex: Ana Silva", ICONS["view"])
-        en_nome.insert(0, item.get("student", ""))
         en_data  = field(body, "Data da Triagem", "dd/mm/aaaa", ICONS["calendar"])
         en_data.insert(0, item.get("date", ""))
 
@@ -596,11 +755,87 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         om_status.set(item.get("status", "Pendente"))
         om_status.grid(row=1, column=1, sticky="ew", padx=(SPACING["icon_gap"] // 2, 0))
 
+        lbl_perguntas = ctk.CTkLabel(body, text="Perguntas do Formulário",
+                                     font=themed_font("body", "bold"),
+                                     text_color=THEME["text"])
+        lbl_perguntas.pack(anchor="w", pady=(SPACING["item_gap"], SPACING["label_gap"]))
+
+        perguntas_scroll = ctk.CTkScrollableFrame(body, fg_color="transparent", height=180)
+        perguntas_scroll.pack(fill="x", pady=(0, SPACING["item_gap"]))
+        self._perguntas_widgets = {}
+
+        existing_responses = {}
+        if item.get("responses") and isinstance(item["responses"], dict):
+            existing_responses = item["responses"]
+
+        def renderizar_perguntas_edicao(nome_formulario: str):
+            for w in perguntas_scroll.winfo_children():
+                w.destroy()
+            self._perguntas_widgets.clear()
+            formulario = next((f for f in self._formularios if f.get("name") == nome_formulario and f.get("is_active")), None)
+            if not formulario:
+                return
+            questions = formulario.get("questions", [])
+            if isinstance(questions, str):
+                try:
+                    questions = json.loads(questions)
+                except json.JSONDecodeError:
+                    questions = []
+            for q in questions:
+                qid = q.get("id") or q.get("text", "pergunta")
+                qtext = q.get("text", "Pergunta")
+                qtype = q.get("type", "text")
+                wrap = ctk.CTkFrame(perguntas_scroll, fg_color="transparent")
+                wrap.pack(fill="x", pady=(0, SPACING["item_gap"]))
+                ctk.CTkLabel(wrap, text=qtext,
+                             font=themed_font("body"),
+                             text_color=THEME["text_secondary"], anchor="w").pack(fill="x", pady=(0, SPACING["label_gap"]))
+                box = ctk.CTkFrame(wrap, fg_color=THEME["input_bg"],
+                                   corner_radius=RADIUS["input"], border_width=1,
+                                   border_color=THEME["input_border"])
+                box.pack(fill="x")
+                valor_existente = existing_responses.get(qid, "")
+                if qtype == "select":
+                    opts = q.get("options", [])
+                    if isinstance(opts, str):
+                        opts = [opts]
+                    widget = ctk.CTkOptionMenu(
+                        box, values=opts if opts else ["Opção 1"],
+                        fg_color=THEME["input_bg"], button_color=THEME["primary"],
+                        button_hover_color=THEME["primary_hover"], text_color=THEME["text"],
+                        dropdown_fg_color=THEME["surface"], dropdown_text_color=THEME["text"],
+                        height=36, corner_radius=RADIUS["input"], font=themed_font("body"),
+                    )
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                    if valor_existente in opts:
+                        widget.set(valor_existente)
+                elif qtype == "textarea":
+                    widget = ctk.CTkTextbox(box, height=80, corner_radius=RADIUS["input"],
+                                            border_width=0, fg_color=THEME["input_bg"],
+                                            text_color=THEME["text"], font=themed_font("body"))
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                    if valor_existente:
+                        widget.insert("0.0", valor_existente)
+                else:
+                    widget = ctk.CTkEntry(box, placeholder_text="Resposta...",
+                                          fg_color=THEME["input_bg"], border_width=0,
+                                          text_color=THEME["text"],
+                                          placeholder_text_color=THEME["text_muted"],
+                                          font=themed_font("body"), height=36)
+                    widget.pack(fill="x", padx=SPACING["label_gap"], pady=SPACING["icon_gap"])
+                    if valor_existente:
+                        widget.insert(0, valor_existente)
+                self._perguntas_widgets[qid] = widget
+
+        om_formulario.configure(command=lambda selected: renderizar_perguntas_edicao(selected))
+
         en_obs = ctk.CTkTextbox(body, height=80, corner_radius=RADIUS["input"],
                                 border_width=1, border_color=THEME["input_border"],
                                 fg_color=THEME["input_bg"], text_color=THEME["text"],
                                 font=themed_font("body"))
         en_obs.pack(fill="x")
+        if item.get("observations"):
+            en_obs.insert("0.0", item.get("observations"))
 
         # Rodapé
         Divider(modal).pack(fill="x")
@@ -614,15 +849,33 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         ).pack(side="left", pady=SPACING["item_gap"])
 
         def salvar():
-            nome = en_nome.get().strip()
-            data = en_data.get().strip()
-            if not nome:
+            estudante_key = om_estudante.get()
+            formulario_nome = om_formulario.get()
+            student_id = estudantes_map.get(estudante_key)
+            if not student_id:
+                self._show_error("Selecione um estudante válido.", title="Atenção")
                 return
+            form_id = formularios_map.get(formulario_nome)
+            if not form_id:
+                self._show_error("Selecione um formulário válido.", title="Atenção")
+                return
+            data = en_data.get().strip()
+            responses = {}
+            for qid, widget in self._perguntas_widgets.items():
+                if isinstance(widget, ctk.CTkTextbox):
+                    responses[qid] = widget.get("0.0", "end").strip()
+                elif isinstance(widget, ctk.CTkOptionMenu):
+                    responses[qid] = widget.get()
+                else:
+                    responses[qid] = widget.get().strip()
             dados = {
-                "student_name": nome,
+                "student_id": student_id,
+                "form_id": form_id,
                 "scheduled_date": data or "—",
                 "priority": om_prioridade.get(),
                 "status": om_status.get(),
+                "responses": json.dumps(responses),
+                "observations": en_obs.get("0.0", "end").strip(),
             }
             def _task():
                 return self.controller_triagem.atualizar_triagem(triagem_id, dados)
@@ -630,7 +883,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                 modal.destroy()
                 self._carregar_triagens()
             def _on_err(e):
-                messagebox.showerror("Erro", f"Falha ao atualizar triagem.\n{e}")
+                self._show_error(f"Falha ao atualizar triagem.\n{e}")
             AsyncRunner.run(task=_task, on_success=_on_ok, on_error=_on_err, widget_ref=self)
 
         PrimaryButton(
@@ -654,17 +907,21 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                         {
                             "id": t.get("id"),
                             "student": t.get("student_name", "Estudante"),
+                            "form_name": t.get("form_name", "—"),
                             "date": t.get("scheduled_date", "—"),
                             "priority": t.get("priority", "Média"),
                             "status": t.get("status", "Pendente"),
+                            "responses": t.get("responses"),
+                            "observations": t.get("observations"),
                         }
                         for t in data
                     ]
             self.data_master = triagens
+            self._atualizar_kpis(triagens)
             self.renderizar_tabela(triagens)
 
         def on_error(exc):
-            messagebox.showerror("Erro", f"Falha ao carregar triagens.\n{exc}")
+            self._show_error(f"Falha ao carregar triagens.\n{exc}")
 
         AsyncRunner.run(
             task=fetch,
@@ -672,6 +929,36 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             on_error=on_error,
             widget_ref=self,
         )
+
+    def _carregar_estudantes(self):
+        def fetch():
+            return self.controller_estudantes.listar_estudantes()
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            if result.get("success"):
+                self._estudantes = result.get("data", [])
+
+        def on_error(exc):
+            pass
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
+
+    def _carregar_formularios(self):
+        def fetch():
+            return self.controller_triagem.listar_formularios()
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            if result.get("success"):
+                self._formularios = result.get("data", [])
+
+        def on_error(exc):
+            pass
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
     def _modal_detalhe(self, item: dict):
         modal = BaseModal(self, title="Detalhe da Triagem", width=420, height=340)
@@ -720,6 +1007,34 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         info_row("Prioridade", item["priority"], p_color)
         info_row("Status",     item["status"],   s_color)
         info_row("Data",       item["date"])
+        info_row("Formulário", item.get("form_name", "—"))
+
+        PrimaryButton(modal, text="Fechar", command=modal.destroy,
+                      height=38, corner_radius=RADIUS["button"],
+        ).pack(pady=(0, SPACING["item_gap"]))
+
+    def _modal_listar_formularios(self):
+        modal = BaseModal(self, title="Formulários de Triagem", width=520, height=420)
+        modal.configure(fg_color=THEME["surface_elevated"])
+
+        body = ctk.CTkFrame(modal, fg_color="transparent")
+        body.pack(fill="both", expand=True, padx=SPACING["card_pad"], pady=SPACING["section_gap"])
+
+        if not self._formularios:
+            ctk.CTkLabel(body, text="Nenhum formulário disponível.",
+                         font=themed_font("body"), text_color=THEME["text_muted"]).pack(pady=SPACING["section_gap"])
+        else:
+            scroll = ctk.CTkScrollableFrame(body, fg_color="transparent")
+            scroll.pack(fill="both", expand=True)
+            for f in self._formularios:
+                if not f.get("is_active"):
+                    continue
+                card = Card(scroll, title=f.get("name", "Sem nome"), auto_body=False)
+                card.pack(fill="x", pady=SPACING["icon_gap"])
+                desc = f.get("description") or "Sem descrição"
+                ctk.CTkLabel(card, text=desc, font=themed_font("body_sm"),
+                             text_color=THEME["text_secondary"], anchor="w").pack(
+                    fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["item_gap"]))
 
         PrimaryButton(modal, text="Fechar", command=modal.destroy,
                       height=38, corner_radius=RADIUS["button"],
@@ -740,5 +1055,3 @@ class TriagemFrame(ctk.CTkScrollableFrame):
 
     def get_priority_color(self, p: str) -> str:
         return _PRIORITY_CFG.get(p, (THEME["text_secondary"], ""))[0]
-
-
