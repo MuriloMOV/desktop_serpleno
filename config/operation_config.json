@@ -1,0 +1,10 @@
+{
+  "mode": "db_primary",
+  "api_base_url": "http://127.0.0.1:8000",
+  "api_timeout": 5,
+  "sync_interval": 300,
+  "auto_sync": true,
+  "offline_cache_size": 1000,
+  "last_sync": null,
+  "api_available": false
+}

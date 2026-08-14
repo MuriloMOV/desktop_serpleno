@@ -1,0 +1,33 @@
+{
+  "read_fallback_total": 4,
+  "write_fallback_total": 0,
+  "by_repository": {
+    "DashboardRepository": {
+      "total": 2,
+      "read": 2,
+      "write": 0,
+      "methods": {
+        "obter_kpis": 2
+      }
+    },
+    "OrientacaoRepository": {
+      "total": 1,
+      "read": 1,
+      "write": 0,
+      "methods": {
+        "listar_estudantes": 1
+      }
+    },
+    "ReportTemplateRepository": {
+      "total": 1,
+      "read": 1,
+      "write": 0,
+      "methods": {
+        "listar_templates": 1
+      }
+    }
+  },
+  "last_read_fallback": "2026-08-14T16:38:42.271684",
+  "last_write_fallback": null,
+  "started_at": "2026-08-14T16:33:35.377174"
+}

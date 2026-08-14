@@ -1,0 +1,108 @@
+{
+  "read_fallback_total": 26,
+  "write_fallback_total": 51,
+  "by_repository": {
+    "EstudanteRepository": {
+      "total": 10,
+      "read": 10,
+      "write": 0,
+      "methods": {
+        "listar": 10
+      }
+    },
+    "AgendamentoRepository": {
+      "total": 5,
+      "read": 5,
+      "write": 0,
+      "methods": {
+        "listar_proximos": 5
+      }
+    },
+    "TriagemRepository": {
+      "total": 5,
+      "read": 5,
+      "write": 0,
+      "methods": {
+        "listar": 5
+      }
+    },
+    "students": {
+      "total": 5,
+      "read": 0,
+      "write": 5,
+      "methods": {
+        "create": 5
+      }
+    },
+    "messages": {
+      "total": 10,
+      "read": 0,
+      "write": 10,
+      "methods": {
+        "create": 5,
+        "update": 5
+      }
+    },
+    "screenings": {
+      "total": 5,
+      "read": 0,
+      "write": 5,
+      "methods": {
+        "create": 5
+      }
+    },
+    "reports": {
+      "total": 5,
+      "read": 0,
+      "write": 5,
+      "methods": {
+        "delete": 5
+      }
+    },
+    "user_preferences": {
+      "total": 5,
+      "read": 0,
+      "write": 5,
+      "methods": {
+        "update": 5
+      }
+    },
+    "alerts": {
+      "total": 5,
+      "read": 0,
+      "write": 5,
+      "methods": {
+        "update": 5
+      }
+    },
+    "appointments": {
+      "total": 12,
+      "read": 0,
+      "write": 12,
+      "methods": {
+        "create": 4,
+        "update": 4,
+        "delete": 4
+      }
+    },
+    "orientations": {
+      "total": 4,
+      "read": 0,
+      "write": 4,
+      "methods": {
+        "create": 4
+      }
+    },
+    "AutenticacaoRepository": {
+      "total": 6,
+      "read": 6,
+      "write": 0,
+      "methods": {
+        "obter_usuario_por_username": 6
+      }
+    }
+  },
+  "last_read_fallback": "2026-08-14T16:27:49.689427",
+  "last_write_fallback": "2026-08-14T16:22:16.138967",
+  "started_at": "2026-08-14T16:12:14.345962"
+}
