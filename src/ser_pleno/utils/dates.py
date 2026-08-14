@@ -19,6 +19,33 @@ def parse_datetime(value) -> Optional[datetime]:
     return None
 
 
+def parse_br_date(value: str) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if not value:
+        return None
+    try:
+        d, m, y = value.split("/")
+        return f"{y}-{m}-{d}"
+    except ValueError:
+        return None
+
+
+def normalize_date(value: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError("Data inválida")
+    value = value.strip()
+    if not value:
+        raise ValueError("Data inválida")
+    if len(value) == 10 and value[4] == "-" and value[7] == "-":
+        return value
+    result = parse_br_date(value)
+    if result is None:
+        raise ValueError("Data inválida")
+    return result
+
+
 def format_date(value, fmt: str = "%Y-%m-%d") -> Optional[str]:
     dt = parse_datetime(value)
     return dt.strftime(fmt) if dt else None

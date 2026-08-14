@@ -15,6 +15,7 @@ SPACING = {
     "button_pad_x": 20,
     "button_pad_y": 12,
     "grid_gap": 20,
+    "xs": 4,
 }
 
 RADIUS = {

@@ -5,14 +5,19 @@ from __future__ import annotations
 
 import logging
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import Any, Callable, Dict, TypeVar
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
 
-def with_api_fallback(api_call_fn: Callable[[], dict], fallback_fn: Callable[..., dict], *args, **kwargs):
+def with_api_fallback(
+    api_call_fn: Callable[[], Dict[str, Any]],
+    fallback_fn: Callable[..., Dict[str, Any]],
+    *args: Any,
+    **kwargs: Any,
+) -> Dict[str, Any]:
     """Executa chamada de API com fallback para repositório/local em caso de falha."""
     try:
         resp = api_call_fn()

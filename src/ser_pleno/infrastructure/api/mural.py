@@ -62,21 +62,21 @@ class ServicoMural:
                 headers['X-CSRFToken'] = auth.csrf_token
         return headers
 
-    def listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1) -> Dict[str, Any]:
+    def listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None) -> Dict[str, Any]:
         """
         Lista mensagens do mural com filtros opcionais
         
         Args:
             busca: Termo para buscar nos campos título, conteúdo e autor
             pagina: Número da página
+            categoria: Filtro por categoria (informativo, aviso, aula, urgente, evento)
             
         Returns:
             Dict com success, data (mensagens)
         """
-        # Em modo independente, usa diretamente o banco local
         if not self._should_use_api():
             logger.info("Modo independente: usando banco local diretamente para mural")
-            return self._local_listar_mensagens(busca, pagina)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
         
         try:
             url = f"{self.base_url}/"
@@ -85,6 +85,8 @@ class ServicoMural:
             params: Dict[str, Any] = {'page': pagina}
             if busca:
                 params['search'] = busca
+            if categoria and categoria != "Todas":
+                params['categoria'] = categoria
             
             if session and requests:
                 try:
@@ -94,19 +96,19 @@ class ServicoMural:
                             return response.json()
                         except Exception as json_err:
                             logger.debug(f"Resposta não é JSON válido: {json_err}")
-                            return self._local_listar_mensagens(busca, pagina)
+                            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
                     else:
                         logger.debug(f"API retornou status {response.status_code}, usando banco local")
-                        return self._local_listar_mensagens(busca, pagina)
+                        return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
                 except Exception as conn_err:
                     logger.warning(f"Erro de conexão com API: {conn_err}, usando banco local")
-                    return self._local_listar_mensagens(busca, pagina)
+                    return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
             
-            return self._local_listar_mensagens(busca, pagina)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
             
         except Exception as e:
             logger.exception(f"Erro ao listar mensagens: {e}")
-            return self._local_listar_mensagens(busca, pagina)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
     
     def obter_mensagem(self, mensagem_id: int) -> Dict[str, Any]:
         """
@@ -280,7 +282,7 @@ class ServicoMural:
     
     # ----------------------- Métodos locais (banco de dados) -----------------------
     
-    def _local_listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1) -> Dict[str, Any]:
+    def _local_listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None) -> Dict[str, Any]:
         """Retorna mensagens do banco local"""
         try:
             connection = get_db_connection()
@@ -292,6 +294,10 @@ class ServicoMural:
             if busca:
                 query += " AND (titulo LIKE %s OR conteudo LIKE %s OR autor LIKE %s)"
                 params.extend([f"%{busca}%", f"%{busca}%", f"%{busca}%"])
+            
+            if categoria and categoria != "Todas":
+                query += " AND categoria = %s"
+                params.append(categoria)
                 
             offset = (pagina - 1) * 10
             query += " ORDER BY publicado_em DESC LIMIT 10 OFFSET %s"

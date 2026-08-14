@@ -3,20 +3,24 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional, Tuple, TypeVar, Union
 
-def safe_str(value, fallback: str = "") -> str:
+T = TypeVar("T")
+
+
+def safe_str(value: Any, fallback: str = "") -> str:
     """Converte valor para string com fallback."""
     if value is None:
         return fallback
     return str(value)
 
 
-def safe_bool(value) -> bool:
+def safe_bool(value: Any) -> bool:
     """Converte valor para boolean de forma segura."""
     return bool(value)
 
 
-def map_row(row: dict, mapping: dict) -> dict:
+def map_row(row: Dict[str, Any], mapping: Dict[str, Union[str, Tuple[str, Optional[Any]]]]) -> Dict[str, Any]:
     """Mapeia um row do banco para dict usando {dest: (src, transform_fn | None)}."""
     result = {}
     for dest, spec in mapping.items():

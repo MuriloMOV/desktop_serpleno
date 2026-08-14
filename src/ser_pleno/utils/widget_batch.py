@@ -23,7 +23,7 @@ class WidgetBatchBuilder:
         batch.execute()
     """
 
-    def __init__(self, parent=None, batch_size: int = 50):
+    def __init__(self, parent: Any = None, batch_size: int = 50) -> None:
         self._parent = parent
         self._batch_size = batch_size
         self._ops: list[Callable[[], None]] = []
