@@ -74,8 +74,8 @@ def _map_message(row: dict) -> dict:
         "read": _safe_bool(row.get("read")),
     }
     if row.get("caminho_arquivo"):
-        message["file_path"] = row.get("caminho_arquivo")
-        message["file_type"] = row.get("tipo_arquivo")
+        message["caminho_arquivo"] = row.get("caminho_arquivo")
+        message["tipo_arquivo"] = row.get("tipo_arquivo")
     return message
 
 
@@ -145,4 +145,12 @@ class ServicoComunicacao:
     def contar_mensagens_nao_lidas(self, usuario_id: int) -> dict:
         total = self.repo.contar_mensagens_nao_lidas(usuario_id)
         return {"success": True, "data": total}
+
+    def marcar_todas_mensagens_lidas(self, usuario_id: int) -> dict:
+        self.repo.marcar_todas_mensagens_lidas(usuario_id)
+        return {"success": True, "message": "Todas as mensagens marcadas como lidas"}
+
+    def excluir_mensagem(self, mensagem_id: int) -> dict:
+        self.repo.excluir_mensagem(mensagem_id)
+        return {"success": True, "message": "Mensagem excluída"}
 

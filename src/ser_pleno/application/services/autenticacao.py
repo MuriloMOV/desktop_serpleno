@@ -243,10 +243,144 @@ class ServicoAutenticacao:
     def logout(self):
         """Encerra a sessão"""
         try:
-            logout_url = f"{self.API_BASE_URL}/api/v1/serpleno/auth/logout/"
+            logout_url = f"{self.API_BASE_URL}/api/v1/auth/logout/"
             self.session.post(logout_url, timeout=5)
         except Exception:
             pass
         self.session = requests.Session()
         self.user = None
         self.csrf_token = None
+
+    def verificar_sessao(self):
+        try:
+            if self._should_use_api():
+                response = self.session.get(
+                    f"{self.API_BASE_URL}/api/v1/auth/check/",
+                    timeout=5,
+                )
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data}
+            user = self.repo.obter_usuario_por_id(self.user.get("id") if self.user else None)
+            return {"success": True, "data": {"authenticated": bool(user), "user": user}}
+        except Exception as e:
+            logger.error(f"Erro ao verificar sessão: {e}")
+            return {"success": False, "message": str(e)}
+
+    def listar_usuarios(self, busca=None, role=None, pagina=1):
+        try:
+            rows = self.repo.listar_usuarios(busca=busca, role=role, pagina=pagina)
+            usuarios = []
+            for r in rows:
+                usuarios.append({
+                    "id": r.get("id"),
+                    "username": r.get("username"),
+                    "email": r.get("email"),
+                    "first_name": r.get("first_name"),
+                    "last_name": r.get("last_name"),
+                    "role": r.get("role"),
+                    "is_staff": bool(r.get("is_staff")),
+                    "is_superuser": bool(r.get("is_superuser")),
+                })
+            total = len(usuarios)
+            return {
+                "success": True,
+                "data": {
+                    "users": usuarios,
+                    "total": total,
+                    "page": pagina,
+                    "total_pages": 1,
+                },
+            }
+        except Exception as e:
+            logger.error(f"Erro ao listar usuários: {e}")
+            return {"success": False, "message": str(e), "data": []}
+
+    def criar_usuario(self, dados):
+        try:
+            user_id = self.repo.criar_usuario(
+                username=dados.get("username"),
+                email=dados.get("email"),
+                password=dados.get("password"),
+                first_name=dados.get("first_name", ""),
+                last_name=dados.get("last_name", ""),
+                role=dados.get("role", "visitante"),
+                is_staff=dados.get("is_staff", False),
+            )
+            return {"success": True, "message": "Usuário criado com sucesso", "data": {"id": user_id}}
+        except Exception as e:
+            logger.error(f"Erro ao criar usuário: {e}")
+            return {"success": False, "message": str(e)}
+
+    def atualizar_usuario(self, user_id, dados):
+        try:
+            self.repo.atualizar_usuario(
+                user_id,
+                email=dados.get("email"),
+                first_name=dados.get("first_name"),
+                last_name=dados.get("last_name"),
+                role=dados.get("role"),
+                is_staff=dados.get("is_staff"),
+            )
+            return {"success": True, "message": "Usuário atualizado com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao atualizar usuário: {e}")
+            return {"success": False, "message": str(e)}
+
+    def deletar_usuario(self, user_id):
+        try:
+            self.repo.deletar_usuario(user_id)
+            return {"success": True, "message": "Usuário deletado com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao deletar usuário: {e}")
+            return {"success": False, "message": str(e)}
+
+    def conceder_permissao(self, user_id, permissao):
+        try:
+            self.repo.conceder_permissao(user_id, permissao)
+            return {"success": True, "message": f"Permissão {permissao} concedida"}
+        except Exception as e:
+            logger.error(f"Erro ao conceder permissão: {e}")
+            return {"success": False, "message": str(e)}
+
+    def revogar_permissao(self, user_id, permissao):
+        try:
+            self.repo.revogar_permissao(user_id, permissao)
+            return {"success": True, "message": f"Permissão {permissao} revogada"}
+        except Exception as e:
+            logger.error(f"Erro ao revogar permissão: {e}")
+            return {"success": False, "message": str(e)}
+
+    def obter_roles(self):
+        roles = [
+            ("admin", "Administrador"),
+            ("psicologo", "Psicólogo"),
+            ("coordenador", "Coordenador"),
+            ("analista", "Analista"),
+            ("suporte", "Suporte"),
+            ("visitante", "Visitante"),
+        ]
+        return {"success": True, "data": [{"value": r[0], "label": r[1]} for r in roles]}
+
+    def obter_permissoes(self):
+        permissions = [
+            ("manage_users", "Gerenciar Usuários"),
+            ("view_audit_log", "Ver Logs de Auditoria"),
+            ("manage_students", "Gerenciar Estudantes"),
+            ("manage_schedule", "Gerenciar Agenda"),
+            ("manage_reports", "Gerenciar Relatórios"),
+            ("view_analytics", "Ver Analytics"),
+        ]
+        return {"success": True, "data": [{"value": p[0], "label": p[1]} for p in permissions]}
+
+    def obter_permissoes_role(self, role):
+        mapping = {
+            "admin": ["manage_users", "view_audit_log", "manage_students", "manage_schedule", "manage_reports", "view_analytics"],
+            "psicologo": ["manage_students", "manage_schedule", "view_analytics"],
+            "coordenador": ["manage_students", "manage_schedule", "manage_reports", "view_analytics"],
+            "analista": ["view_analytics"],
+            "suporte": ["manage_students"],
+            "visitante": [],
+        }
+        perms = mapping.get(role, [])
+        return {"success": True, "data": {"role": role, "permissions": perms}}

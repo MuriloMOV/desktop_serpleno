@@ -183,6 +183,12 @@ class ServicoEstudante:
                     "attention_reason": r.get("attention_reason")
                     or r.get("attention_notes")
                     or "",
+                    "professor_responsavel": r.get("professor_responsavel") or "Não informado",
+                    "status": r.get("status") or "ativo",
+                    "priority_level": r.get("priority_level") or 0,
+                    "general_notes": r.get("general_notes") or "",
+                    "minigame_blocked": bool(r.get("minigames_blocked") or r.get("minigame_blocked") or False),
+                    "minigame_block_reason": r.get("minigames_block_reason") or r.get("minigame_block_reason") or "",
                 }
             return {"success": True, "data": student}
         except Exception as e:
@@ -242,6 +248,17 @@ class ServicoEstudante:
                 email=email,
                 has_medical_report=bool(dados.get("has_medical_report", False)),
                 requires_attention=bool(dados.get("requires_attention", False)),
+                professor_responsavel=dados.get("professor_responsavel", "Não informado"),
+                status=dados.get("status", "ativo"),
+                priority_level=int(dados.get("priority_level", 0)),
+                tags=dados.get("tags"),
+                curso=dados.get("course"),
+                age=dados.get("age"),
+                phone=dados.get("phone"),
+                emergency_contact=dados.get("emergency_contact"),
+                emergency_phone=dados.get("emergency_phone"),
+                attention_reason=dados.get("attention_reason"),
+                general_notes=dados.get("general_notes"),
             )
             _invalidate_dashboard_cache()
             return {"success": True, "message": "Estudante criado com sucesso"}
@@ -280,6 +297,17 @@ class ServicoEstudante:
                 email=email,
                 has_medical_report=bool(dados.get("has_medical_report", False)),
                 requires_attention=bool(dados.get("requires_attention", False)),
+                professor_responsavel=dados.get("professor_responsavel", "Não informado"),
+                status=dados.get("status", "ativo"),
+                priority_level=int(dados.get("priority_level", 0)),
+                tags=dados.get("tags"),
+                curso=dados.get("course"),
+                age=dados.get("age"),
+                phone=dados.get("phone"),
+                emergency_contact=dados.get("emergency_contact"),
+                emergency_phone=dados.get("emergency_phone"),
+                attention_reason=dados.get("attention_reason"),
+                general_notes=dados.get("general_notes"),
             )
             _invalidate_dashboard_cache()
             return {"success": True, "message": "Estudante atualizado com sucesso"}
@@ -310,6 +338,97 @@ class ServicoEstudante:
         except Exception as e:
             logger.error(f"Erro no fallback ao deletar estudante: {e}")
             return {"success": False, "error": str(e)}
+
+    def bloquear_minigames(self, id_estudante: int, motivo: str = "") -> Dict[str, Any]:
+        """Bloqueia o acesso do estudante aos minigames."""
+        def _api_call():
+            resp = self._api.post(f"students/{id_estudante}/block-minigames/", json={"reason": motivo})
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_bloquear_minigames,
+            id_estudante,
+            motivo,
+        )
+
+    def _fallback_bloquear_minigames(self, id_estudante: int, motivo: str) -> Dict[str, Any]:
+        try:
+            self.repo.bloquear_minigames(id_estudante, motivo)
+            _invalidate_dashboard_cache()
+            return {"success": True, "message": "Minigames bloqueados com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao bloquear minigames: {e}")
+            return {"success": False, "error": str(e)}
+
+    def desbloquear_minigames(self, id_estudante: int) -> Dict[str, Any]:
+        """Desbloqueia o acesso do estudante aos minigames."""
+        def _api_call():
+            resp = self._api.post(f"students/{id_estudante}/unblock-minigames/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_desbloquear_minigames,
+            id_estudante,
+        )
+
+    def _fallback_desbloquear_minigames(self, id_estudante: int) -> Dict[str, Any]:
+        try:
+            self.repo.desbloquear_minigames(id_estudante)
+            _invalidate_dashboard_cache()
+            return {"success": True, "message": "Minigames desbloqueados com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao desbloquear minigames: {e}")
+            return {"success": False, "error": str(e)}
+
+    def verificar_comportamento_suspeito(self, id_estudante: int) -> Dict[str, Any]:
+        """Verifica comportamento suspeito de gamificação."""
+        def _api_call():
+            resp = self._api.post(f"students/{id_estudante}/check-suspicious-behavior/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_verificar_comportamento_suspeito,
+            id_estudante,
+        )
+
+    def _fallback_verificar_comportamento_suspeito(self, id_estudante: int) -> Dict[str, Any]:
+        try:
+            result = self.repo.verificar_comportamento_suspeito(id_estudante)
+            return {"success": True, "data": result}
+        except Exception as e:
+            logger.error(f"Erro ao verificar comportamento suspeito: {e}")
+            return {"success": False, "error": str(e)}
+
+    def obter_log_bloqueio(self, id_estudante: int) -> Dict[str, Any]:
+        """Retorna histórico de bloqueios de minigames do estudante."""
+        def _api_call():
+            resp = self._api.get(f"students/{id_estudante}/block-log/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return with_api_fallback(
+            _api_call,
+            self._fallback_obter_log_bloqueio,
+            id_estudante,
+        )
+
+    def _fallback_obter_log_bloqueio(self, id_estudante: int) -> Dict[str, Any]:
+        try:
+            rows = self.repo.obter_log_bloqueio(id_estudante)
+            return {"success": True, "data": rows}
+        except Exception as e:
+            logger.error(f"Erro ao obter log de bloqueio: {e}")
+            return {"success": False, "error": str(e), "data": []}
 
 
 # Instância global para fácil acesso

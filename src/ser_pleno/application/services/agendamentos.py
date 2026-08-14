@@ -517,3 +517,32 @@ class ServicoAgendamento:
         except Exception as e:
             logging.warning(f"Erro ao sincronizar agendamento {appointment_id} com API: {e}")
             # Não levanta exceção - o agendamento local já foi salvo
+
+    def listar_agendamentos_mes(self, ano, mes):
+        """Lista agendamentos de um mês específico para o calendário."""
+        try:
+            rows = self.repo.listar_agendamentos_mes(ano, mes)
+            agendamentos = []
+            for row in rows:
+                data_hora = row["data_hora"]
+                if isinstance(data_hora, str):
+                    try:
+                        data_hora = datetime.strptime(data_hora, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        pass
+                agendamentos.append({
+                    "id_agendamento": row["id"],
+                    "nome": row["nome"],
+                    "id_aluno": row["id_aluno"],
+                    "data_hora": data_hora,
+                    "motivo": row["motivo"],
+                    "status": self._convert_status_backend_to_frontend(row["status"]),
+                    "local": row.get("local"),
+                    "profissional": row.get("profissional"),
+                    "laudo": row.get("laudo"),
+                    "origem": row.get("origem"),
+                })
+            return {"success": True, "data": agendamentos}
+        except Exception as e:
+            logging.error(f"Erro ao listar agendamentos do mês: {e}")
+            return {"success": True, "data": []}

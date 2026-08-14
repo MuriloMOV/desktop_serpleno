@@ -6,6 +6,7 @@ Funciona de forma independente com sincronização opcional com a API do SerPlen
 import logging
 import json
 import datetime
+import os
 from typing import Optional, List, Dict, Any
 
 try:
@@ -82,7 +83,7 @@ class ServicoOrientacoes:
     
     def _get_headers(self):
         """Retorna headers com CSRF token se disponível"""
-        headers: Dict[str, str] = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json"}
         auth = self._auth_service
         if auth:
             if hasattr(auth, "get_headers"):
@@ -93,16 +94,19 @@ class ServicoOrientacoes:
     
     def listar_orientacoes(
         self,
-        id_estudante: Optional[int] = None,
-        tema: Optional[str] = None,
-        pagina: int = 1,
-    ) -> Dict[str, Any]:
+        id_estudante=None,
+        tema=None,
+        pagina=1,
+        date_from=None,
+        date_to=None,
+        search=None,
+    ):
         """Lista orientações com filtros opcionais."""
         try:
             rows = self.repo.listar_orientacoes(id_estudante)
             orientacoes = []
             for r in rows:
-                orientacoes.append({
+                o = {
                     "id": r.get("id"),
                     "title": r.get("title"),
                     "theme": r.get("theme"),
@@ -116,8 +120,23 @@ class ServicoOrientacoes:
                     "motivational_message": r.get("motivational_message"),
                     "created_at": str(r.get("created_at")) if r.get("created_at") else None,
                     "action_plan": json.loads(r.get("action_plan", "[]")) if r.get("action_plan") else [],
-                })
-            
+                }
+                if tema and o["theme"] != tema:
+                    continue
+                if search:
+                    term = search.lower()
+                    if term not in (o.get("title") or "").lower():
+                        continue
+                if date_from:
+                    sd = o.get("session_date") or ""
+                    if sd < date_from:
+                        continue
+                if date_to:
+                    sd = o.get("session_date") or ""
+                    if sd > date_to:
+                        continue
+                orientacoes.append(o)
+
             total = len(orientacoes)
             logger.info(f"Encontradas {total} orientações no repositório")
             return {
@@ -134,7 +153,7 @@ class ServicoOrientacoes:
                 "data": {"orientations": [], "pagination": {"page": 1, "total": 0}},
             }
 
-    def obter_orientacao(self, id_orientacao: int) -> Dict[str, Any]:
+    def obter_orientacao(self, id_orientacao: int):
         """Obtém detalhes de uma orientação específica."""
         try:
             r = self.repo.obter_orientacao(id_orientacao)
@@ -163,9 +182,7 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao obter orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def criar_orientacao(
-        self, dados: Dict[str, Any], arquivos: Optional[List] = None
-    ) -> Dict[str, Any]:
+    def criar_orientacao(self, dados, arquivos=None):
         """Cria uma nova orientação."""
         try:
             orientacao_id = self.repo.criar_orientacao(
@@ -175,7 +192,7 @@ class ServicoOrientacoes:
                 session_date=dados.get("session_date"),
                 content=dados.get("content"),
                 is_markdown=dados.get("is_markdown", False),
-                motivational_message=dados.get("motivational_message"),
+                motivational_message=dados.get("motivational_message", ""),
                 action_plan=dados.get("action_plan", []),
                 psychologist=dados.get("psychologist", "Equipe SerPleno")
             )
@@ -185,19 +202,18 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao criar orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def atualizar_orientacao(
-        self, id_orientacao: int, dados: Dict[str, Any], arquivos: Optional[List] = None
-    ) -> Dict[str, Any]:
+    def atualizar_orientacao(self, id_orientacao: int, dados, arquivos=None):
         """Atualiza uma orientação existente."""
         try:
             self.repo.atualizar_orientacao(
                 id_orientacao=id_orientacao,
+                student_id=dados.get("student_id"),
                 title=dados.get("title"),
                 theme=dados.get("theme"),
                 session_date=dados.get("session_date"),
                 content=dados.get("content"),
                 is_markdown=dados.get("is_markdown", False),
-                motivational_message=dados.get("motivational_message"),
+                motivational_message=dados.get("motivational_message", ""),
                 action_plan=dados.get("action_plan", []),
                 psychologist=dados.get("psychologist")
             )
@@ -206,7 +222,7 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao atualizar orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def deletar_orientacao(self, id_orientacao: int) -> Dict[str, Any]:
+    def deletar_orientacao(self, id_orientacao: int):
         """Deleta uma orientação."""
         try:
             self.repo.deletar_orientacao(id_orientacao)
@@ -215,17 +231,15 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao deletar orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def get_preset(self, chave: str) -> Optional[Dict]:
+    def get_preset(self, chave: str):
         """Retorna um preset específico"""
         return self.PRESETS.get(chave)
 
-    def get_presets(self) -> Dict[str, Dict]:
+    def get_presets(self):
         """Retorna todos os presets disponíveis"""
         return self.PRESETS
 
-    def duplicar_orientacao(
-        self, id_orientacao: int, id_estudante: Optional[int] = None
-    ) -> Dict[str, Any]:
+    def duplicar_orientacao(self, id_orientacao: int, id_estudante: Optional[int] = None):
         """Duplica uma orientação existente."""
         try:
             orientacao_resp = self.obter_orientacao(id_orientacao)
@@ -249,7 +263,7 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao duplicar orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def obter_estatisticas(self, id_estudante: Optional[int] = None) -> Dict[str, Any]:
+    def obter_estatisticas(self, id_estudante: Optional[int] = None):
         """Obtém estatísticas das orientações."""
         try:
             stats = self.repo.obter_estatisticas()
@@ -258,7 +272,7 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao obter estatísticas: {e}")
             return {"success": True, "data": {"total": 0, "by_theme": [], "by_month": []}}
 
-    def listar_estudantes(self) -> Dict[str, Any]:
+    def listar_estudantes(self):
         """Lista todos os estudantes cadastrados."""
         try:
             rows = self.repo.listar_estudantes()
@@ -274,6 +288,192 @@ class ServicoOrientacoes:
         except Exception as e:
             logger.error(f"Erro ao listar estudantes: {e}")
             return {"success": True, "data": []}
+
+    def listar_anexos(self, orientation_id: int):
+        """Lista anexos de uma orientação."""
+        try:
+            if self._should_use_api():
+                api_result = self._listar_anexos_api(orientation_id)
+                if api_result.get("success"):
+                    return api_result
+                logger.warning("Falha ao listar anexos via API, usando repositório local")
+            rows = self.repo.listar_anexos(orientation_id)
+            anexos = [
+                {
+                    "id": r.get("id"),
+                    "orientation_id": r.get("orientation_id"),
+                    "uploaded_by_id": r.get("uploaded_by_id"),
+                    "file": r.get("file"),
+                    "file_name": r.get("file_name"),
+                    "mime_type": r.get("mime_type"),
+                    "created_at": r.get("created_at"),
+                }
+                for r in rows
+            ]
+            return {"success": True, "data": anexos}
+        except Exception as e:
+            logger.error(f"Erro ao listar anexos: {e}")
+            return {"success": True, "data": []}
+
+    def _listar_anexos_api(self, orientation_id: int):
+        try:
+            session = self._get_session()
+            endpoint = f"{self.base_url.rstrip('/')}/orientations/{orientation_id}/attachments/"
+            response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+            if response.ok:
+                data = response.json()
+                return {"success": True, "data": data.get("data", data)}
+            return {"success": False, "message": f"Erro na API: {response.status_code}"}
+        except Exception as e:
+            logger.warning(f"Erro ao listar anexos via API: {e}")
+            return {"success": False, "message": str(e)}
+
+    def adicionar_anexo(self, orientation_id: int, arquivo_path: str, uploaded_by_id: int):
+        """Adiciona um anexo a uma orientação."""
+        try:
+            file_name = os.path.basename(arquivo_path)
+            mime_type = self._detectar_mime_type(arquivo_path)
+
+            if self._should_use_api():
+                api_result = self._adicionar_anexo_api(orientation_id, arquivo_path, file_name, mime_type, uploaded_by_id)
+                if api_result.get("success"):
+                    return api_result
+                logger.warning("Falha ao adicionar anexo via API, usando repositório local")
+
+            attachment_id = self.repo.criar_anexo(orientation_id, uploaded_by_id, arquivo_path, file_name, mime_type)
+            logger.info(f"Anexo criado localmente: {attachment_id}")
+            return {"success": True, "message": "Anexo adicionado com sucesso", "data": {"id": attachment_id}}
+        except Exception as e:
+            logger.error(f"Erro ao adicionar anexo: {e}")
+            return {"success": False, "message": str(e)}
+
+    def _adicionar_anexo_api(self, orientation_id: int, arquivo_path: str, file_name: str, mime_type: str, uploaded_by_id: int):
+        try:
+            session = self._get_session()
+            endpoint = f"{self.base_url.rstrip('/')}/orientations/{orientation_id}/attachments/"
+            with open(arquivo_path, "rb") as f:
+                files = {"file": (file_name, f, mime_type)}
+                data = {"uploaded_by_id": uploaded_by_id}
+                response = session.post(endpoint, files=files, data=data, headers=self._get_headers(), timeout=15)
+            if response.ok:
+                result = response.json()
+                logger.info(f"Anexo adicionado via API: {result}")
+                return result
+            return {"success": False, "message": f"Erro na API: {response.status_code}"}
+        except Exception as e:
+            logger.warning(f"Erro ao adicionar anexo via API: {e}")
+            return {"success": False, "message": str(e)}
+
+    def deletar_anexo(self, attachment_id: int):
+        """Deleta um anexo."""
+        try:
+            if self._should_use_api():
+                api_result = self._deletar_anexo_api(attachment_id)
+                if api_result.get("success"):
+                    return api_result
+                logger.warning("Falha ao deletar anexo via API, usando repositório local")
+
+            self.repo.deletar_anexo(attachment_id)
+            return {"success": True, "message": "Anexo deletado com sucesso"}
+        except Exception as e:
+            logger.error(f"Erro ao deletar anexo: {e}")
+            return {"success": False, "message": str(e)}
+
+    def _deletar_anexo_api(self, attachment_id: int):
+        try:
+            session = self._get_session()
+            endpoint = f"{self.base_url.rstrip('/')}/orientations/attachments/{attachment_id}/delete/"
+            response = session.delete(endpoint, headers=self._get_headers(), timeout=10)
+            if response.ok:
+                return {"success": True, "message": "Anexo deletado via API"}
+            return {"success": False, "message": f"Erro na API: {response.status_code}"}
+        except Exception as e:
+            logger.warning(f"Erro ao deletar anexo via API: {e}")
+            return {"success": False, "message": str(e)}
+
+    def obter_temas(self):
+        """Obtém lista de temas disponíveis para orientações."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/themes/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+            temas = [
+                {"value": "Geral", "label": "Geral"},
+                {"value": "Acadêmico", "label": "Acadêmico"},
+                {"value": "Emocional", "label": "Emocional"},
+                {"value": "Social", "label": "Social"},
+                {"value": "Familiar", "label": "Familiar"},
+                {"value": "Vocacional", "label": "Vocacional"},
+            ]
+            return {"success": True, "data": temas}
+        except Exception as e:
+            logger.error(f"Erro ao obter temas: {e}")
+            return {"success": True, "data": [
+                {"value": "Geral", "label": "Geral"},
+                {"value": "Acadêmico", "label": "Acadêmico"},
+                {"value": "Emocional", "label": "Emocional"},
+                {"value": "Social", "label": "Social"},
+                {"value": "Familiar", "label": "Familiar"},
+                {"value": "Vocacional", "label": "Vocacional"},
+            ]}
+
+    def obter_templates(self):
+        """Obtém lista de templates de orientação."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/templates/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+            templates = [
+                {"id": "study_support", "label": "Apoio Pedagógico"},
+                {"id": "emotional_support", "label": "Apoio Emocional"},
+                {"id": "career_guidance", "label": "Orientação Profissional"},
+            ]
+            return {"success": True, "data": templates}
+        except Exception as e:
+            logger.error(f"Erro ao obter templates: {e}")
+            return {"success": True, "data": [
+                {"id": "study_support", "label": "Apoio Pedagógico"},
+                {"id": "emotional_support", "label": "Apoio Emocional"},
+                {"id": "career_guidance", "label": "Orientação Profissional"},
+            ]}
+
+    def usar_template(self, template_id, student_id):
+        """Cria uma orientação a partir de um template."""
+        try:
+            preset = self.get_preset(template_id)
+            if not preset:
+                return {"success": False, "message": "Template não encontrado"}
+            componentes = {c["id"]: c.get("label", "") for c in preset.get("components", [])}
+            content_parts = [f"**{v}**" for v in componentes.values() if v]
+            content = "\n\n".join(content_parts) if content_parts else preset.get("label", "")
+            dados = {
+                "student_id": student_id,
+                "title": preset.get("label", "Orientação"),
+                "theme": "Geral",
+                "session_date": datetime.datetime.now().strftime("%Y-%m-%d"),
+                "content": content,
+                "is_markdown": False,
+                "motivational_message": "",
+                "action_plan": [],
+                "psychologist": "Equipe SerPleno",
+            }
+            return self.criar_orientacao(dados)
+        except Exception as e:
+            logger.error(f"Erro ao usar template: {e}")
+            return {"success": False, "message": str(e)}
+
+    def _detectar_mime_type(self, file_path: str) -> str:
+        import mimetypes
+        mime, _ = mimetypes.guess_type(file_path)
+        return mime or "application/octet-stream"
 
 
 # Instância global para fácil acesso
