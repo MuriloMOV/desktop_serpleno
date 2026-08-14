@@ -521,6 +521,10 @@ class PublicacaoModal(BaseModal):
         except Exception: pass
         self._show_error(f"{err.get('message') if isinstance(err, dict) else err}")
 
+    def _show_error(self, message: str, title: str = "Atenção") -> None:
+        import tkinter.messagebox as mb
+        mb.showwarning(title, message)
+
     # —— Blocos ————————————————————————————————————————————————————————————————
     def _on_add_block(self):
         cur = self.f_layout.get() or "single"
