@@ -317,6 +317,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._por_estudante: dict = {}
         self._action_plan_itens: list[dict] = []
         self._toast = None
+        self._orientacoes_page_size = 20
+        self._orientacoes_rendered_count = 0
+        self._skeleton_job = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -1000,17 +1003,40 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._carregar_dados()
 
     def _carregar_dados(self):
+        if self._skeleton_job:
+            self._skeleton_job = None
+        self._show_skeleton()
+
         def fetch():
             return self.controller_orientacoes.listar_orientacoes()
 
         def on_success(resultado):
+            self._hide_skeleton()
             self._renderizar(resultado)
 
         def on_error(exc):
+            self._hide_skeleton()
             logger.error("Erro ao carregar orientações: %s", exc)
 
         AsyncRunner.run(task=fetch, on_success=on_success,
                         on_error=on_error, widget_ref=self)
+
+    def _show_skeleton(self):
+        for w in self._area_historico.winfo_children():
+            w.destroy()
+        for _ in range(8):
+            s = ctk.CTkFrame(self._area_historico, fg_color=O["card_bg"],
+                             corner_radius=O["card_radius"], height=90)
+            s.pack(fill="x", pady=(0, 10), padx=4)
+            s.pack_propagate(False)
+            ctk.CTkFrame(s, width=4, corner_radius=0, fg_color=THEME["border"]).pack(
+                side="left", fill="y")
+            ctk.CTkFrame(s, fg_color="transparent").pack(
+                side="left", fill="both", expand=True, padx=spacing("md"), pady=spacing("md"))
+
+    def _hide_skeleton(self):
+        for w in self._area_historico.winfo_children():
+            w.destroy()
 
     def _carregar_estudantes(self):
         def fetch():
@@ -1129,8 +1155,31 @@ class OrientacoesFrame(ctk.CTkFrame):
                          text_color=O["text_muted"]).pack(pady=30)
             return
 
-        batch = WidgetBatchBuilder(parent=self._area_historico, batch_size=20)
-        for o in orientacoes:
+        self._orientacoes_lista_completa = list(orientacoes)
+        self._orientacoes_rendered_count = 0
+
+        if hasattr(self, "_btn_mais") and self._btn_mais:
+            self._btn_mais.destroy()
+            self._btn_mais = None
+
+        self._carregar_mais_orientacoes()
+
+    def _carregar_mais_orientacoes(self):
+        if not hasattr(self, "_orientacoes_lista_completa"):
+            return
+        if self._skeleton_job:
+            self._skeleton_job = None
+
+        start = self._orientacoes_rendered_count
+        page_size = self._orientacoes_page_size
+        end = min(start + page_size, len(self._orientacoes_lista_completa))
+        page = self._orientacoes_lista_completa[start:end]
+
+        if not page and start == 0:
+            return
+
+        batch = WidgetBatchBuilder(parent=self._area_historico, batch_size=8)
+        for o in page:
             batch.add(lambda o=o: OrientationHistoryCard(
                 self._area_historico, orientation=o,
                 on_view=self._ver_orientacao,
@@ -1139,6 +1188,21 @@ class OrientacoesFrame(ctk.CTkFrame):
                 on_delete=self._excluir_orientacao,
             ).pack(fill="both", expand=True, pady=(0, 10)))
         batch.execute()
+
+        self._orientacoes_rendered_count = end
+
+        faltam = len(self._orientacoes_lista_completa) - end
+        if faltam > 0 and self.winfo_exists():
+            self._btn_mais = ctk.CTkButton(
+                self._area_historico,
+                text=f"Carregar mais ({faltam})",
+                command=self._carregar_mais_orientacoes,
+                height=36, width=220, corner_radius=10,
+                fg_color=O["accent_soft"], hover_color=O["accent"],
+                text_color=O["accent"],
+                font=font(size=12, weight="bold"),
+            )
+            self._btn_mais.pack(pady=12)
 
     def _salvar_orientacao(self):
         titulo    = self.f_titulo.get().strip()

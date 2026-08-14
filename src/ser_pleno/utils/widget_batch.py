@@ -50,7 +50,15 @@ class WidgetBatchBuilder:
         if parent is not None and hasattr(parent, "winfo_ismapped") and not parent.winfo_ismapped():
             effective_batch = min(self._batch_size, 8)
 
-        # Em telas grandes, divide em lotes menores para não travar a UI
+        # Se o pai suportar after_idle, agenda a execução em lotes curtos
+        # para não travar a UI com muitos widgets de uma vez.
+        if has_after:
+            self._ops = self._ops[::-1]
+            parent.after_idle(self._execute_next_batch, parent, effective_batch, 0)
+        else:
+            self._execute_all(effective_batch)
+
+    def _execute_all(self, effective_batch: int) -> None:
         total = len(self._ops)
         for i in range(0, total, effective_batch):
             lot = self._ops[i:i + effective_batch]
@@ -59,15 +67,34 @@ class WidgetBatchBuilder:
                     op()
                 except Exception as exc:
                     logger.debug("WidgetBatchBuilder: erro ao criar widget: %s", exc)
-
-            # Apenas o último lote força o recálculo de layout
-            if i + effective_batch >= total and has_after:
-                try:
-                    parent.after(0, parent.update_idletasks)
-                except Exception:
-                    pass
-
         self._ops.clear()
+
+    def _execute_next_batch(self, parent: Any, batch_size: int, index: int) -> None:
+        total = len(self._ops)
+        if index >= total or not parent.winfo_exists():
+            self._ops.clear()
+            return
+
+        lot = self._ops[index:index + batch_size]
+        for op in lot:
+            try:
+                op()
+            except Exception as exc:
+                logger.debug("WidgetBatchBuilder: erro ao criar widget: %s", exc)
+
+        next_index = index + batch_size
+        if next_index < total:
+            try:
+                parent.after(0, parent.update_idletasks)
+                parent.after_idle(self._execute_next_batch, parent, batch_size, next_index)
+            except Exception:
+                self._ops.clear()
+        else:
+            self._ops.clear()
+            try:
+                parent.after(0, parent.update_idletasks)
+            except Exception:
+                pass
 
 
 def batch_render(parent, widgets_data: list, builder_fn, batch_size: int = 50) -> None:
