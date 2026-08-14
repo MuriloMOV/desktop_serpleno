@@ -28,6 +28,7 @@ SEED_TABLES: List[Tuple[str, str, str, str, Dict[str, str]]] = [
     ("desktop_report", "reports", "upsert_report", "generated_at", {}),
     ("desktop_moodentry", "wellness_mood", "upsert_wellness_mood", "entry_date", {}),
     ("desktop_wellnesscheckin", "wellness_checkin", "upsert_wellness_checkin", "check_in_date", {}),
+    ("help_requests", "help_requests", "upsert_help_request", "updated_at", {}),
 ]
 
 # Whitelist de colunas permitidas por tabela MySQL (evita drift para SQLite).
@@ -42,6 +43,7 @@ SEED_COLUMNS: Dict[str, set] = {
     "desktop_report": {"id", "name", "report_type", "format", "generated_at", "parameters", "data", "file_path", "file_size", "is_public", "expires_at", "generated_by_id"},
     "desktop_moodentry": {"id", "student_id", "mood_level", "notes", "entry_date"},
     "desktop_wellnesscheckin": {"id", "student_id", "overall_wellbeing", "check_in_date", "check_in_type", "responses", "attention_areas", "recommendations", "follow_up_needed", "follow_up_date", "professional_notes", "conducted_by_id"},
+    "help_requests": {"id", "aluno_id", "tipo", "mensagem", "prioridade", "status", "localizacao", "dados_extras", "created_at", "updated_at", "viewed_at", "resolved_at", "resposta_enviada", "resposta_em", "resposta_lida", "atendimento_finalizado"},
 }
 
 

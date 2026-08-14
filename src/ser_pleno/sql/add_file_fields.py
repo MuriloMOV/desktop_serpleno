@@ -1,9 +1,3 @@
-import sys
-import os
-
-# Adiciona o diretório raiz do projeto ao PATH para importações corretas
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from ser_pleno.config.db_config import get_db_connection
 
 def add_file_fields():

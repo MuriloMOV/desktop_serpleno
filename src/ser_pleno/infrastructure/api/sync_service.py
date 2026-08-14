@@ -30,6 +30,25 @@ from ser_pleno.repositories.base import is_local_id, execute_non_query, fetch_al
 logger = logging.getLogger(__name__)
 
 
+MYSQL_TABLE_WHITELIST = {
+    "aluno",
+    "agendamento",
+    "desktop_orientation",
+    "desktop_screening",
+    "desktop_message",
+    "desktop_report",
+    "desktop_alert",
+}
+
+
+def validate_mysql_table_name(table: str) -> None:
+    if table not in MYSQL_TABLE_WHITELIST:
+        raise ValueError(
+            f"Nome de tabela MySQL invalido: {table!r}. "
+            f"Tabelas permitidas: {sorted(MYSQL_TABLE_WHITELIST)}"
+        )
+
+
 def _shorten_avatar(value: Any) -> str:
     if not value:
         return "a"
@@ -77,7 +96,6 @@ class SyncQueue:
 class SyncService:
     """Servico de sincronizacao com serpleno_web"""
 
-    # Endpoints de sincronizacao
     SYNC_ENDPOINTS = {
         'students': '/api/v1/desktop/students/',
         'appointments': '/api/v1/desktop/schedule/appointments/',
@@ -87,13 +105,16 @@ class SyncService:
     }
 
     _instance: Optional['SyncService'] = None
+    _lock = threading.RLock()
     _running: bool = False
     _thread: Optional[threading.Thread] = None
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
         return cls._instance
 
     def __init__(self):
@@ -139,6 +160,7 @@ class SyncService:
             return
 
         self._running = True
+        self._stop_event = threading.Event()
         self._thread = threading.Thread(target=self._sync_loop, daemon=True)
         self._thread.start()
         logger.info("Sincronizacao em background iniciada")
@@ -146,6 +168,8 @@ class SyncService:
     def stop_background_sync(self):
         """Para sincronizacao em background"""
         self._running = False
+        if hasattr(self, '_stop_event'):
+            self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=5)
             self._thread = None
@@ -190,11 +214,11 @@ class SyncService:
                             logger.error("Erro no sync local->API: %s", exc)
 
                 # Aguarda proximo ciclo
-                time.sleep(self.config.sync_interval)
+                self._stop_event.wait(timeout=self.config.sync_interval)
 
             except Exception as exc:
                 logger.error("Erro no loop de sincronizacao: %s", exc)
-                time.sleep(60)  # Aguarda 1 minuto em caso de erro
+                self._stop_event.wait(timeout=60)
 
     def _process_queue(self):
         """Processa fila de operacoes pendentes"""
@@ -387,8 +411,8 @@ class SyncService:
         """Aplica INSERT no MySQL local."""
         queries = {
             'students': (
-                "INSERT INTO aluno (nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO aluno (nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention, created_at, updated_at, minigame_blocked) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)",
                 (
                     data.get('nome'),
                     data.get('professor_responsavel') or 'Não informado',
@@ -400,11 +424,12 @@ class SyncService:
                     int(data.get('notifications_enabled') if data.get('notifications_enabled') is not None else 1),
                     int(data.get('has_medical_report', 0)),
                     int(data.get('requires_attention', 0)),
+                    int(data.get('minigame_blocked', 0)),
                 ),
             ),
             'appointments': (
-                "INSERT INTO agendamento (student_id, data_hora, motivo, status, local, profissional, laudo, origem) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO agendamento (student_id, data_hora, motivo, status, local, profissional, laudo, origem, created_at, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
                 (data.get('student_id'), data.get('data_hora'), data.get('motivo'), data.get('status'),
                  data.get('local'), data.get('profissional'), data.get('laudo'), data.get('origem')),
             ),
@@ -488,6 +513,8 @@ class SyncService:
             logger.warning("Entidade desconhecida para apply UPDATE: %s", entity)
             return False
 
+        validate_mysql_table_name(table)
+
         set_clause = ', '.join(updates)
         if entity in tables_with_updated_at:
             set_clause += ", updated_at = NOW()"
@@ -518,6 +545,8 @@ class SyncService:
         if not table:
             logger.warning("Entidade desconhecida para apply DELETE: %s", entity)
             return False
+
+        validate_mysql_table_name(table)
 
         query = f"DELETE FROM {table} WHERE id = %s"
         try:

@@ -14,10 +14,51 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+TABLE_WHITELIST = {
+    "students",
+    "appointments",
+    "orientations",
+    "screenings",
+    "mural_posts",
+    "sync_queue",
+    "wellness_mood",
+    "wellness_checkin",
+    "wellness_challenges",
+    "wellness_challenge_assignments",
+    "alerts",
+    "messages",
+    "reports",
+    "user_preferences",
+    "orientation_attachments",
+    "goals",
+    "goal_progress",
+    "help_requests",
+    "notifications",
+    "report_templates",
+    "shared_clinical_data",
+    "auth_users",
+}
+
+
+def validate_table_name(table: str) -> None:
+    if table not in TABLE_WHITELIST:
+        raise ValueError(
+            f"Nome de tabela invalido: {table!r}. "
+            f"Tabelas permitidas: {sorted(TABLE_WHITELIST)}"
+        )
+
+
+def _validate_identifier(name: str, kind: str = "identificador") -> None:
+    if not name.isidentifier():
+        raise ValueError(f"Nome de {kind} invalido: {name!r}")
+
+
+from ser_pleno.config.paths import get_project_root
+
 class LocalCache:
     """Cache local SQLite para dados que devem funcionar offline."""
 
-    _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    _BASE_DIR = get_project_root()
     DB_FILE = os.path.join(_BASE_DIR, "config", "ser_pleno_local.db")
 
     def __init__(self) -> None:
@@ -47,8 +88,8 @@ class LocalCache:
         if conn is not None:
             try:
                 conn.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha ao fechar conexão local: %s", exc)
             self._local.connection = None
 
     def _ensure_tables(self) -> None:
@@ -60,8 +101,19 @@ class LocalCache:
                     id INTEGER PRIMARY KEY,
                     nome TEXT,
                     email TEXT,
+                    curso TEXT,
+                    age INTEGER,
+                    phone TEXT,
+                    professor_responsavel TEXT,
+                    emergency_contact TEXT,
+                    emergency_phone TEXT,
+                    attention_reason TEXT,
+                    general_notes TEXT,
                     has_medical_report INTEGER DEFAULT 0,
                     requires_attention INTEGER DEFAULT 0,
+                    status TEXT DEFAULT 'ativo',
+                    priority_level INTEGER DEFAULT 0,
+                    tags TEXT DEFAULT '[]',
                     updated_at TEXT
                 );
                 CREATE TABLE IF NOT EXISTS appointments (
@@ -153,6 +205,26 @@ class LocalCache:
                     conducted_by_id INTEGER,
                     updated_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS wellness_challenges (
+                    id INTEGER PRIMARY KEY,
+                    title TEXT,
+                    description TEXT,
+                    category TEXT,
+                    difficulty TEXT,
+                    points INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TEXT,
+                    updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS wellness_challenge_assignments (
+                    id INTEGER PRIMARY KEY,
+                    challenge_id INTEGER,
+                    student_id INTEGER,
+                    assigned_by_id INTEGER,
+                    status TEXT DEFAULT 'assigned',
+                    assigned_at TEXT,
+                    completed_at TEXT
+                );
                 CREATE TABLE IF NOT EXISTS alerts (
                     id INTEGER PRIMARY KEY,
                     alert_type TEXT,
@@ -190,6 +262,56 @@ class LocalCache:
                     user_id INTEGER,
                     theme TEXT,
                     notifications TEXT,
+                    updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS shared_clinical_data (
+                    id INTEGER PRIMARY KEY,
+                    student_id INTEGER,
+                    shared_by_id INTEGER,
+                    shared_with_user_id INTEGER,
+                    shared_with_role TEXT,
+                    data_type TEXT,
+                    created_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS help_requests (
+                    id INTEGER PRIMARY KEY,
+                    aluno_id INTEGER,
+                    tipo TEXT,
+                    mensagem TEXT,
+                    prioridade TEXT,
+                    status TEXT,
+                    localizacao TEXT,
+                    dados_extras TEXT,
+                    created_at TEXT,
+                    updated_at TEXT,
+                    viewed_at TEXT,
+                    resolved_at TEXT,
+                    resposta_enviada INTEGER DEFAULT 0,
+                    resposta_em TEXT,
+                    resposta_lida INTEGER DEFAULT 0,
+                    atendimento_finalizado INTEGER DEFAULT 0
+                );
+                CREATE TABLE IF NOT EXISTS auth_users (
+                    id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    email TEXT,
+                    password_hash TEXT,
+                    is_superuser INTEGER DEFAULT 0,
+                    is_staff INTEGER DEFAULT 0,
+                    is_active INTEGER DEFAULT 1,
+                    last_login TEXT,
+                    created_at TEXT,
+                    updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS report_templates (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    report_type TEXT,
+                    template_config TEXT,
+                    default_parameters TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_by_id INTEGER,
+                    created_at TEXT,
                     updated_at TEXT
                 );
                 """
@@ -237,12 +359,16 @@ class LocalCache:
     # Generic helpers
 
     def upsert(self, table: str, data: Dict[str, Any], pk_field: str = "id") -> None:
+        validate_table_name(table)
         if not data:
             return
         keys = list(data.keys())
+        for key in keys:
+            _validate_identifier(key, kind="coluna")
         placeholders = ", ".join(["?"] * len(keys))
         columns = ", ".join(keys)
         update_clause = ", ".join([f"{k}=excluded.{k}" for k in keys if k != pk_field])
+        _validate_identifier(pk_field, kind="campo PK")
         query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders}) ON CONFLICT(id) DO UPDATE SET {update_clause};"
         values = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in data.values()]
         conn = self._get_connection()
@@ -252,17 +378,21 @@ class LocalCache:
         except Exception:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha no rollback: %s", exc)
             raise
 
     def update(self, table: str, data: Dict[str, Any], pk_field: str, entity_id: Any) -> None:
+        validate_table_name(table)
         if not data:
             return
+        for key in data.keys():
+            _validate_identifier(key, kind="coluna")
         set_clause = ", ".join(f"{k}=?" for k in data.keys())
         keys = list(data.keys())
         values = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in data.values()]
         values.append(entity_id)
+        _validate_identifier(pk_field, kind="campo PK")
         query = f"UPDATE {table} SET {set_clause} WHERE {pk_field}=?"
         conn = self._get_connection()
         try:
@@ -271,11 +401,12 @@ class LocalCache:
         except Exception:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha no rollback: %s", exc)
             raise
 
     def list_all(self, table: str, where_clause: Optional[str] = None, params: tuple = ()) -> List[Dict[str, Any]]:
+        validate_table_name(table)
         query = f"SELECT * FROM {table}"
         if where_clause:
             query += f" WHERE {where_clause}"
@@ -284,10 +415,13 @@ class LocalCache:
             cursor = conn.execute(query, params)
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-        except Exception:
+        except Exception as exc:
+            logger.debug("Falha em list_all(%s): %s", table, exc)
             return []
 
     def delete(self, table: str, pk_field: str, entity_id: Any) -> None:
+        validate_table_name(table)
+        _validate_identifier(pk_field, kind="campo PK")
         conn = self._get_connection()
         try:
             conn.execute(f"DELETE FROM {table} WHERE {pk_field}=?", (entity_id,))
@@ -295,8 +429,8 @@ class LocalCache:
         except Exception:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha no rollback: %s", exc)
             raise
 
     def add_sync_queue(self, operation: str, entity: str, entity_id: int, data: Dict[str, Any]) -> None:
@@ -331,8 +465,8 @@ class LocalCache:
         except Exception:
             try:
                 conn.rollback()
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Falha no rollback: %s", exc)
 
     # Students
 
@@ -425,10 +559,43 @@ class LocalCache:
     def list_wellness_checkins(self) -> List[Dict[str, Any]]:
         return self.list_all("wellness_checkin")
 
+    def upsert_wellness_challenge(self, challenge: Dict[str, Any]) -> None:
+        challenge["updated_at"] = datetime.now().isoformat()
+        self.upsert("wellness_challenges", challenge)
+
+    def list_wellness_challenges(self) -> List[Dict[str, Any]]:
+        return self.list_all("wellness_challenges")
+
+    def upsert_wellness_challenge_assignment(self, assignment: Dict[str, Any]) -> None:
+        assignment["updated_at"] = datetime.now().isoformat()
+        self.upsert("wellness_challenge_assignments", assignment)
+
+    def list_wellness_challenge_assignments(self, student_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        where = None
+        params: tuple = ()
+        if student_id is not None:
+            where = "student_id=?"
+            params = (student_id,)
+        return self.list_all("wellness_challenge_assignments", where_clause=where, params=params)
+
     def get_student_name_map(self) -> Dict[int, str]:
         """Retorna mapa student_id -> nome para enriquecimento de leituras locais."""
         rows = self.list_all("students")
         return {r.get("id"): r.get("nome", "") for r in rows if r.get("id") is not None}
+
+    # Help Requests
+
+    def upsert_help_request(self, help_request: Dict[str, Any]) -> None:
+        help_request["updated_at"] = datetime.now().isoformat()
+        self.upsert("help_requests", help_request)
+
+    def list_help_requests(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        where = None
+        params: tuple = ()
+        if status:
+            where = "status=?"
+            params = (status,)
+        return self.list_all("help_requests", where_clause=where, params=params)
 
     # Alerts
 
@@ -469,6 +636,15 @@ class LocalCache:
     def list_reports(self) -> List[Dict[str, Any]]:
         return self.list_all("reports")
 
+    # Report Templates
+
+    def upsert_report_template(self, template: Dict[str, Any]) -> None:
+        template["updated_at"] = datetime.now().isoformat()
+        self.upsert("report_templates", template)
+
+    def list_report_templates(self) -> List[Dict[str, Any]]:
+        return self.list_all("report_templates")
+
     # User preferences
 
     def upsert_user_preferences(self, prefs: Dict[str, Any]) -> None:
@@ -477,15 +653,52 @@ class LocalCache:
     def list_user_preferences(self) -> List[Dict[str, Any]]:
         return self.list_all("user_preferences")
 
+    # Orientation attachments
+
+    def upsert_orientation_attachment(self, attachment: Dict[str, Any]) -> None:
+        self.upsert("orientation_attachments", attachment)
+
+    def list_orientation_attachments(self, orientation_id: int) -> List[Dict[str, Any]]:
+        return self.list_all("orientation_attachments", where_clause="orientation_id=?", params=(orientation_id,))
+
+    def delete_orientation_attachment(self, attachment_id: int) -> None:
+        self.delete("orientation_attachments", "id", attachment_id)
+
+    # Shared Clinical Data
+
+    def upsert_shared_data(self, data: Dict[str, Any]) -> None:
+        self.upsert("shared_clinical_data", data)
+
+    def list_shared_data(self, busca: Optional[str] = None, data_type: Optional[str] = None, student_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        where = None
+        params: tuple = ()
+        parts = []
+        if data_type:
+            parts.append("data_type=?")
+            params = params + (data_type,)
+        if student_id:
+            parts.append("student_id=?")
+            params = params + (student_id,)
+        if parts:
+            where = " AND ".join(parts)
+        rows = self.list_all("shared_clinical_data", where_clause=where, params=params)
+        if busca:
+            termo = busca.lower()
+            rows = [r for r in rows if termo in r.get("student_name", "").lower()]
+        return rows
+
 
 # Singleton do cache local SQLite.
 _local_cache_instance: Optional["LocalCache"] = None
+_local_cache_lock = threading.RLock()
 
 
 def get_local_cache() -> "LocalCache":
     global _local_cache_instance
     if _local_cache_instance is None:
-        _local_cache_instance = LocalCache()
+        with _local_cache_lock:
+            if _local_cache_instance is None:
+                _local_cache_instance = LocalCache()
     return _local_cache_instance
 
 
