@@ -124,8 +124,8 @@ def write_with_fallback(
                         qid = data.get("id") or entity_id
                         from ser_pleno.infrastructure.api.sync_service import queue_sync
                         queue_sync(operation, entity, qid, data)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("Falha ao enfileirar sync (write fallback): %s", exc)
             return local_result
         raise
 
@@ -138,6 +138,6 @@ def write_with_fallback(
                 qid = data.get("id") or entity_id
                 from ser_pleno.infrastructure.api.sync_service import queue_sync
                 queue_sync(operation, entity, qid, data)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Falha ao enfileirar sync (write sucesso): %s", exc)
     return mysql_result

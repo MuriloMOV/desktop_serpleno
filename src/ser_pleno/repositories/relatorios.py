@@ -17,7 +17,7 @@ from ser_pleno.infrastructure.api.sync_service import queue_sync
 
 class RelatorioRepository:
     @with_local_fallback("_local_listar_relatorios")
-    def listar_relatorios(self, tipo=None, data_inicio=None, pagina=1):
+    def listar_relatorios(self, tipo=None, data_inicio=None, pagina=1, search=None, data_fim=None):
         query = "SELECT * FROM desktop_report WHERE 1=1"
         params = []
 
@@ -27,6 +27,12 @@ class RelatorioRepository:
         if data_inicio:
             query += " AND generated_at >= %s"
             params.append(data_inicio)
+        if data_fim:
+            query += " AND generated_at <= %s"
+            params.append(data_fim)
+        if search:
+            query += " AND name LIKE %s"
+            params.append(f"%{search}%")
 
         offset = (pagina - 1) * 10
         query += " ORDER BY generated_at DESC LIMIT 10 OFFSET %s"
@@ -34,14 +40,53 @@ class RelatorioRepository:
 
         return fetch_all(query, params)
 
-    def _local_listar_relatorios(self, tipo=None, data_inicio=None, pagina=1):
+    def _local_listar_relatorios(self, tipo=None, data_inicio=None, pagina=1, search=None, data_fim=None):
         rows = local_cache.list_reports()
         if tipo:
             rows = [r for r in rows if r.get("report_type") == tipo]
         if data_inicio:
             rows = [r for r in rows if (r.get("generated_at") or "") >= data_inicio]
+        if data_fim:
+            rows = [r for r in rows if (r.get("generated_at") or "") <= data_fim]
+        if search:
+            search_lower = search.lower()
+            rows = [r for r in rows if search_lower in (r.get("name") or "").lower()]
         offset = (pagina - 1) * 10
         return rows[offset:offset + 10]
+
+    @with_local_fallback("_local_listar_relatorios_filtrados")
+    def listar_relatorios_filtrados(self, tipo=None, data_inicio=None, data_fim=None, search=None, pagina=1):
+        query = "SELECT * FROM desktop_report WHERE 1=1"
+        params = []
+
+        if tipo:
+            query += " AND report_type = %s"
+            params.append(tipo)
+        if data_inicio:
+            query += " AND generated_at >= %s"
+            params.append(data_inicio)
+        if data_fim:
+            query += " AND generated_at <= %s"
+            params.append(data_fim)
+        if search:
+            query += " AND name LIKE %s"
+            params.append(f"%{search}%")
+
+        query += " ORDER BY generated_at DESC"
+        return fetch_all(query, params)
+
+    def _local_listar_relatorios_filtrados(self, tipo=None, data_inicio=None, data_fim=None, search=None, pagina=1):
+        rows = local_cache.list_reports()
+        if tipo:
+            rows = [r for r in rows if r.get("report_type") == tipo]
+        if data_inicio:
+            rows = [r for r in rows if (r.get("generated_at") or "") >= data_inicio]
+        if data_fim:
+            rows = [r for r in rows if (r.get("generated_at") or "") <= data_fim]
+        if search:
+            search_lower = search.lower()
+            rows = [r for r in rows if search_lower in (r.get("name") or "").lower()]
+        return rows
 
     @with_local_fallback("_local_obter_estatisticas")
     def obter_estatisticas(self):

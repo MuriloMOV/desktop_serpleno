@@ -124,6 +124,30 @@ class DashboardRepository:
             "social": round(bem_estar_media * 0.85, 2),
         }
 
+        recent_query = """
+            SELECT a.id, a.data_hora, a.status, al.nome AS student_name, al.curso
+            FROM agendamento a
+            LEFT JOIN aluno al ON a.student_id = al.id_aluno
+            WHERE a.data_hora <= NOW() AND a.status = 'completed'
+            ORDER BY a.data_hora DESC
+            LIMIT %s
+        """
+        recent_rows = fetch_all(recent_query, (5,))
+
+        recent_appointments = []
+        for r in recent_rows:
+            data_hora = r.get("data_hora")
+            recent_appointments.append(
+                {
+                    "id": r.get("id"),
+                    "student_name": r.get("student_name") or "Estudante",
+                    "curso": r.get("curso") or "Curso não informado",
+                    "time": data_hora.strftime("%H:%M") if hasattr(data_hora, "strftime") else "--:--",
+                    "date": data_hora.strftime("%Y-%m-%d") if hasattr(data_hora, "strftime") else str(data_hora),
+                    "status": r.get("status") or "completed",
+                }
+            )
+
         total_disp = base.get("total_disponibilidade") or 0
         total_agend = base.get("agendamentos_hoje_ativos") or 0
 
@@ -134,6 +158,7 @@ class DashboardRepository:
             "total_students": base.get("total_alunos") or 0,
             "attention_students": attention_students,
             "upcoming_appointments": upcoming_appointments,
+            "recent_appointments": recent_appointments,
             "media_humor": round(base.get("media_humor_hoje"), 2) if base.get("media_humor_hoje") else None,
             "humor_history": humor_history,
             "bem_estar_dimensions": bem_estar_dimensions,
@@ -148,6 +173,7 @@ class DashboardRepository:
             "total_students": self._local_contar_alunos(),
             "attention_students": self._local_estudantes_atencao(),
             "upcoming_appointments": self._local_proximos_agendamentos(5),
+            "recent_appointments": self._local_proximos_atendimentos_recentes(5),
             "media_humor": self._local_media_humor_hoje(),
             "humor_history": self._local_historico_humor_30_dias(),
             "bem_estar_dimensions": self._local_bem_estar_dimensoes(),
@@ -261,6 +287,26 @@ class DashboardRepository:
                 "curso": "Curso não informado",
                 "time": data_hora[11:16] if len(data_hora) >= 16 else "--:--",
                 "date": data_hora[:10] if len(data_hora) >= 10 else str(data_hora),
+            })
+        return resultado
+
+    def _local_proximos_atendimentos_recentes(self, limite=5):
+        rows = local_cache.list_all(
+            "appointments",
+            where_clause="status = ?",
+            params=("completed",),
+        )
+        rows = sorted(rows, key=lambda x: x.get("data_hora") or "", reverse=True)[:limite]
+        resultado = []
+        for r in rows:
+            data_hora = r.get("data_hora") or ""
+            resultado.append({
+                "id": r.get("id"),
+                "student_name": "Estudante",
+                "curso": "Curso não informado",
+                "time": data_hora[11:16] if len(data_hora) >= 16 else "--:--",
+                "date": data_hora[:10] if len(data_hora) >= 10 else str(data_hora),
+                "status": "completed",
             })
         return resultado
 

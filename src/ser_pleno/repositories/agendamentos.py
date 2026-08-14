@@ -2,7 +2,9 @@
 """Repositorio de agendamentos."""
 
 from datetime import date, datetime, time, timedelta
+from typing import Any, Dict, List, Optional
 
+from ser_pleno.infrastructure.api.sync_service import queue_sync
 from ser_pleno.repositories.base import (
     fetch_all,
     fetch_one,
@@ -12,12 +14,11 @@ from ser_pleno.repositories.base import (
     write_with_fallback,
     generate_local_id,
 )
-from ser_pleno.infrastructure.api.sync_service import queue_sync
 
 
 class AgendamentoRepository:
     @with_local_fallback("_local_listar_proximos")
-    def listar_proximos(self, limite=5):
+    def listar_proximos(self, limite: int = 5) -> List[Dict[str, Any]]:
         query = """
             SELECT a.id, a.data_hora, a.status, al.nome AS student_name, al.curso
             FROM agendamento a
@@ -28,7 +29,7 @@ class AgendamentoRepository:
         """
         return fetch_all(query, (limite,))
 
-    def _local_listar_proximos(self, limite=5):
+    def _local_listar_proximos(self, limite: int = 5) -> List[Dict[str, Any]]:
         rows = local_cache.list_all(
             "appointments",
             where_clause="status != ?",
@@ -48,11 +49,11 @@ class AgendamentoRepository:
         return resultado[:limite]
 
     @with_local_fallback("_local_contar_por_status")
-    def contar_por_status(self, status):
+    def contar_por_status(self, status: str) -> Dict[str, Any]:
         query = "SELECT COUNT(*) as total FROM agendamento WHERE status = %s"
         return fetch_one(query, (status,))
 
-    def _local_contar_por_status(self, status):
+    def _local_contar_por_status(self, status: str) -> Dict[str, Any]:
         rows = local_cache.list_all(
             "appointments",
             where_clause="status=?",
@@ -61,37 +62,37 @@ class AgendamentoRepository:
         return {"total": len(rows)}
 
     @with_local_fallback("_local_contar_hoje")
-    def contar_hoje(self):
+    def contar_hoje(self) -> Dict[str, Any]:
         query = "SELECT COUNT(*) as total FROM agendamento WHERE DATE(data_hora) = CURDATE()"
         return fetch_one(query)
 
-    def _local_contar_hoje(self):
+    def _local_contar_hoje(self) -> Dict[str, Any]:
         hoje = datetime.now().strftime("%Y-%m-%d")
         rows = local_cache.list_appointments(data=hoje)
         return {"total": len(rows)}
 
     @with_local_fallback("_local_contar_hoje_ativos")
-    def contar_hoje_ativos(self):
+    def contar_hoje_ativos(self) -> Dict[str, Any]:
         query = "SELECT COUNT(*) as total FROM agendamento WHERE DATE(data_hora) = CURDATE() AND status != 'canceled'"
         return fetch_one(query)
 
-    def _local_contar_hoje_ativos(self):
+    def _local_contar_hoje_ativos(self) -> Dict[str, Any]:
         hoje = datetime.now().strftime("%Y-%m-%d")
         rows = local_cache.list_appointments(data=hoje)
         ativos = [r for r in rows if r.get("status") != "canceled"]
         return {"total": len(ativos)}
 
     @with_local_fallback("_local_total_disponibilidade")
-    def total_disponibilidade(self):
+    def total_disponibilidade(self) -> Dict[str, Any]:
         query = "SELECT COUNT(*) as total FROM disponibilidade WHERE is_active = 1"
         return fetch_one(query)
 
-    def _local_total_disponibilidade(self):
+    def _local_total_disponibilidade(self) -> Dict[str, Any]:
         # Disponibilidade nao esta no LocalCache; retorna 0 como fallback seguro
         return {"total": 0}
 
     @with_local_fallback("_local_listar_horarios_base")
-    def listar_horarios_base(self):
+    def listar_horarios_base(self) -> List[str]:
         """Retorna os horarios base ativos da grade."""
         query = "SELECT Horario FROM disponibilidade WHERE is_active = 1 ORDER BY Horario"
         rows = fetch_all(query)
@@ -105,26 +106,26 @@ class AgendamentoRepository:
                 horarios.append(horario_str[:5] if len(horario_str) > 5 else horario_str)
         return horarios
 
-    def _local_listar_horarios_base(self):
+    def _local_listar_horarios_base(self) -> List[str]:
         # Horarios base nao sao sincronizados; retorna lista vazia
         return []
 
     @with_local_fallback("_local_taxa_presenca_ultimos_30_dias")
-    def taxa_presenca_ultimos_30_dias(self):
+    def taxa_presenca_ultimos_30_dias(self) -> Dict[str, Any]:
         query = """
             SELECT COUNT(*) as total, SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed
             FROM agendamento WHERE DATE(data_hora) >= CURDATE() - INTERVAL 30 DAY
         """
         return fetch_one(query)
 
-    def _local_taxa_presenca_ultimos_30_dias(self):
+    def _local_taxa_presenca_ultimos_30_dias(self) -> Dict[str, Any]:
         rows = local_cache.list_all("appointments")
         total = len(rows)
         completed = sum(1 for r in rows if r.get("status") == "completed")
         return {"total": total, "completed": completed}
 
     @with_local_fallback("_local_verificar_disponibilidade")
-    def verificar_disponibilidade(self, data, time_str):
+    def verificar_disponibilidade(self, data: str, time_str: str) -> Optional[Dict[str, Any]]:
         """Verifica se um horario esta disponivel."""
         data_hora_str = f"{data} {time_str}"
         data_hora = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M")
@@ -134,7 +135,7 @@ class AgendamentoRepository:
         """
         return fetch_one(query, (data_hora, data_hora + timedelta(minutes=59)))
 
-    def _local_verificar_disponibilidade(self, data, time_str):
+    def _local_verificar_disponibilidade(self, data: str, time_str: str) -> Optional[Dict[str, Any]]:
         data_hora_str = f"{data} {time_str}:00"
         rows = local_cache.list_all(
             "appointments",
@@ -144,30 +145,30 @@ class AgendamentoRepository:
         return rows[0] if rows else None
 
     @with_local_fallback("_local_obter_nome_aluno")
-    def obter_nome_aluno(self, id_aluno):
+    def obter_nome_aluno(self, id_aluno: int) -> Optional[Dict[str, Any]]:
         """Obtem o nome do aluno pelo ID."""
         query = "SELECT nome FROM aluno WHERE id_aluno = %s"
         return fetch_one(query, (id_aluno,))
 
-    def _local_obter_nome_aluno(self, id_aluno):
+    def _local_obter_nome_aluno(self, id_aluno: int) -> Optional[Dict[str, Any]]:
         rows = local_cache.list_all("students", where_clause="id=?", params=(id_aluno,))
         if rows:
             return {"nome": rows[0].get("nome")}
         return None
 
     @with_local_fallback("_local_obter_time_id")
-    def obter_time_id(self, hora_str):
+    def obter_time_id(self, hora_str: str) -> Optional[Dict[str, Any]]:
         """Obtem o ID do horario na tabela disponibilidade."""
         time_obj = datetime.strptime(hora_str, "%H:%M").time()
         query = "SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s"
         return fetch_one(query, (time_obj,))
 
-    def _local_obter_time_id(self, hora_str):
+    def _local_obter_time_id(self, hora_str: str) -> Optional[Dict[str, Any]]:
         # Disponibilidade nao e sincronizada no cache local
         return None
 
     @with_local_fallback("_local_obter_agendamento_para_sincronizacao")
-    def obter_agendamento_para_sincronizacao(self, appointment_id):
+    def obter_agendamento_para_sincronizacao(self, appointment_id: int) -> Optional[Dict[str, Any]]:
         """Obtem os dados de um agendamento para sincronizacao com a API."""
         query = """
             SELECT a.id, a.student_id, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem,
@@ -178,7 +179,7 @@ class AgendamentoRepository:
         """
         return fetch_one(query, (appointment_id,))
 
-    def _local_obter_agendamento_para_sincronizacao(self, appointment_id):
+    def _local_obter_agendamento_para_sincronizacao(self, appointment_id: int) -> Optional[Dict[str, Any]]:
         rows = local_cache.list_all("appointments", where_clause="id=?", params=(appointment_id,))
         if rows:
             r = rows[0]
@@ -197,7 +198,18 @@ class AgendamentoRepository:
             }
         return None
 
-    def criar_agendamento(self, id_aluno, data_hora, nome_agendamento, motivo, status, local, profissional, laudo, origem):
+    def criar_agendamento(
+        self,
+        id_aluno: int,
+        data_hora: Any,
+        nome_agendamento: str,
+        motivo: str,
+        status: str,
+        local: str,
+        profissional: str,
+        laudo: str,
+        origem: str,
+    ) -> int:
         """Cria um novo agendamento."""
         query = """
             INSERT INTO agendamento (student_id, data_hora, nome, motivo, status, local, profissional, laudo, origem)
@@ -239,7 +251,7 @@ class AgendamentoRepository:
         return last_id
 
     @with_local_fallback("_local_listar_agendamentos")
-    def listar_agendamentos(self, data=None):
+    def listar_agendamentos(self, data: Optional[str] = None) -> List[Dict[str, Any]]:
         """Lista agendamentos com filtro opcional por data."""
         query = """
             SELECT a.id, al.nome, al.id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
@@ -253,7 +265,7 @@ class AgendamentoRepository:
         query += " ORDER BY a.data_hora"
         return fetch_all(query, params)
 
-    def _local_listar_agendamentos(self, data=None):
+    def _local_listar_agendamentos(self, data: Optional[str] = None) -> List[Dict[str, Any]]:
         rows = local_cache.list_appointments(data=data)
         name_map = local_cache.get_student_name_map()
         resultado = []
@@ -272,7 +284,18 @@ class AgendamentoRepository:
             })
         return resultado
 
-    def atualizar_agendamento(self, id_agendamento, id_aluno, data_hora, motivo, status, local, profissional, laudo, origem):
+    def atualizar_agendamento(
+        self,
+        id_agendamento: int,
+        id_aluno: int,
+        data_hora: Any,
+        motivo: str,
+        status: str,
+        local: str,
+        profissional: str,
+        laudo: str,
+        origem: str,
+    ) -> int:
         """Atualiza um agendamento existente."""
         query = """
             UPDATE agendamento
@@ -311,7 +334,7 @@ class AgendamentoRepository:
             queue_data_fn=_queue_data,
         )
 
-    def deletar_agendamento(self, id_agendamento):
+    def deletar_agendamento(self, id_agendamento: int) -> int:
         """Deleta um agendamento pelo ID."""
         query = "DELETE FROM agendamento WHERE id = %s"
 
@@ -329,7 +352,7 @@ class AgendamentoRepository:
             queue_data_fn=lambda r, eid: {"id": id_agendamento},
         )
 
-    def adicionar_horario_disponibilidade(self, horario):
+    def adicionar_horario_disponibilidade(self, horario: str) -> Any:
         """Adiciona um novo horario na tabela de disponibilidade."""
         time_obj = datetime.strptime(horario, "%H:%M").time()
         query = """
@@ -339,17 +362,17 @@ class AgendamentoRepository:
         return execute_non_query(query, (time_obj,))
 
     @with_local_fallback("_local_verificar_horario_existe")
-    def verificar_horario_existe(self, horario):
+    def verificar_horario_existe(self, horario: str) -> Optional[Dict[str, Any]]:
         """Verifica se um horario ja existe na tabela de disponibilidade."""
         time_obj = datetime.strptime(horario, "%H:%M").time()
         query = "SELECT id_disponibilidade FROM disponibilidade WHERE Horario = %s"
         return fetch_one(query, (time_obj,))
 
-    def _local_verificar_horario_existe(self, horario):
+    def _local_verificar_horario_existe(self, horario: str) -> Optional[Dict[str, Any]]:
         # Disponibilidade nao e sincronizada no cache local
         return None
 
-    def remover_horario_disponibilidade(self, horario):
+    def remover_horario_disponibilidade(self, horario: str) -> Any:
         """Remove um horario da tabela de disponibilidade."""
         time_obj = datetime.strptime(horario, "%H:%M").time()
         # Verifica se ha agendamentos usando este horario
@@ -362,6 +385,17 @@ class AgendamentoRepository:
         query_delete = "DELETE FROM disponibilidade WHERE Horario = %s"
         return execute_non_query(query_delete, (time_obj,))
 
-    def obter_ultimo_id_inserido(self):
+    def obter_ultimo_id_inserido(self) -> int:
         """Obtem o ultimo ID inserido no banco de dados."""
         return fetch_one("SELECT LAST_INSERT_ID() as id", ()).get("id")
+
+    def listar_agendamentos_mes(self, ano: int, mes: int) -> List[Dict[str, Any]]:
+        """Lista agendamentos de um mês específico para o calendário."""
+        query = """
+            SELECT a.id, al.nome, al.id_aluno, a.data_hora, a.motivo, a.status, a.local, a.profissional, a.laudo, a.origem
+            FROM agendamento a
+            INNER JOIN aluno al ON a.student_id = al.id_aluno
+            WHERE YEAR(a.data_hora) = %s AND MONTH(a.data_hora) = %s
+            ORDER BY a.data_hora
+        """
+        return fetch_all(query, (ano, mes))

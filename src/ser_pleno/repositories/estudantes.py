@@ -14,12 +14,15 @@ from ser_pleno.repositories.base import (
     generate_local_id,
 )
 from ser_pleno.infrastructure.api.sync_service import queue_sync
+from ser_pleno.infrastructure.local.local_cache import validate_table_name
 
 
 # Whitelist de colunas que podem ser atualizadas via DML.
 # Qualquer campo fora desta lista e rejeitado antes de atingir o banco.
 _CAMPOS_ATUALIZAVEIS = {
     "nome",
+    "curso",
+    "age",
     "professor_responsavel",
     "has_medical_report",
     "requires_attention",
@@ -29,6 +32,11 @@ _CAMPOS_ATUALIZAVEIS = {
     "avatar",
     "dark_mode",
     "notifications_enabled",
+    "phone",
+    "emergency_contact",
+    "emergency_phone",
+    "attention_reason",
+    "general_notes",
 }
 
 
@@ -45,7 +53,7 @@ def _shorten_avatar(value: Any) -> str:
     return text[:1]
 
 
-def _student_data(nome, email, has_medical_report, requires_attention, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1):
+def _student_data(nome, email, has_medical_report, requires_attention, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1, curso=None, age=None, phone=None, emergency_contact=None, emergency_phone=None, attention_reason=None, general_notes=None):
     data = {
         "nome": nome,
         "email": email,
@@ -58,6 +66,13 @@ def _student_data(nome, email, has_medical_report, requires_attention, professor
         "avatar": _shorten_avatar(avatar),
         "dark_mode": int(dark_mode),
         "notifications_enabled": int(notifications_enabled),
+        "curso": curso,
+        "age": age,
+        "phone": phone,
+        "emergency_contact": emergency_contact,
+        "emergency_phone": emergency_phone,
+        "attention_reason": attention_reason,
+        "general_notes": general_notes,
     }
     return data
 
@@ -116,6 +131,7 @@ class EstudanteRepository:
         return fetch_one(query, (id_estudante,))
 
     def _local_obter(self, id_estudante):
+        validate_table_name("students")
         rows = local_cache.list_all("students", where_clause="id=?", params=(id_estudante,))
         if not rows:
             return None
@@ -124,19 +140,31 @@ class EstudanteRepository:
             "id_aluno": r.get("id"),
             "nome": r.get("nome"),
             "email": r.get("email"),
+            "curso": r.get("curso"),
+            "age": r.get("age"),
+            "phone": r.get("phone"),
+            "professor_responsavel": r.get("professor_responsavel"),
+            "emergency_contact": r.get("emergency_contact"),
+            "emergency_phone": r.get("emergency_phone"),
+            "attention_reason": r.get("attention_reason"),
+            "general_notes": r.get("general_notes"),
             "has_medical_report": r.get("has_medical_report", 0),
             "requires_attention": r.get("requires_attention", 0),
+            "status": r.get("status", "ativo"),
+            "priority_level": r.get("priority_level", 0),
             "contact": r.get("email"),
+            "minigames_blocked": r.get("minigames_blocked", 0),
+            "minigame_block_reason": r.get("minigame_block_reason"),
         }
 
-    def criar(self, nome, email, has_medical_report=False, requires_attention=False, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1):
+    def criar(self, nome, email, has_medical_report=False, requires_attention=False, professor_responsavel='Não informado', status='ativo', priority_level=0, tags=None, avatar='/default_avatar.png', dark_mode=0, notifications_enabled=1, curso=None, age=None, phone=None, emergency_contact=None, emergency_phone=None, attention_reason=None, general_notes=None):
         query = (
             "INSERT INTO aluno "
-            "(nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            "(nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention, curso, age, phone, emergency_contact, emergency_phone, attention_reason, general_notes) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
         )
         avatar_value = _shorten_avatar(avatar)
-        params = (nome, professor_responsavel, status, int(priority_level), json.dumps(tags) if tags else "[]", avatar_value, int(dark_mode), int(notifications_enabled), int(has_medical_report), int(requires_attention))
+        params = (nome, professor_responsavel, status, int(priority_level), json.dumps(tags) if tags else "[]", avatar_value, int(dark_mode), int(notifications_enabled), int(has_medical_report), int(requires_attention), curso, age, phone, emergency_contact, emergency_phone, attention_reason, general_notes)
         student_data = _student_data(
             nome, email, has_medical_report, requires_attention,
             professor_responsavel=professor_responsavel,
@@ -146,6 +174,13 @@ class EstudanteRepository:
             avatar=avatar_value,
             dark_mode=dark_mode,
             notifications_enabled=notifications_enabled,
+            curso=curso,
+            age=age,
+            phone=phone,
+            emergency_contact=emergency_contact,
+            emergency_phone=emergency_phone,
+            attention_reason=attention_reason,
+            general_notes=general_notes,
         )
 
         def _mysql():
@@ -179,7 +214,6 @@ class EstudanteRepository:
         if not dados:
             return 0
 
-        # aluno não possui coluna email; email reside em auth_user via user_id
         mysql_dados = {k: v for k, v in dados.items() if k != "email"}
         set_clause = ", ".join(f"{k} = %s" for k in mysql_dados)
         params = list(mysql_dados.values()) + [id_estudante]
@@ -196,6 +230,13 @@ class EstudanteRepository:
             avatar=dados.get("avatar", "/default_avatar.png"),
             dark_mode=dados.get("dark_mode", 0),
             notifications_enabled=dados.get("notifications_enabled", 1),
+            curso=dados.get("curso"),
+            age=dados.get("age"),
+            phone=dados.get("phone"),
+            emergency_contact=dados.get("emergency_contact"),
+            emergency_phone=dados.get("emergency_phone"),
+            attention_reason=dados.get("attention_reason"),
+            general_notes=dados.get("general_notes"),
         )
         student_data["id"] = id_estudante
 
@@ -224,6 +265,7 @@ class EstudanteRepository:
             return 1
 
         def _local(mysql_result):
+            validate_table_name("students")
             local_cache.delete("students", "id", id_estudante)
             return 1
 
@@ -232,3 +274,32 @@ class EstudanteRepository:
             operation="delete", entity="students", entity_id=id_estudante,
             queue_data_fn=lambda r, eid: {"id": id_estudante},
         )
+
+    def bloquear_minigames(self, id_estudante, motivo=""):
+        query = "UPDATE aluno SET minigames_blocked = 1, minigames_block_reason = %s WHERE id_aluno = %s"
+        execute_non_query(query, (motivo, id_estudante))
+        queue_sync("update", "students", id_estudante, {"minigames_blocked": 1, "minigames_block_reason": motivo})
+        return 1
+
+    def desbloquear_minigames(self, id_estudante):
+        query = "UPDATE aluno SET minigames_blocked = 0, minigames_block_reason = NULL WHERE id_aluno = %s"
+        execute_non_query(query, (id_estudante,))
+        queue_sync("update", "students", id_estudante, {"minigames_blocked": 0})
+        return 1
+
+    def verificar_comportamento_suspeito(self, id_estudante):
+        query = "SELECT * FROM aluno WHERE id_aluno = %s"
+        student = fetch_one(query, (id_estudante,))
+        if not student:
+            return {"suspicious": False, "reasons": ["Estudante não encontrado"]}
+        reasons = []
+        if student.get("priority_level", 0) >= 4:
+            reasons.append("Alto nível de prioridade")
+        if student.get("requires_attention"):
+            reasons.append("Requer atenção")
+        suspicious = len(reasons) > 0
+        return {"suspicious": suspicious, "reasons": reasons, "student_id": id_estudante}
+
+    def obter_log_bloqueio(self, id_estudante):
+        query = "SELECT * FROM minigame_block_log WHERE student_id = %s ORDER BY blocked_at DESC"
+        return fetch_all(query, (id_estudante,))
