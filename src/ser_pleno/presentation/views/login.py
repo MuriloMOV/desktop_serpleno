@@ -26,12 +26,8 @@ logger = logging.getLogger("apps.desktop")
 
 _IS_WINDOWS = hasattr(ctypes, "windll")
 
-
-# —————————————————————————————————————————————
-#  Paleta dedicada à tela de login
-# —————————————————————————————————————————————
 _LOGIN_PALETTE = {
-    "grad_top_left": "#1E1B4B",
+    "grad_top_left": "#FF0400",
     "grad_top_right": "#312E81",
     "grad_bottom_left": "#4338CA",
     "grad_bottom": "#6D5CE8",
@@ -105,12 +101,7 @@ _BUBBLE_OUTLINE_WIDTH = 1.2
 _CHIP_HEIGHT = 30
 
 
-# —————————————————————————————————————————————
-#  Campo de entrada refinado
-# —————————————————————————————————————————————
 class LoginInputField(ctk.CTkFrame):
-    """Campo de entrada reutilizável com rótulo, ícone semântico e toggle de visibilidade de senha."""
-
     def __init__(
         self,
         master,
@@ -189,9 +180,6 @@ class LoginInputField(ctk.CTkFrame):
         pass
 
 
-# —————————————————————————————————————————————
-#  Frame principal de login
-# —————————————————————————————————————————————
 class LoginFrame(ctk.CTkFrame):
     def __init__(self, parent: ctk.CTkBaseClass, controller: "App") -> None:
         self.palette = _LOGIN_PALETTE
@@ -226,12 +214,6 @@ class LoginFrame(ctk.CTkFrame):
     def _on_destroy(self, _event=None) -> None:
         self._alive = False
 
-    def _posicionar_card(self) -> None:
-        if getattr(self, "_shake_active", False):
-            return
-        if hasattr(self, "card"):
-            self.card.place(relx=0.5, rely=0.5, anchor="center")
-
     def _on_configure(self, event=None) -> None:
         if self._bg_draw_job:
             self.after_cancel(self._bg_draw_job)
@@ -252,7 +234,7 @@ class LoginFrame(ctk.CTkFrame):
         self._gradient_cache[key] = photo
         return photo
 
-    def _generate_gradient_pil(self, w: int, h: int) -> "Image.Image":
+    def _generate_gradient_pil(self, w: int, h: int) -> Image.Image:
         top_l = self.palette["grad_top_left"]
         top_r = self.palette["grad_top_right"]
         bot = self.palette["grad_bottom"]
@@ -330,10 +312,10 @@ class LoginFrame(ctk.CTkFrame):
             self._apply_gradient(w, h, cached)
             return
 
-        def _generate() -> "Image.Image":
+        def _generate() -> Image.Image:
             return self._generate_gradient_pil(w, h)
 
-        def _on_ready(pil_img: "Image.Image") -> None:
+        def _on_ready(pil_img: Image.Image) -> None:
             if not self._alive or not self.winfo_exists():
                 return
             current_size = (self.winfo_width(), self.winfo_height())
@@ -371,7 +353,7 @@ class LoginFrame(ctk.CTkFrame):
         key = (w, h)
         if key not in self._gradient_cache:
 
-            def _gen() -> "Image.Image":
+            def _gen() -> Image.Image:
                 return self._generate_gradient_pil(w, h)
 
             def _on_ready(pil_img, size=(w, h)):
@@ -385,15 +367,6 @@ class LoginFrame(ctk.CTkFrame):
         self._lazy_gradient_index += 1
         if self._lazy_gradient_index < len(self._lazy_gradient_sizes):
             self.after_idle(self._generate_next_gradient)
-
-    def _elevar_elementos(self) -> None:
-        for b in self.bolhas:
-            if b.get("id"):
-                self.canvas.tag_raise(b["id"])
-        if hasattr(self, "_music_btn"):
-            self._music_btn.lift()
-        if hasattr(self, "card"):
-            self.card.lift()
 
     def _criar_bolhas(self) -> None:
         for _ in range(_BUBBLE_COUNT):
@@ -480,26 +453,25 @@ class LoginFrame(ctk.CTkFrame):
         self.after(_ANIMATION_FPS, self._animar_bolhas)
 
     def _criar_card_login(self) -> None:
-        """Cria o card branco arredondado do login."""
+        c_top = _lerp_color(self.palette["grad_top_left"], self.palette["grad_top_right"], 0.5)
+        mid_color = _lerp_color(c_top, self.palette["grad_bottom"], 0.5**_GRADIENT_TWEEN_POWER)
+
         self.card = ctk.CTkFrame(
             self,
             width=CARD_W,
             height=CARD_H,
             fg_color=self.palette["card_bg"],
+            bg_color=mid_color,
             corner_radius=_CARD_CORNER_RADIUS,
-            border_width=1,
-            border_color=self.palette["card_border"],
+            border_width=0,
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
 
-        self._card = self.card
-
-        inner = ctk.CTkFrame(self.card, fg_color="transparent")
+        inner = ctk.CTkFrame(self.card, fg_color="transparent", bg_color="transparent")
         inner.pack(fill="both", expand=True, padx=32, pady=28)
 
-        # Header
-        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header = ctk.CTkFrame(inner, fg_color="transparent", bg_color="transparent")
         header.pack(fill="x", pady=(0, 12))
 
         badge = ctk.CTkFrame(
@@ -544,15 +516,10 @@ class LoginFrame(ctk.CTkFrame):
             justify="center",
         ).pack(pady=(0, 10))
 
-        # Chips
-        info_row = ctk.CTkFrame(inner, fg_color="transparent")
+        info_row = ctk.CTkFrame(inner, fg_color="transparent", bg_color="transparent")
         info_row.pack(pady=(0, 12))
 
-        for text in [
-            "🔒 LGPD",
-            "⚡ Rápido",
-            "🤝 Apoio",
-        ]:
+        for text in ["🔒 LGPD", "⚡ Rápido", "🤝 Apoio"]:
             chip = ctk.CTkFrame(
                 info_row,
                 height=_CHIP_HEIGHT,
@@ -566,7 +533,6 @@ class LoginFrame(ctk.CTkFrame):
 
         Divider(inner).pack(fill="x", pady=(0, 16))
 
-        # Inputs e Ações
         self.input_user = LoginInputField(
             inner, "Usuário", placeholder="Seu nome de usuário", palette=self.palette
         )
@@ -618,6 +584,29 @@ class LoginFrame(ctk.CTkFrame):
         self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
         self.entry_user.focus_set()
 
+    def _posicionar_card(self) -> None:
+        if getattr(self, "_shake_active", False):
+            return
+
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 1 or h <= 1:
+            return
+
+        if hasattr(self, "card"):
+            self.card.place(relx=0.5, rely=0.5, anchor="center")
+
+        self._elevar_elementos()
+
+    def _elevar_elementos(self) -> None:
+        for b in self.bolhas:
+            if b.get("id"):
+                self.canvas.tag_raise(b["id"])
+        if hasattr(self, "_music_btn"):
+            self._music_btn.lift()
+        if hasattr(self, "card"):
+            self.card.lift()
+
     def _criar_music_toggle(self) -> None:
         self.music_var = ctk.StringVar(value="off")
 
@@ -628,6 +617,7 @@ class LoginFrame(ctk.CTkFrame):
             height=_MUSIC_BTN_SIZE,
             corner_radius=RADIUS["pill"],
             fg_color=self.palette["card_bg"],
+            bg_color=self.palette["grad_bottom"],
             hover_color=self.palette["accent_soft"],
             text_color=self.palette["text_muted"],
             border_width=1,
