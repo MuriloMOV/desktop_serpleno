@@ -121,145 +121,93 @@ _ERRO_WRAPLENGTH = 340
 _BUBBLE_OUTLINE_WIDTH = 1.2
 _CHIP_HEIGHT = 30
 
-
 # —————————————————————————————————————————————
 #  Campo de entrada refinado (Ajustado para cores claras)
 # —————————————————————————————————————————————
 class LoginInputField(ctk.CTkFrame):
+    """Campo de entrada reutilizável com rótulo, ícone semântico e toggle de visibilidade de senha."""
+
     def __init__(
         self,
-        parent: ctk.CTkBaseClass,
-        label: str,
+        master,
+        label_text: str,
         placeholder: str = "",
         icon: str = "",
         password: bool = False,
-    ) -> None:
-        super().__init__(parent, fg_color="transparent")
-        self._password = password
-        self._show_pass = False
-        self._border_normal = _LOGIN_PALETTE["input_border"]
-        self._border_focus = _LOGIN_PALETTE["accent"]
-        self._border_error = THEME["danger"]
-        self._border_success = THEME["success"]
-        self._bg_normal = _LOGIN_PALETTE["input_bg"]
-        self._bg_focus = _LOGIN_PALETTE["card_bg"]
-        self._state = "normal"
+        palette: dict | None = None,
+        **kwargs,
+    ):
+        super().__init__(master, fg_color="transparent", **kwargs)
+        self.palette = palette or _LOGIN_PALETTE
+        self.password = password
+        self.is_hidden = password
 
-        self._label = ctk.CTkLabel(
+        # Rótulo acima do campo
+        ctk.CTkLabel(
             self,
-            text=label,
+            text=label_text,
             font=themed_font("caption", "bold"),
-            text_color=_LOGIN_PALETTE["text_primary"],
+            text_color=self.palette["text_primary"],
             anchor="w",
-        )
-        self._label.pack(fill="x", padx=spacing("sm"), pady=(0, spacing("label_gap")))
+        ).pack(fill="x", pady=(0, 4))
 
-        self._box = ctk.CTkFrame(
+        # Container do Input
+        input_container = ctk.CTkFrame(
             self,
-            corner_radius=RADIUS["input"],
-            fg_color=self._bg_normal,
+            fg_color=self.palette["input_bg"],
             border_width=1,
-            border_color=self._border_normal,
+            border_color=self.palette["card_border"],
+            corner_radius=RADIUS["md"],
         )
-        self._box.pack(fill="x")
-        self._box.grid_columnconfigure(1, weight=1)
+        input_container.pack(fill="x")
 
-        if icon:
-            ctk.CTkLabel(
-                self._box,
-                text=icon,
-                font=themed_font("body"),
-                text_color=_LOGIN_PALETTE["text_muted"],
-                width=_ENTRY_ICON_WIDTH,
-            ).grid(row=0, column=0, padx=(spacing("sm"), 0), pady=spacing("md"))
+        # Ícone à esquerda (👤 para usuário, 🔒 para senha)
+        left_icon = "👤" if "usuário" in label_text.lower() else "🔒" if password else icon
+        ctk.CTkLabel(
+            input_container,
+            text=left_icon,
+            font=themed_font("body"),
+            text_color=self.palette["text_muted"],
+            width=30,
+        ).pack(side="left", padx=(10, 0))
 
+        # Entry
         self.entry = ctk.CTkEntry(
-            self._box,
+            input_container,
             placeholder_text=placeholder,
-            placeholder_text_color=_LOGIN_PALETTE["text_light"],
+            show="*" if password else "",
             fg_color="transparent",
             border_width=0,
-            text_color=_LOGIN_PALETTE["text_primary"],
+            text_color=self.palette["text_primary"],
             font=themed_font("body"),
-            height=42,
-            show="●" if password else "",
         )
-        self.entry.grid(row=0, column=1, sticky="ew", padx=_ENTRY_GRID_PADX, pady=_ENTRY_GRID_PADY)
+        self.entry.pack(side="left", fill="x", expand=True, padx=8, pady=8)
 
+        # Botão de alternar visibilidade (👁) apenas para campos de senha
         if password:
-            self._eye_btn = ctk.CTkButton(
-                self._box,
-                text=ICONS["view"],
-                width=_EYE_BTN_WIDTH,
-                height=_EYE_BTN_HEIGHT,
+            self.btn_toggle = ctk.CTkButton(
+                input_container,
+                text="👁",
+                width=30,
                 fg_color="transparent",
-                hover_color=_LOGIN_PALETTE["accent_soft"],
-                text_color=_LOGIN_PALETTE["text_muted"],
-                font=themed_font("body"),
-                command=self._toggle_show,
-                corner_radius=RADIUS["button"],
-                cursor="hand2",
+                hover_color=self.palette["accent_soft"],
+                text_color=self.palette["text_muted"],
+                command=self._toggle_password,
             )
-            self._eye_btn.grid(row=0, column=2, padx=_EYE_BTN_PADX, pady=_EYE_BTN_PADY)
-            self._eye_btn.bind("<Return>", lambda _: self._toggle_show())
-            self._eye_btn.bind("<space>", lambda _: self._toggle_show())
+            self.btn_toggle.pack(side="right", padx=(0, 6))
 
-        self._msg = ctk.CTkLabel(
-            self,
-            text="",
-            anchor="w",
-            font=themed_font("caption"),
-            text_color=THEME["danger"],
-        )
-        self._msg.pack(fill="x", padx=spacing("sm"), pady=(spacing("xs"), 0))
-
-        self.entry.bind("<FocusIn>", self._on_focus_in)
-        self.entry.bind("<FocusOut>", self._on_focus_out)
+    def _toggle_password(self) -> None:
+        self.is_hidden = not self.is_hidden
+        self.entry.configure(show="*" if self.is_hidden else "")
 
     def get(self) -> str:
         return self.entry.get()
 
-    def set_error(self, msg: str = "") -> None:
-        self._state = "error"
-        self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
-        self._label.configure(text_color=THEME["danger"])
-        self._msg.configure(
-            text=f"{ICONS['alert']}   {msg}" if msg else "", text_color=THEME["danger"]
-        )
-
-    def set_success(self) -> None:
-        self._state = "success"
-        self._box.configure(border_color=self._border_success, fg_color=THEME["success_soft"])
-        self._label.configure(text_color=THEME["success"])
-        self._msg.configure(text="")
+    def set_error(self, message: str) -> None:
+        pass
 
     def clear_state(self) -> None:
-        self._state = "normal"
-        self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
-        self._label.configure(text_color=_LOGIN_PALETTE["text_primary"])
-        self._msg.configure(text="")
-
-    def _on_focus_in(self, _=None) -> None:
-        self._box.configure(border_color=self._border_focus, fg_color=self._bg_focus)
-        self._label.configure(text_color=_LOGIN_PALETTE["accent"])
-
-    def _on_focus_out(self, _=None) -> None:
-        if self._state == "error":
-            self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
-            self._label.configure(text_color=THEME["danger"])
-        elif self._state == "success":
-            self._box.configure(border_color=self._border_success, fg_color=THEME["success_soft"])
-            self._label.configure(text_color=THEME["success"])
-        else:
-            self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
-            self._label.configure(text_color=_LOGIN_PALETTE["text_primary"])
-
-    def _toggle_show(self) -> None:
-        self._show_pass = not self._show_pass
-        self.entry.configure(show="" if self._show_pass else "●")
-        self._eye_btn.configure(text=ICONS["hide"] if self._show_pass else ICONS["view"])
-
-
+        pass
 # —————————————————————————————————————————————
 #  Frame principal de login
 # —————————————————————————————————————————————
@@ -553,197 +501,182 @@ class LoginFrame(ctk.CTkFrame):
         self.after(_ANIMATION_FPS, self._animar_bolhas)
 
     def _criar_card_login(self) -> None:
-            """Cria o frame do card de login e seu conteúdo interno de forma organizada."""
-            # Container principal do Card com cantos arredondados nativos
-            self.card = ctk.CTkFrame(
-                self,
-                width=CARD_W,
-                height=CARD_H,
-                fg_color=self.palette["card_bg"],
-                corner_radius=_CARD_CORNER_RADIUS,
-                border_width=1,
-                border_color=self.palette["card_border"],
-            )
-            self.card.place(relx=0.5, rely=0.5, anchor="center")
-            self.card.pack_propagate(False)
-            self.card.lift()
-
-            self._card = self.card
-
-            # Frame interno com padding para afastar os elementos das bordas
-            inner = ctk.CTkFrame(self.card, fg_color="transparent")
-            inner.pack(fill="both", expand=True, padx=32, pady=28)
-
-            # ---------------------------------------------------------
-            # HEADER (Badge, Ícone, Título e Subtítulo)
-            # ---------------------------------------------------------
-            header = ctk.CTkFrame(inner, fg_color="transparent")
-            header.pack(fill="x", pady=(0, 12))
-
-            badge = ctk.CTkFrame(
-                header,
-                corner_radius=RADIUS["pill"],
-                fg_color=self.palette["accent_soft"],
-            )
-            badge.pack(pady=(0, 10))
-            ctk.CTkLabel(
-                badge,
-                text="Acesso seguro · Plataforma SerPleno",
-                font=themed_font("caption", "bold"),
-                text_color=self.palette["accent"],
-            ).pack(padx=16, pady=6)
-
-            icon_bg = ctk.CTkFrame(
-                header,
-                width=_ICON_BG_SIZE,
-                height=_ICON_BG_SIZE,
-                corner_radius=RADIUS["avatar"],
-                fg_color=self.palette["accent_soft"],
-            )
-            icon_bg.pack(pady=(0, 8))
-            icon_bg.pack_propagate(False)
-            ctk.CTkLabel(
-                icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color=_ICON_TEXT_COLOR
-            ).place(relx=0.5, rely=0.5, anchor="center")
-
-            ctk.CTkLabel(
-                header,
-                text="SerPleno",
-                font=themed_font("h2", "bold"),
-                text_color=self.palette["text_primary"],
-            ).pack(pady=(0, 2))
-
-            ctk.CTkLabel(
-                header,
-                text="Bem-estar, acompanhamento escolar e comunicação integrada",
-                font=themed_font("caption"),
-                text_color=self.palette["text_muted"],
-                wraplength=360,
-                justify="center",
-            ).pack(pady=(0, 10))
-
-            # ---------------------------------------------------------
-            # CHIPS DE INFORMAÇÃO
-            # ---------------------------------------------------------
-            info_row = ctk.CTkFrame(inner, fg_color="transparent")
-            info_row.pack(pady=(0, 12))
-
-            for text in [
-                f"{ICONS['lock']} LGPD",
-                f"{ICONS['alert']} Rápido",
-                f"{ICONS['user']} Apoio",
-            ]:
-                chip = ctk.CTkFrame(
-                    info_row,
-                    height=_CHIP_HEIGHT,
-                    corner_radius=RADIUS["pill"],
-                    fg_color=self.palette["input_bg"],
-                )
-                chip.pack(side="left", padx=4)
-                ctk.CTkLabel(
-                    chip, text=text, font=themed_font("caption"), text_color=self.palette["text_muted"]
-                ).pack(padx=10, pady=4)
-
-            Divider(inner).pack(fill="x", pady=(0, 16))
-
-            # ---------------------------------------------------------
-            # CAMPOS DE FORMULÁRIO E AÇÕES
-            # ---------------------------------------------------------
-            self.input_user = LoginInputField(
-                inner, "Usuário", placeholder="Seu nome de usuário", icon=ICONS["user"]
-            )
-            self.input_user.pack(fill="x", pady=(0, 12))
-
-            self.input_pass = LoginInputField(
-                inner, "Senha", placeholder="Sua senha", icon=ICONS["lock"], password=True
-            )
-            self.input_pass.pack(fill="x", pady=(0, 8))
-
-            self.lbl_erro = ctk.CTkLabel(
-                inner,
-                text="",
-                text_color=self.palette["danger"],
-                font=themed_font("caption"),
-                anchor="center",
-                wraplength=_ERRO_WRAPLENGTH,
-            )
-            self.lbl_erro.pack(fill="x", pady=(0, 8))
-
-            self.btn_entrar = PrimaryButton(
-                inner,
-                text="Entrar",
-                command=self._fazer_login,
-                height=46,
-                corner_radius=RADIUS["lg"],
-            )
-            self.btn_entrar.pack(fill="x", pady=(0, 8))
-
-            _termos_btn = ctk.CTkButton(
-                inner,
-                text=f"{ICONS['lock']} Termos de Privacidade",
-                command=self._abrir_termos,
-                fg_color="transparent",
-                hover_color=self.palette["accent_soft"],
-                text_color=self.palette["accent"],
-                border_width=1,
-                border_color=self.palette["accent_medium"],
-                corner_radius=RADIUS["button"],
-                height=36,
-                font=themed_font("caption", "bold"),
-                anchor="center",
-            )
-            _termos_btn.pack(fill="x")
-
-            # Mapeamento e atalhos
-            self.entry_user = self.input_user.entry
-            self.entry_pass = self.input_pass.entry
-            self.entry_user.bind("<Return>", lambda _: self._fazer_login())
-            self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
-            self.entry_user.focus_set()
-
-            
-    def _criar_music_toggle(self) -> None:
-        self.music_var = ctk.StringVar(value="off")
-        self._music_btn_frame = ctk.CTkFrame(
+        """Cria o frame do card de login ajustando o rendering dos cantos arredondados."""
+        self.card = ctk.CTkFrame(
             self,
+            width=CARD_W,
+            height=CARD_H,
             fg_color=self.palette["card_bg"],
-            corner_radius=_MUSIC_BTN_RADIUS,
-            width=_MUSIC_BTN_SIZE,
-            height=_MUSIC_BTN_SIZE,
+            corner_radius=_CARD_CORNER_RADIUS,
+            border_width=1,
+            border_color=self.palette["card_border"],
         )
-        self._music_btn_frame.place(
-            relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
-        )
-        self._music_btn_frame.pack_propagate(False)
+        self.card.place(relx=0.5, rely=0.5, anchor="center")
+        self.card.pack_propagate(False)
+        self.card.lift()
 
-        self._music_btn = ctk.CTkButton(
-            self._music_btn_frame,
-            text=ICONS["music"],
-            width=_MUSIC_BTN_INNER_SIZE,
-            height=_MUSIC_BTN_INNER_SIZE,
-            corner_radius=RADIUS["button"],
-            font=themed_font("h3"),
+        self._card = self.card
+
+        # Frame interno de conteúdo
+        inner = ctk.CTkFrame(self.card, fg_color="transparent")
+        inner.pack(fill="both", expand=True, padx=32, pady=28)
+
+        # ---------------------------------------------------------
+        # HEADER
+        # ---------------------------------------------------------
+        header = ctk.CTkFrame(inner, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 12))
+
+        badge = ctk.CTkFrame(
+            header,
+            corner_radius=RADIUS["pill"],
+            fg_color=self.palette["accent_soft"],
+        )
+        badge.pack(pady=(0, 10))
+        ctk.CTkLabel(
+            badge,
+            text="Acesso seguro · Plataforma SerPleno",
+            font=themed_font("caption", "bold"),
+            text_color=self.palette["accent"],
+        ).pack(padx=16, pady=6)
+
+        icon_bg = ctk.CTkFrame(
+            header,
+            width=_ICON_BG_SIZE,
+            height=_ICON_BG_SIZE,
+            corner_radius=RADIUS["avatar"],
+            fg_color=self.palette["accent_soft"],
+        )
+        icon_bg.pack(pady=(0, 8))
+        icon_bg.pack_propagate(False)
+        ctk.CTkLabel(icon_bg, text="🧠", font=themed_font("h2"), text_color=_ICON_TEXT_COLOR).place(
+            relx=0.5, rely=0.5, anchor="center"
+        )
+
+        ctk.CTkLabel(
+            header,
+            text="SerPleno",
+            font=themed_font("h2", "bold"),
+            text_color=self.palette["text_primary"],
+        ).pack(pady=(0, 2))
+
+        ctk.CTkLabel(
+            header,
+            text="Bem-estar, acompanhamento escolar e comunicação integrada",
+            font=themed_font("caption"),
+            text_color=self.palette["text_muted"],
+            wraplength=360,
+            justify="center",
+        ).pack(pady=(0, 10))
+
+        # ---------------------------------------------------------
+        # CHIPS
+        # ---------------------------------------------------------
+        info_row = ctk.CTkFrame(inner, fg_color="transparent")
+        info_row.pack(pady=(0, 12))
+
+        for text in [
+            "🔒 LGPD",
+            "⚡ Rápido",
+            "🤝 Apoio",
+        ]:
+            chip = ctk.CTkFrame(
+                info_row,
+                height=_CHIP_HEIGHT,
+                corner_radius=RADIUS["pill"],
+                fg_color=self.palette["input_bg"],
+            )
+            chip.pack(side="left", padx=4)
+            ctk.CTkLabel(
+                chip, text=text, font=themed_font("caption"), text_color=self.palette["text_muted"]
+            ).pack(padx=10, pady=4)
+
+        Divider(inner).pack(fill="x", pady=(0, 16))
+
+        # ---------------------------------------------------------
+        # INPUTS E BOTÕES
+        # ---------------------------------------------------------
+        self.input_user = LoginInputField(
+            inner, "Usuário", placeholder="Seu nome de usuário", palette=self.palette
+        )
+        self.input_user.pack(fill="x", pady=(0, 12))
+
+        self.input_pass = LoginInputField(
+            inner, "Senha", placeholder="Sua senha", password=True, palette=self.palette
+        )
+        self.input_pass.pack(fill="x", pady=(0, 8))
+
+        self.lbl_erro = ctk.CTkLabel(
+            inner,
+            text="",
+            text_color=self.palette["danger"],
+            font=themed_font("caption"),
+            anchor="center",
+            wraplength=_ERRO_WRAPLENGTH,
+        )
+        self.lbl_erro.pack(fill="x", pady=(0, 8))
+
+        self.btn_entrar = PrimaryButton(
+            inner,
+            text="Entrar",
+            command=self._fazer_login,
+            height=46,
+            corner_radius=RADIUS["lg"],
+        )
+        self.btn_entrar.pack(fill="x", pady=(0, 8))
+
+        _termos_btn = ctk.CTkButton(
+            inner,
+            text="🛡️ Termos de Privacidade",
+            command=self._abrir_termos,
             fg_color="transparent",
             hover_color=self.palette["accent_soft"],
-            text_color=self.palette["text_muted"],
-            border_width=0,
-            command=self._toggle_music,
-            cursor="hand2",
+            text_color=self.palette["accent"],
+            border_width=1,
+            border_color=self.palette["accent_medium"],
+            corner_radius=RADIUS["button"],
+            height=36,
+            font=themed_font("caption", "bold"),
+            anchor="center",
         )
-        self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
+        _termos_btn.pack(fill="x")
 
-        if not _IS_WINDOWS:
-            from ser_pleno.presentation.components.ui_components import Tooltip
+        self.entry_user = self.input_user.entry
+        self.entry_pass = self.input_pass.entry
+        self.entry_user.bind("<Return>", lambda _: self._fazer_login())
+        self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
+        self.entry_user.focus_set()
 
-            Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
+    def _criar_music_toggle(self) -> None:
+            self.music_var = ctk.StringVar(value="off")
+            
+            # Criação direta do botão arredondado (sem o CTkFrame intermediário que cria a borda preta)
+            self._music_btn = ctk.CTkButton(
+                self,
+                text=ICONS["music"],
+                width=_MUSIC_BTN_SIZE,
+                height=_MUSIC_BTN_SIZE,
+                corner_radius=_MUSIC_BTN_RADIUS,
+                font=themed_font("h3"),
+                fg_color=self.palette["card_bg"],
+                hover_color=self.palette["accent_soft"],
+                text_color=self.palette["text_muted"],
+                border_width=0,
+                command=self._toggle_music,
+                cursor="hand2",
+            )
+            self._music_btn.place(
+                relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
+            )
+
+            if not _IS_WINDOWS:
+                from ser_pleno.presentation.components.ui_components import Tooltip
+                Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
 
     def _ajustar_botao_musica(self, event=None) -> None:
-        if hasattr(self, "_music_btn_frame") and self._music_btn_frame.winfo_exists():
-            w = self._music_btn_frame.winfo_width()
-            h = self._music_btn_frame.winfo_height()
-            if w > 1 and h > 1:
+            if hasattr(self, "_music_btn") and self._music_btn.winfo_exists():
                 try:
-                    self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
+                    self._music_btn.lift()
                 except Exception:
                     pass
 
@@ -770,7 +703,9 @@ class LoginFrame(ctk.CTkFrame):
                 self._mci_send("stop serpleno_bgm")
                 self._mci_send("close serpleno_bgm")
                 self._music_playing = False
-                self._music_btn.configure(text=ICONS["music"], text_color=self.palette["text_muted"])
+                self._music_btn.configure(
+                    text=ICONS["music"], text_color=self.palette["text_muted"]
+                )
             except Exception:
                 pass
 
