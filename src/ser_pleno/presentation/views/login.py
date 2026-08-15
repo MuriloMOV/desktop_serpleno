@@ -4,10 +4,11 @@ import ctypes
 import logging
 import time
 import random
+from collections import OrderedDict
+from pathlib import Path
 
 import customtkinter as ctk
-from tkinter import PhotoImage
-from PIL import Image, ImageTk, ImageDraw, ImageFilter
+from PIL import Image, ImageTk
 
 from ser_pleno.application.controllers.autenticacao import AutenticacaoController
 from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
@@ -72,7 +73,52 @@ def _lerp_color(c1_hex: str, c2_hex: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-CARD_W, CARD_H = 444, 640
+CARD_W, CARD_H = 444, 720
+_CARD_CORNER_RADIUS = 20
+_BUBBLE_COUNT = 16
+_GRADIENT_STEP_PX = 4
+_GRADIENT_CACHE_MAX = 3
+_LAZY_SIZES = [(1024, 768), (1280, 720), (800, 600)]
+_BUBBLE_WOBBLE_SPEED = 0.025
+_BUBBLE_SPEED_MIN = 0.10
+_BUBBLE_SPEED_MAX = 0.45
+_BUBBLE_WOBBLE_AMP_MIN = 0.2
+_BUBBLE_WOBBLE_AMP_MAX = 0.7
+_BUBBLE_SIZE_MIN = 14
+_BUBBLE_SIZE_MAX = 80
+_BUBBLE_ALPHA_MIN = 0.05
+_BUBBLE_ALPHA_MAX = 0.18
+_SHAKE_STEPS = 8
+_SHAKE_INTERVAL_MS = 38
+_SHAKE_OFFSET_PX = 5
+_MUSIC_BTN_SIZE = 64
+_MUSIC_BTN_INNER_SIZE = 48
+_MUSIC_BTN_RADIUS = 24
+_MUSIC_BTN_MARGIN = 16
+_BG_RESIZE_DEBOUNCE_MS = 120
+_BG_DRAW_WARN_THRESHOLD_MS = 40
+_ANIMATION_FPS = 33
+_GLOW_RADIUS_FACTOR = 0.55
+_GRADIENT_TWEEN_POWER = 0.8
+_ICON_BG_SIZE = 68
+_MODAL_ICON_BG_SIZE = 52
+_TITLE_GAP = 12
+_MODAL_WIDTH_POLICY = 440
+_MODAL_HEIGHT_POLICY = 360
+_MODAL_WIDTH_TERMS = 480
+_MODAL_HEIGHT_TERMS = 420
+_MUSIC_FILE_RELATIVE = Path("assets") / "Music" / "background_music.mp3"
+_ICON_TEXT_COLOR = "#7C3AED"
+_ENTRY_ICON_WIDTH = 36
+_EYE_BTN_WIDTH = 36
+_EYE_BTN_HEIGHT = 36
+_EYE_BTN_PADX = (0, 6)
+_EYE_BTN_PADY = 4
+_ENTRY_GRID_PADX = (4, 0)
+_ENTRY_GRID_PADY = 4
+_ERRO_WRAPLENGTH = 340
+_BUBBLE_OUTLINE_WIDTH = 1.2
+_CHIP_HEIGHT = 30
 
 
 # —————————————————————————————————————————————
@@ -82,20 +128,23 @@ class LoginInputField(ctk.CTkFrame):
     """Campo de entrada com label, ícone e estados normal/foco/erro/sucesso."""
 
     def __init__(
-        self, parent, label: str, placeholder: str = "", icon: str = "", password: bool = False
-    ):
+        self,
+        parent: ctk.CTkBaseClass,
+        label: str,
+        placeholder: str = "",
+        icon: str = "",
+        password: bool = False,
+    ) -> None:
         super().__init__(parent, fg_color="transparent")
         self._password = password
         self._show_pass = False
-        # Resolvidas em tempo de execução (não como atributo de classe) para
-        # sempre refletir o tema ativo, mesmo depois de um toggle de modo.
         self._border_normal = THEME["border"]
         self._border_focus = THEME["primary"]
         self._border_error = THEME["danger"]
         self._border_success = THEME["success"]
         self._bg_normal = THEME["bg_alt"]
         self._bg_focus = THEME["surface"]
-        self._state = "normal"  # normal | error | success
+        self._state = "normal"
 
         self._label = ctk.CTkLabel(
             self,
@@ -122,7 +171,7 @@ class LoginInputField(ctk.CTkFrame):
                 text=icon,
                 font=themed_font("body"),
                 text_color=THEME["text_secondary"],
-                width=36,
+                width=_ENTRY_ICON_WIDTH,
             ).grid(row=0, column=0, padx=(spacing("sm"), 0), pady=spacing("md"))
 
         self.entry = ctk.CTkEntry(
@@ -136,14 +185,14 @@ class LoginInputField(ctk.CTkFrame):
             height=42,
             show="●" if password else "",
         )
-        self.entry.grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=4)
+        self.entry.grid(row=0, column=1, sticky="ew", padx=_ENTRY_GRID_PADX, pady=_ENTRY_GRID_PADY)
 
         if password:
             self._eye_btn = ctk.CTkButton(
                 self._box,
                 text=ICONS["view"],
-                width=36,
-                height=36,
+                width=_EYE_BTN_WIDTH,
+                height=_EYE_BTN_HEIGHT,
                 fg_color="transparent",
                 hover_color=self._bg_normal,
                 text_color=THEME["text_secondary"],
@@ -152,7 +201,7 @@ class LoginInputField(ctk.CTkFrame):
                 corner_radius=RADIUS["button"],
                 cursor="hand2",
             )
-            self._eye_btn.grid(row=0, column=2, padx=(0, 6), pady=4)
+            self._eye_btn.grid(row=0, column=2, padx=_EYE_BTN_PADX, pady=_EYE_BTN_PADY)
             self._eye_btn.bind("<Return>", lambda _: self._toggle_show())
             self._eye_btn.bind("<space>", lambda _: self._toggle_show())
 
@@ -168,11 +217,12 @@ class LoginInputField(ctk.CTkFrame):
         self.entry.bind("<FocusIn>", self._on_focus_in)
         self.entry.bind("<FocusOut>", self._on_focus_out)
 
-    # —— API pública ———————————————————————————————————————————————
     def get(self) -> str:
+        """Retorna o texto atual do campo."""
         return self.entry.get()
 
-    def set_error(self, msg: str = ""):
+    def set_error(self, msg: str = "") -> None:
+        """Aplica estado visual de erro ao campo."""
         self._state = "error"
         self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
         self._label.configure(text_color=THEME["danger"])
@@ -180,28 +230,25 @@ class LoginInputField(ctk.CTkFrame):
             text=f"{ICONS['alert']}   {msg}" if msg else "", text_color=THEME["danger"]
         )
 
-    def set_success(self):
+    def set_success(self) -> None:
+        """Aplica estado visual de sucesso ao campo."""
         self._state = "success"
         self._box.configure(border_color=self._border_success, fg_color=THEME["success_soft"])
         self._label.configure(text_color=THEME["success"])
         self._msg.configure(text="")
 
-    def clear_state(self):
+    def clear_state(self) -> None:
+        """Reseta o campo para o estado normal."""
         self._state = "normal"
         self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
         self._label.configure(text_color=THEME["text_secondary"])
         self._msg.configure(text="")
 
-    # —— Internos ——————————————————————————————————————————————————
-    def _on_focus_in(self, _=None):
+    def _on_focus_in(self, _=None) -> None:
         self._box.configure(border_color=self._border_focus, fg_color=self._bg_focus)
         self._label.configure(text_color=THEME["primary"])
 
-    def _on_focus_out(self, _=None):
-        # Ao perder o foco, só volta ao estado "normal" se não houver um
-        # erro/sucesso pendente —” antes disso era resetado incondicionalmente,
-        # fazendo o aviso de campo obrigatório sumir visualmente assim que o
-        # usuário clicava para fora, mesmo com o campo ainda vazio/inválido.
+    def _on_focus_out(self, _=None) -> None:
         if self._state == "error":
             self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
             self._label.configure(text_color=THEME["danger"])
@@ -212,7 +259,7 @@ class LoginInputField(ctk.CTkFrame):
             self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
             self._label.configure(text_color=THEME["text_secondary"])
 
-    def _toggle_show(self):
+    def _toggle_show(self) -> None:
         self._show_pass = not self._show_pass
         self.entry.configure(show="" if self._show_pass else "●")
         self._eye_btn.configure(text=ICONS["hide"] if self._show_pass else ICONS["view"])
@@ -222,9 +269,7 @@ class LoginInputField(ctk.CTkFrame):
 #  Frame principal de login
 # —————————————————————————————————————————————
 class LoginFrame(ctk.CTkFrame):
-    _GRADIENT_CACHE_MAX = 3
-
-    def __init__(self, parent, controller):
+    def __init__(self, parent: ctk.CTkBaseClass, controller: "App") -> None:
         self.palette = _LOGIN_PALETTE
         super().__init__(parent, fg_color=self.palette["grad_top_left"])
 
@@ -234,97 +279,74 @@ class LoginFrame(ctk.CTkFrame):
         self._is_loading = False
         self._music_playing = False
         self._alive = True
-        self._resize_job = None
-        self._bg_draw_job = None
+        self._shake_active = False
+        self._bg_draw_job: int | None = None
         self._last_bg_size = (0, 0)
-        self._gradient_cache: dict[tuple[int, int], ImageTk.PhotoImage] = {}
+        self._gradient_cache: OrderedDict[tuple[int, int], ImageTk.PhotoImage] = OrderedDict()
         self._t_draw_start = 0.0
 
         self.bind("<Destroy>", self._on_destroy)
 
-        # Canvas de fundo (gradiente + bolhas + sombra e card arredondado via PIL)
         self.canvas = ctk.CTkCanvas(self, highlightthickness=0, bd=0)
         self.canvas.place(relwidth=1, relheight=1)
 
         self._criar_bolhas()
         self._schedule_lazy_gradient_preload()
         self._criar_music_toggle()
-        card_img = None
-        try:
-            card_img = self._criar_imagem_card()
-            self._card_img_id = self.canvas.create_image(
-                0, 0, anchor="nw", image=card_img, tags="card_img"
-            )
-            self.canvas.image_card = card_img
-        except Exception:
-            pass
-        self._card_img = card_img
         self._criar_card_login()
 
         self.bind("<Configure>", self._on_configure)
-        # Handler especial para redimensionamento do frame do botão de música
         if hasattr(self, "_music_btn_frame"):
             self._music_btn_frame.bind("<Configure>", self._ajustar_botao_musica)
-        # Garante posicionamento inicial do card após a janela ser exibida
         self.after_idle(self._posicionar_card)
         self._animar_bolhas()
 
-    def _on_destroy(self, event):
-        # Corta a recursão do after() de animação assim que o frame morre —”
-        # antes, o loop de bolhas continuava se reagendando indefinidamente
-        # mesmo depois do LoginFrame ser destruído (ex.: após login bem
-        # sucedido), pois só adiava a checagem em vez de parar de fato.
-        #
-        # NOTA: CustomTkinter implementa CTkFrame sobre um canvas interno,
-        # então o bind("<Destroy>", ...) feito em `self` na verdade recebe
-        # esse widget interno como event.widget —” não dá para comparar com
-        # `is self`. Como só existe esta única inscrição, qualquer disparo
-        # dela já indica que este LoginFrame está sendo destruído.
+    def _on_destroy(self, _event=None) -> None:
         self._alive = False
 
     # ••••••••••••••••••••••••••••••••••••••
     #  FUNDO —” gradiente diagonal (com debounce de redimensionamento)
     # ••••••••••••••••••••••••••••••••••••••
-    def _posicionar_card(self):
-        if hasattr(self, "_card_img_id") and hasattr(self, "_card_img"):
-            w = self.winfo_width()
-            h = self.winfo_height()
-            if w > 1 and h > 1:
-                card_w, card_h = 444, 720
-                card_x = (w - card_w) / 2
-                card_y = (h - card_h) / 2
-                self.canvas.coords(self._card_img_id, card_x, card_y)
+    def _posicionar_card(self) -> None:
+        """Reposiciona o card no centro do canvas."""
+        if getattr(self, "_shake_active", False):
+            return
+        if hasattr(self, "card"):
+            self.card.place(relx=0.5, rely=0.5, anchor="center")
 
-    def _on_configure(self, event=None):
+    def _on_configure(self, event=None) -> None:
+        """Debounce de redimensionamento para redesenhar o fundo."""
         if self._bg_draw_job:
             self.after_cancel(self._bg_draw_job)
-        self._bg_draw_job = self.after(120, self._desenhar_fundo)
-        # Garante posicionamento do card imediatamente, sem esperar redesenho completo
+        self._bg_draw_job = self.after(_BG_RESIZE_DEBOUNCE_MS, self._desenhar_fundo)
         self.after_idle(self._posicionar_card)
 
     def _get_or_create_gradient(self, w: int, h: int) -> ImageTk.PhotoImage:
         key = (w, h)
-        if key in self._gradient_cache:
-            return self._gradient_cache[key]
+        cached = self._gradient_cache.get(key)
+        if cached is not None:
+            self._gradient_cache.move_to_end(key)
+            return cached
 
         pil_img = self._generate_gradient_pil(w, h)
         photo = ImageTk.PhotoImage(pil_img)
-        if len(self._gradient_cache) >= self._GRADIENT_CACHE_MAX:
-            self._gradient_cache.pop(next(iter(self._gradient_cache)))
+        if len(self._gradient_cache) >= _GRADIENT_CACHE_MAX:
+            self._gradient_cache.popitem(last=False)
         self._gradient_cache[key] = photo
         return photo
 
     def _generate_gradient_pil(self, w: int, h: int) -> "Image.Image":
+        """Gera imagem PIL com gradiente diagonal para o fundo."""
         top_l = self.palette["grad_top_left"]
         top_r = self.palette["grad_top_right"]
         bot = self.palette["grad_bottom"]
         c_top = _lerp_color(top_l, top_r, 0.5)
 
         img = Image.new("RGB", (w, h))
-        step = 4
+        step = _GRADIENT_STEP_PX
         for y in range(0, h, step):
             t = y / h
-            color = _lerp_color(c_top, bot, t**0.8)
+            color = _lerp_color(c_top, bot, t**_GRADIENT_TWEEN_POWER)
             img.paste(color, (0, y, w, min(y + step, h)))
         return img
 
@@ -335,18 +357,16 @@ class LoginFrame(ctk.CTkFrame):
             0, 0, w, h, fill=self.palette["grad_top_left"], outline="", tags="bg"
         )
         self.canvas.tag_lower("bg")
-        if hasattr(self, "_card_img_id"):
-            self.canvas.tag_raise("card_img")
-            self.canvas.tag_raise("bubble")
+        self.canvas.tag_raise("bubble")
         self._elevar_elementos()
 
     def _apply_gradient(self, w: int, h: int, photo: ImageTk.PhotoImage) -> None:
-        """Aplica gradiente já pronto ao canvas."""
+        """Aplica gradiente já pronto ao canvas, incluindo glows decorativos."""
         self.canvas.delete("bg")
         self.canvas.create_image(0, 0, anchor="nw", image=photo, tags="bg")
         self.canvas.image_bg = photo
 
-        glow_r = int(w * 0.55)
+        glow_r = int(w * _GLOW_RADIUS_FACTOR)
         self.canvas.create_oval(
             w - glow_r,
             -glow_r // 2,
@@ -367,19 +387,18 @@ class LoginFrame(ctk.CTkFrame):
         )
 
         self.canvas.tag_lower("bg")
-        if hasattr(self, "_card_img_id"):
-            self.canvas.tag_raise("card_img")
-            self.canvas.tag_raise("bubble")
+        self.canvas.tag_raise("bubble")
         self._elevar_elementos()
 
         try:
             draw_ms = (time.perf_counter() - self._t_draw_start) * 1000
-            if draw_ms > 40:
+            if draw_ms > _BG_DRAW_WARN_THRESHOLD_MS:
                 logger.warning("PERF login_grad_draw_ms=%.1f size=%dx%d", draw_ms, w, h)
         except Exception:
             pass
 
-    def _desenhar_fundo(self, event=None):
+    def _desenhar_fundo(self, event=None) -> None:
+        """Redesenha o fundo com debounce, gerando gradiente em background se necessário."""
         self._bg_draw_job = None
         w = self.winfo_width()
         h = self.winfo_height()
@@ -392,37 +411,30 @@ class LoginFrame(ctk.CTkFrame):
 
         self._t_draw_start = time.perf_counter()
 
-        # Placeholder imediato para responsividade
         self._show_bg_placeholder(w, h)
 
-        # Se já está em cache, aplica direto
         cached = self._gradient_cache.get((w, h))
         if cached is not None:
             self._apply_gradient(w, h, cached)
             return
 
-        # Gera gradiente em background
-        def _generate():
+        def _generate() -> "Image.Image":
             return self._generate_gradient_pil(w, h)
 
-        def _on_ready(pil_img):
+        def _on_ready(pil_img: "Image.Image") -> None:
             if not self._alive or not self.winfo_exists():
                 return
             current_size = (self.winfo_width(), self.winfo_height())
             if current_size != (w, h):
-                # Tamanho mudou durante geração; deixa o próximo ciclo tratar
                 return
             photo = ImageTk.PhotoImage(pil_img)
             self._gradient_cache[(w, h)] = photo
-            if len(self._gradient_cache) > self._GRADIENT_CACHE_MAX:
-                oldest = next(iter(self._gradient_cache))
-                del self._gradient_cache[oldest]
+            if len(self._gradient_cache) > _GRADIENT_CACHE_MAX:
+                self._gradient_cache.popitem(last=False)
             self._apply_gradient(w, h, photo)
 
-        def _on_error(exc):
+        def _on_error(exc: Exception) -> None:
             logger.warning("Falha ao gerar gradiente em background: %s", exc)
-
-        from ser_pleno.utils.async_runner import AsyncRunner
 
         AsyncRunner.run(
             task=_generate,
@@ -432,12 +444,14 @@ class LoginFrame(ctk.CTkFrame):
         )
 
     def _schedule_lazy_gradient_preload(self) -> None:
+        """Agenda pré-carregamento de gradientes para tamanhos comuns."""
         common_sizes = [(1024, 768), (1280, 720), (800, 600)]
-        self._lazy_gradient_sizes = common_sizes
-        self._lazy_gradient_index = 0
+        self._lazy_gradient_sizes: list[tuple[int, int]] = common_sizes
+        self._lazy_gradient_index: int = 0
         self.after_idle(self._generate_next_gradient)
 
-    def _generate_next_gradient(self):
+    def _generate_next_gradient(self) -> None:
+        """Gera próximo gradiente da fila de pré-carregamento."""
         if self._lazy_gradient_index >= len(self._lazy_gradient_sizes):
             return
         if not self._alive or not self.winfo_exists():
@@ -446,38 +460,39 @@ class LoginFrame(ctk.CTkFrame):
         w, h = self._lazy_gradient_sizes[self._lazy_gradient_index]
         key = (w, h)
         if key not in self._gradient_cache:
-            def _gen():
+
+            def _gen() -> "Image.Image":
                 return self._generate_gradient_pil(w, h)
+
             def _on_ready(pil_img, size=(w, h)):
                 if not self._alive or not self.winfo_exists():
                     return
                 photo = ImageTk.PhotoImage(pil_img)
                 self._gradient_cache[size] = photo
+
             AsyncRunner.run(task=_gen, on_success=_on_ready, widget_ref=self)
 
         self._lazy_gradient_index += 1
         if self._lazy_gradient_index < len(self._lazy_gradient_sizes):
             self.after_idle(self._generate_next_gradient)
 
-    def _elevar_elementos(self):
+    def _elevar_elementos(self) -> None:
+        """Eleva bolhas, botão de música e card para garantir ordem de renderização."""
         for b in self.bolhas:
             if b.get("id"):
                 self.canvas.tag_raise(b["id"])
-        # Eleva o frame do botão de música para garantir que fique acima das bolhas
         if hasattr(self, "_music_btn_frame"):
             self._music_btn_frame.lift()
         if hasattr(self, "card"):
             self.card.lift()
 
-    # ••••••••••••••••••••••••••••••••••
-    #  BOLHAS flutuantes —“ mais delicadas
-    # ••••••••••••••••••••••••••••••••••
-    def _criar_bolhas(self):
-        for _ in range(16):
+    def _criar_bolhas(self) -> None:
+        """Cria as bolhas decorativas flutuantes no canvas."""
+        for _ in range(_BUBBLE_COUNT):
             x = random.randint(0, 1400)
             y = random.randint(50, 900)
-            size = random.randint(14, 80)
-            a = random.uniform(0.05, 0.18)
+            size = random.randint(_BUBBLE_SIZE_MIN, _BUBBLE_SIZE_MAX)
+            a = random.uniform(_BUBBLE_ALPHA_MIN, _BUBBLE_ALPHA_MAX)
 
             w_val = min(255, int(200 + 55 * a))
             fill = f"#{w_val:02x}{w_val:02x}{w_val:02x}"
@@ -488,7 +503,7 @@ class LoginFrame(ctk.CTkFrame):
                 x + size,
                 y + size,
                 outline=fill,
-                width=1.2,
+                width=_BUBBLE_OUTLINE_WIDTH,
                 fill="",
                 tags="bubble",
             )
@@ -510,22 +525,23 @@ class LoginFrame(ctk.CTkFrame):
                     "x": float(x),
                     "y": float(y),
                     "size": size,
-                    "speed": random.uniform(0.10, 0.45),
+                    "speed": random.uniform(_BUBBLE_SPEED_MIN, _BUBBLE_SPEED_MAX),
                     "wobble": random.uniform(0, 2 * math.pi),
-                    "wobble_amp": random.uniform(0.2, 0.7),
+                    "wobble_amp": random.uniform(_BUBBLE_WOBBLE_AMP_MIN, _BUBBLE_WOBBLE_AMP_MAX),
                 }
             )
 
-    def _animar_bolhas(self):
+    def _animar_bolhas(self) -> None:
+        """Loop de animação das bolhas; auto-encerra quando o frame for destruído."""
         if not self._alive or not self.winfo_exists():
-            return  # não reagenda — encerra o loop de vez
+            return
 
         w, h = self.winfo_width(), self.winfo_height()
         if w > 1 and h > 1:
             for b in self.bolhas:
                 prev_x, prev_y = b["x"], b["y"]
                 b["y"] -= b["speed"]
-                b["wobble"] += 0.025
+                b["wobble"] += _BUBBLE_WOBBLE_SPEED
                 b["x"] += math.sin(b["wobble"]) * b["wobble_amp"]
 
                 wrapped = False
@@ -554,38 +570,22 @@ class LoginFrame(ctk.CTkFrame):
                 else:
                     self.canvas.move(b["reflex_id"], rx - prev_rx, ry - prev_ry)
 
-        self.after(33, self._animar_bolhas)
+        self.after(_ANIMATION_FPS, self._animar_bolhas)
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  CARD DE LOGIN
-    # ••••••••••••••••••••••••••••••••••••••
-    # ••••••••••••••••••••••••••••••••••••••
-    #  CARD DE LOGIN —“ arredondamento no canvas via PIL
-    # ••••••••••••••••••••••••••••••••••••••
-    def _criar_imagem_card(self):
-        """Cria imagem do card com bordas arredondadas usando PIL."""
-        tamanho = (444, 720)
-        img = Image.new("RGBA", tamanho, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
-        draw.rounded_rectangle([0, 0, 443, 719], radius=20, fill=(255, 255, 255, 255))
-        return ImageTk.PhotoImage(img)
-
-    def _criar_card_login(self):
-        # Mantém fundo branco no CTk; o arredondamento visual vem da imagem PIL no canvas
+    def _criar_card_login(self) -> None:
+        """Cria o frame do card de login e seu conteúdo interno."""
         self.card = ctk.CTkFrame(
             self,
-            width=444,
-            height=720,
-            corner_radius=20,
+            width=CARD_W,
+            height=CARD_H,
+            corner_radius=_CARD_CORNER_RADIUS,
             fg_color=_LOGIN_PALETTE["card_bg"],
-            bg_color=_LOGIN_PALETTE["card_bg"],
             border_width=0,
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
         self.card.lift()
 
-        # Atualiza referência do card para uso no _desenhar_fundo
         self._card = self.card
 
         inner = ctk.CTkFrame(self.card, fg_color="transparent")
@@ -609,15 +609,15 @@ class LoginFrame(ctk.CTkFrame):
 
         icon_bg = ctk.CTkFrame(
             header,
-            width=68,
-            height=68,
+            width=_ICON_BG_SIZE,
+            height=_ICON_BG_SIZE,
             corner_radius=RADIUS["avatar"],
             fg_color=self.palette["accent_soft"],
         )
         icon_bg.pack(pady=(0, 10))
         icon_bg.pack_propagate(False)
         ctk.CTkLabel(
-            icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color="#7C3AED"
+            icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color=_ICON_TEXT_COLOR
         ).place(relx=0.5, rely=0.5, anchor="center")
 
         ctk.CTkLabel(
@@ -642,7 +642,10 @@ class LoginFrame(ctk.CTkFrame):
             f"{ICONS['user']} Apoio contínuo",
         ]:
             chip = ctk.CTkFrame(
-                info_row, height=30, corner_radius=RADIUS["pill"], fg_color=THEME["bg_alt"]
+                info_row,
+                height=_CHIP_HEIGHT,
+                corner_radius=RADIUS["pill"],
+                fg_color=THEME["bg_alt"],
             )
             chip.pack(side="left", padx=(0, 8))
             chip.pack_propagate(False)
@@ -668,7 +671,7 @@ class LoginFrame(ctk.CTkFrame):
             text_color=self.palette["danger"],
             font=themed_font("body"),
             anchor="center",
-            wraplength=340,
+            wraplength=_ERRO_WRAPLENGTH,
         )
         self.lbl_erro.pack(pady=(12, 0))
 
@@ -683,7 +686,7 @@ class LoginFrame(ctk.CTkFrame):
 
         _termos_btn = ctk.CTkButton(
             inner,
-            text=f"{ICONS['lock']}  Termos de Privacidade",
+            text=f"{ICONS['lock']} Termos de Privacidade",
             command=self._abrir_termos,
             fg_color="transparent",
             hover_color=self.palette["accent_soft"],
@@ -706,20 +709,23 @@ class LoginFrame(ctk.CTkFrame):
     # ••••••••••••••••••••••••••••••••••••••
     #  TOGGLE DE MÚSICA (canto inferior direito)
     # ••••••••••••••••••••••••••••••••••••••
-    def _criar_music_toggle(self):
+    def _criar_music_toggle(self) -> None:
+        """Cria botão flutuante de play/pause de música no canto inferior direito."""
         self.music_var = ctk.StringVar(value="off")
-        self._music_btn_frame = ctk.CTkFrame(self, fg_color="transparent", width=64, height=64)
-        self._music_btn_frame.pack(side="right", padx=(16, 16), pady=(0, 16), anchor="se")
+        self._music_btn_frame = ctk.CTkFrame(
+            self, fg_color="transparent", width=_MUSIC_BTN_SIZE, height=_MUSIC_BTN_SIZE
+        )
+        self._music_btn_frame.place(
+            relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
+        )
         self._music_btn_frame.pack_propagate(False)
 
-        # Botão circular: corner_radius = metade da largura/altura (48/2 = 24).
-        # border_width=0 evita artefatos de renderização no Windows.
         self._music_btn = ctk.CTkButton(
             self._music_btn_frame,
             text=ICONS["music"],
-            width=48,
-            height=48,
-            corner_radius=24,
+            width=_MUSIC_BTN_INNER_SIZE,
+            height=_MUSIC_BTN_INNER_SIZE,
+            corner_radius=_MUSIC_BTN_RADIUS,
             font=themed_font("h3"),
             fg_color=_LOGIN_PALETTE["card_bg"],
             hover_color=_LOGIN_PALETTE["accent_soft"],
@@ -730,15 +736,12 @@ class LoginFrame(ctk.CTkFrame):
         )
         self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
         if not _IS_WINDOWS:
-            # Playback via winmm só existe no Windows. Em vez de deixar o
-            # botão quebrar o app com AttributeError em Linux/Mac (o código
-            # original chamava ctypes.windll incondicionalmente), avisamos
-            # visualmente que o recurso é indisponível nesta plataforma.
             from ser_pleno.presentation.components.ui_components import Tooltip
 
             Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
 
-    def _ajustar_botao_musica(self, event=None):
+    def _ajustar_botao_musica(self, event=None) -> None:
+        """Reposiona o botão de música dentro do frame container."""
         if hasattr(self, "_music_btn_frame") and self._music_btn_frame.winfo_exists():
             w = self._music_btn_frame.winfo_width()
             h = self._music_btn_frame.winfo_height()
@@ -748,13 +751,16 @@ class LoginFrame(ctk.CTkFrame):
                 except Exception:
                     pass
 
-    def _toggle_music(self):
+    def _toggle_music(self) -> None:
+        """Alterna play/pause da música de fundo via WinMM (apenas Windows)."""
         if not _IS_WINDOWS:
             return
         is_playing = getattr(self, "_music_playing", False)
         if not is_playing:
-            path = "assets/Music/background_music.mp3"
-            if not os.path.exists(path):
+            path = _MUSIC_FILE_RELATIVE
+            if not path.is_absolute():
+                path = Path(__file__).resolve().parent.parent.parent / path
+            if not path.exists():
                 logger.warning("Arquivo de música não encontrado em %s", path)
                 return
             try:
@@ -774,17 +780,18 @@ class LoginFrame(ctk.CTkFrame):
                 pass
 
     def _mci_send(self, cmd: str) -> None:
-        import ctypes
-
+        """Envia comando MCI para o driver WinMM do Windows."""
         ctypes.windll.winmm.mciSendStringA(cmd.encode("utf-8"), None, 0, None)
 
     # ••••••••••••••••••••••••••••••••••••••
     #  LÓGICA DE LOGIN
     # ••••••••••••••••••••••••••••••••••••••
-    def fazer_login(self):
+    def fazer_login(self) -> None:
+        """Interface pública para iniciar o fluxo de autenticação."""
         self._fazer_login()
 
-    def _fazer_login(self):
+    def _fazer_login(self) -> None:
+        """Valida credenciais e aciona o controller de autenticação."""
         if self._is_loading:
             return
 
@@ -815,10 +822,10 @@ class LoginFrame(ctk.CTkFrame):
 
         login_start = time.perf_counter()
 
-        def _task():
+        def _task() -> dict:
             return self.controller_autenticacao.login(username, password)
 
-        def _on_success(result):
+        def _on_success(result: dict) -> None:
             success = result.get("success", False)
             user = result.get("user", {})
             if success:
@@ -827,7 +834,7 @@ class LoginFrame(ctk.CTkFrame):
                 msg = result.get("message", "Erro ao fazer login")
                 self._on_login_failure(msg)
 
-        def _on_error(exc):
+        def _on_error(exc: Exception) -> None:
             self._on_login_failure(f"Erro de conexão: {exc}")
 
         AsyncRunner.run(
@@ -837,20 +844,26 @@ class LoginFrame(ctk.CTkFrame):
             widget_ref=self,
         )
 
-    def _shake_card(self):
-        def shake(step=0):
+    def _shake_card(self) -> None:
+        """Anima o card com shake horizontal para indicar erro de credenciais."""
+        self._shake_active = True
+
+        def shake(step: int = 0) -> None:
             if not self.winfo_exists():
+                self._shake_active = False
                 return
-            if step >= 8:
+            if step >= _SHAKE_STEPS:
                 self.card.place(relx=0.5, rely=0.5, anchor="center", x=0, y=0)
+                self._shake_active = False
                 return
-            offset = -5 if step % 2 == 0 else 5
+            offset = -_SHAKE_OFFSET_PX if step % 2 == 0 else _SHAKE_OFFSET_PX
             self.card.place(relx=0.5, rely=0.5, anchor="center", x=offset, y=0)
-            self.after(38, lambda: shake(step + 1))
+            self.after(_SHAKE_INTERVAL_MS, lambda: shake(step + 1))
 
         shake()
 
-    def _on_login_success(self, user, login_start=None):
+    def _on_login_success(self, user: dict, login_start: float | None = None) -> None:
+        """Prossegue para o sistema principal após autenticação bem-sucedida."""
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text="")
@@ -858,7 +871,8 @@ class LoginFrame(ctk.CTkFrame):
             user, auth_service=self.controller_autenticacao.auth_service, login_start=login_start
         )
 
-    def _on_login_failure(self, msg):
+    def _on_login_failure(self, msg: str) -> None:
+        """Exibe mensagem de erro e reaplica estado visual de falha."""
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text=f"{ICONS['cross']}•  {msg}", text_color=self.palette["danger"])
@@ -866,16 +880,18 @@ class LoginFrame(ctk.CTkFrame):
         self.input_pass.entry.delete(0, "end")
         self._shake_card()
 
-    def _set_idle_state(self):
+    def _set_idle_state(self) -> None:
+        """Restaura botão de login para o estado ocioso."""
         self.btn_entrar.configure(text="Entrar", state="normal")
 
     # ••••••••••••••••••••••••••••••••••••••
     #  POLÍTICA DE PRIVACIDADE
     # ••••••••••••••••••••••••••••••••••••••
-    def _abrir_politica(self):
+    def _abrir_modal(self, titulo: str, texto: str, largura: int, altura: int) -> None:
+        """Abre modal genérico com ícone, título, texto e botão de confirmação."""
         top = ctk.CTkToplevel(self)
-        top.title("Política de Privacidade")
-        top.geometry("440x360")
+        top.title(titulo)
+        top.geometry(f"{largura}x{altura}")
         top.configure(fg_color=THEME["surface"])
         top.resizable(False, False)
         top.transient(self.winfo_toplevel())
@@ -883,7 +899,8 @@ class LoginFrame(ctk.CTkFrame):
         top.after(
             50,
             lambda: top.geometry(
-                f"440x360+{self.winfo_screenwidth() // 2 - 220}+{self.winfo_screenheight() // 2 - 180}"
+                f"{largura}x{altura}+{self.winfo_screenwidth() // 2 - largura // 2}"
+                f"+{self.winfo_screenheight() // 2 - altura // 2}"
             ),
         )
 
@@ -892,8 +909,8 @@ class LoginFrame(ctk.CTkFrame):
 
         icon_bg = ctk.CTkFrame(
             inner,
-            width=52,
-            height=52,
+            width=_MODAL_ICON_BG_SIZE,
+            height=_MODAL_ICON_BG_SIZE,
             corner_radius=RADIUS["avatar"],
             fg_color=self.palette["accent_soft"],
         )
@@ -905,89 +922,52 @@ class LoginFrame(ctk.CTkFrame):
 
         ctk.CTkLabel(
             inner,
-            text="Política de Privacidade",
+            text=titulo,
             font=themed_font("h4", "bold"),
             text_color=self.palette["text_primary"],
-        ).pack(pady=(0, 12))
+        ).pack(pady=(0, _TITLE_GAP))
 
         ctk.CTkLabel(
             inner,
-            text=(
+            text=texto,
+            font=themed_font("body"),
+            text_color=self.palette["text_muted"],
+            justify="center",
+        ).pack(pady=(0, 20))
+
+        PrimaryButton(
+            inner,
+            text="Entendi",
+            command=top.destroy,
+            height=40,
+            corner_radius=RADIUS["button"],
+            width=160,
+        ).pack()
+
+    def _abrir_politica(self) -> None:
+        """Abre modal com a Política de Privacidade."""
+        self._abrir_modal(
+            titulo="Política de Privacidade",
+            texto=(
                 "O SerPleno trata seus dados com responsabilidade e em\n"
                 "conformidade com a LGPD. Esta política garante a proteção\n"
                 "de informações pessoais e acadêmicas durante o uso da\n"
                 "plataforma."
             ),
-            font=themed_font("body"),
-            text_color=self.palette["text_muted"],
-            justify="center",
-        ).pack(pady=(0, 20))
-
-        PrimaryButton(
-            inner,
-            text="Entendi",
-            command=top.destroy,
-            height=40,
-            corner_radius=RADIUS["button"],
-            width=160,
-        ).pack()
-
-    def _abrir_termos(self):
-        top = ctk.CTkToplevel(self)
-        top.title("Termos de Privacidade")
-        top.geometry("480x420")
-        top.configure(fg_color=THEME["surface"])
-        top.resizable(False, False)
-        top.transient(self.winfo_toplevel())
-        top.grab_set()
-        top.after(
-            50,
-            lambda: top.geometry(
-                f"480x420+{self.winfo_screenwidth() // 2 - 240}+{self.winfo_screenheight() // 2 - 210}"
-            ),
+            largura=_MODAL_WIDTH_POLICY,
+            altura=_MODAL_HEIGHT_POLICY,
         )
 
-        inner = ctk.CTkFrame(top, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=spacing("modal"), pady=spacing("modal"))
-
-        icon_bg = ctk.CTkFrame(
-            inner,
-            width=52,
-            height=52,
-            corner_radius=RADIUS["avatar"],
-            fg_color=self.palette["accent_soft"],
-        )
-        icon_bg.pack(pady=(0, 14))
-        icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text=ICONS["lock"], font=themed_font("h3")).place(
-            relx=0.5, rely=0.5, anchor="center"
-        )
-
-        ctk.CTkLabel(
-            inner,
-            text="Termos de Privacidade",
-            font=themed_font("h4", "bold"),
-            text_color=self.palette["text_primary"],
-        ).pack(pady=(0, 12))
-
-        ctk.CTkLabel(
-            inner,
-            text=(
+    def _abrir_termos(self) -> None:
+        """Abre modal com os Termos de Privacidade."""
+        self._abrir_modal(
+            titulo="Termos de Privacidade",
+            texto=(
                 "Estes termos regem o uso da plataforma SerPleno e o tratamento\n"
                 "de dados pessoais e acadêmicos. Ao acessar o sistema, você concorda\n"
                 "com as práticas descritas na Política de Privacidade e com o uso\n"
                 "responsável das informações compartilhadas."
             ),
-            font=themed_font("body"),
-            text_color=self.palette["text_muted"],
-            justify="center",
-        ).pack(pady=(0, 20))
-
-        PrimaryButton(
-            inner,
-            text="Entendi",
-            command=top.destroy,
-            height=40,
-            corner_radius=RADIUS["button"],
-            width=160,
-        ).pack()
+            largura=_MODAL_WIDTH_TERMS,
+            altura=_MODAL_HEIGHT_TERMS,
+        )
