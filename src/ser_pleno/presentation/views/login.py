@@ -67,19 +67,11 @@ def _lerp_color(c1_hex: str, c2_hex: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def _criar_imagem_arredondada(largura: int, altura: int, raio: int, cor: str) -> ImageTk.PhotoImage:
-    img = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    draw.rounded_rectangle([0, 0, largura - 1, altura - 1], radius=raio, fill=cor)
-    return ImageTk.PhotoImage(img)
-
-
 CARD_W, CARD_H = 444, 720
 _CARD_CORNER_RADIUS = 20
 _BUBBLE_COUNT = 16
 _GRADIENT_STEP_PX = 4
 _GRADIENT_CACHE_MAX = 3
-_LAZY_SIZES = [(1024, 768), (1280, 720), (800, 600)]
 _BUBBLE_WOBBLE_SPEED = 0.025
 _BUBBLE_SPEED_MIN = 0.10
 _BUBBLE_SPEED_MAX = 0.45
@@ -92,10 +84,8 @@ _BUBBLE_ALPHA_MAX = 0.18
 _SHAKE_STEPS = 8
 _SHAKE_INTERVAL_MS = 38
 _SHAKE_OFFSET_PX = 5
-_MUSIC_BTN_SIZE = 64
-_MUSIC_BTN_INNER_SIZE = 48
-_MUSIC_BTN_RADIUS = 24
-_MUSIC_BTN_MARGIN = 16
+_MUSIC_BTN_SIZE = 52
+_MUSIC_BTN_MARGIN = 20
 _BG_RESIZE_DEBOUNCE_MS = 120
 _BG_DRAW_WARN_THRESHOLD_MS = 40
 _ANIMATION_FPS = 33
@@ -110,19 +100,13 @@ _MODAL_WIDTH_TERMS = 480
 _MODAL_HEIGHT_TERMS = 420
 _MUSIC_FILE_RELATIVE = Path("assets") / "Music" / "background_music.mp3"
 _ICON_TEXT_COLOR = "#7C3AED"
-_ENTRY_ICON_WIDTH = 36
-_EYE_BTN_WIDTH = 36
-_EYE_BTN_HEIGHT = 36
-_EYE_BTN_PADX = (0, 6)
-_EYE_BTN_PADY = 4
-_ENTRY_GRID_PADX = (4, 0)
-_ENTRY_GRID_PADY = 4
 _ERRO_WRAPLENGTH = 340
 _BUBBLE_OUTLINE_WIDTH = 1.2
 _CHIP_HEIGHT = 30
 
+
 # —————————————————————————————————————————————
-#  Campo de entrada refinado (Ajustado para cores claras)
+#  Campo de entrada refinado
 # —————————————————————————————————————————————
 class LoginInputField(ctk.CTkFrame):
     """Campo de entrada reutilizável com rótulo, ícone semântico e toggle de visibilidade de senha."""
@@ -142,7 +126,6 @@ class LoginInputField(ctk.CTkFrame):
         self.password = password
         self.is_hidden = password
 
-        # Rótulo acima do campo
         ctk.CTkLabel(
             self,
             text=label_text,
@@ -151,7 +134,6 @@ class LoginInputField(ctk.CTkFrame):
             anchor="w",
         ).pack(fill="x", pady=(0, 4))
 
-        # Container do Input
         input_container = ctk.CTkFrame(
             self,
             fg_color=self.palette["input_bg"],
@@ -161,7 +143,6 @@ class LoginInputField(ctk.CTkFrame):
         )
         input_container.pack(fill="x")
 
-        # Ícone à esquerda (👤 para usuário, 🔒 para senha)
         left_icon = "👤" if "usuário" in label_text.lower() else "🔒" if password else icon
         ctk.CTkLabel(
             input_container,
@@ -171,7 +152,6 @@ class LoginInputField(ctk.CTkFrame):
             width=30,
         ).pack(side="left", padx=(10, 0))
 
-        # Entry
         self.entry = ctk.CTkEntry(
             input_container,
             placeholder_text=placeholder,
@@ -183,7 +163,6 @@ class LoginInputField(ctk.CTkFrame):
         )
         self.entry.pack(side="left", fill="x", expand=True, padx=8, pady=8)
 
-        # Botão de alternar visibilidade (👁) apenas para campos de senha
         if password:
             self.btn_toggle = ctk.CTkButton(
                 input_container,
@@ -208,6 +187,8 @@ class LoginInputField(ctk.CTkFrame):
 
     def clear_state(self) -> None:
         pass
+
+
 # —————————————————————————————————————————————
 #  Frame principal de login
 # —————————————————————————————————————————————
@@ -235,12 +216,10 @@ class LoginFrame(ctk.CTkFrame):
 
         self._criar_bolhas()
         self._schedule_lazy_gradient_preload()
-        self._criar_music_toggle()
         self._criar_card_login()
+        self._criar_music_toggle()
 
         self.bind("<Configure>", self._on_configure)
-        if hasattr(self, "_music_btn_frame"):
-            self._music_btn_frame.bind("<Configure>", self._ajustar_botao_musica)
         self.after_idle(self._posicionar_card)
         self._animar_bolhas()
 
@@ -411,8 +390,8 @@ class LoginFrame(ctk.CTkFrame):
         for b in self.bolhas:
             if b.get("id"):
                 self.canvas.tag_raise(b["id"])
-        if hasattr(self, "_music_btn_frame"):
-            self._music_btn_frame.lift()
+        if hasattr(self, "_music_btn"):
+            self._music_btn.lift()
         if hasattr(self, "card"):
             self.card.lift()
 
@@ -501,7 +480,7 @@ class LoginFrame(ctk.CTkFrame):
         self.after(_ANIMATION_FPS, self._animar_bolhas)
 
     def _criar_card_login(self) -> None:
-        """Cria o frame do card de login ajustando o rendering dos cantos arredondados."""
+        """Cria o card branco arredondado do login."""
         self.card = ctk.CTkFrame(
             self,
             width=CARD_W,
@@ -513,17 +492,13 @@ class LoginFrame(ctk.CTkFrame):
         )
         self.card.place(relx=0.5, rely=0.5, anchor="center")
         self.card.pack_propagate(False)
-        self.card.lift()
 
         self._card = self.card
 
-        # Frame interno de conteúdo
         inner = ctk.CTkFrame(self.card, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=32, pady=28)
 
-        # ---------------------------------------------------------
-        # HEADER
-        # ---------------------------------------------------------
+        # Header
         header = ctk.CTkFrame(inner, fg_color="transparent")
         header.pack(fill="x", pady=(0, 12))
 
@@ -569,9 +544,7 @@ class LoginFrame(ctk.CTkFrame):
             justify="center",
         ).pack(pady=(0, 10))
 
-        # ---------------------------------------------------------
-        # CHIPS
-        # ---------------------------------------------------------
+        # Chips
         info_row = ctk.CTkFrame(inner, fg_color="transparent")
         info_row.pack(pady=(0, 12))
 
@@ -593,9 +566,7 @@ class LoginFrame(ctk.CTkFrame):
 
         Divider(inner).pack(fill="x", pady=(0, 16))
 
-        # ---------------------------------------------------------
-        # INPUTS E BOTÕES
-        # ---------------------------------------------------------
+        # Inputs e Ações
         self.input_user = LoginInputField(
             inner, "Usuário", placeholder="Seu nome de usuário", palette=self.palette
         )
@@ -648,37 +619,30 @@ class LoginFrame(ctk.CTkFrame):
         self.entry_user.focus_set()
 
     def _criar_music_toggle(self) -> None:
-            self.music_var = ctk.StringVar(value="off")
-            
-            # Criação direta do botão arredondado (sem o CTkFrame intermediário que cria a borda preta)
-            self._music_btn = ctk.CTkButton(
-                self,
-                text=ICONS["music"],
-                width=_MUSIC_BTN_SIZE,
-                height=_MUSIC_BTN_SIZE,
-                corner_radius=_MUSIC_BTN_RADIUS,
-                font=themed_font("h3"),
-                fg_color=self.palette["card_bg"],
-                hover_color=self.palette["accent_soft"],
-                text_color=self.palette["text_muted"],
-                border_width=0,
-                command=self._toggle_music,
-                cursor="hand2",
-            )
-            self._music_btn.place(
-                relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
-            )
+        self.music_var = ctk.StringVar(value="off")
 
-            if not _IS_WINDOWS:
-                from ser_pleno.presentation.components.ui_components import Tooltip
-                Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
+        self._music_btn = ctk.CTkButton(
+            self,
+            text=ICONS["music"],
+            width=_MUSIC_BTN_SIZE,
+            height=_MUSIC_BTN_SIZE,
+            corner_radius=RADIUS["pill"],
+            fg_color=self.palette["card_bg"],
+            hover_color=self.palette["accent_soft"],
+            text_color=self.palette["text_muted"],
+            border_width=1,
+            border_color=self.palette["card_border"],
+            command=self._toggle_music,
+            cursor="hand2",
+        )
+        self._music_btn.place(
+            relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
+        )
 
-    def _ajustar_botao_musica(self, event=None) -> None:
-            if hasattr(self, "_music_btn") and self._music_btn.winfo_exists():
-                try:
-                    self._music_btn.lift()
-                except Exception:
-                    pass
+        if not _IS_WINDOWS:
+            from ser_pleno.presentation.components.ui_components import Tooltip
+
+            Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
 
     def _toggle_music(self) -> None:
         if not _IS_WINDOWS:
