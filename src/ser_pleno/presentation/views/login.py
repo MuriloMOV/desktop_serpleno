@@ -1,27 +1,25 @@
-import os
-import math
+from __future__ import annotations
+
 import ctypes
 import logging
-import time
+import math
 import random
+import time
 from collections import OrderedDict
 from pathlib import Path
 
 import customtkinter as ctk
-from PIL import Image, ImageTk
+import tkinter as tk
+from PIL import Image, ImageDraw, ImageTk
 
 from ser_pleno.application.controllers.autenticacao import AutenticacaoController
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, blend_color
-from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.presentation.components.ui_components import (
-    PrimaryButton,
-    GhostButton,
-    SecondaryButton,
-    InputField,
-    Badge,
     Divider,
+    PrimaryButton,
 )
 from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.ui.theme import RADIUS, THEME, themed_font
+from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.utils.async_runner import AsyncRunner
 
 logger = logging.getLogger("apps.desktop")
@@ -30,29 +28,25 @@ _IS_WINDOWS = hasattr(ctypes, "windll")
 
 
 # —————————————————————————————————————————————
-#  Paleta dedicada A  tela de login
-# (gradiente e bolhas mantêm identidade própria)
+#  Paleta dedicada à tela de login
 # —————————————————————————————————————————————
 _LOGIN_PALETTE = {
-    # Gradiente
     "grad_top_left": "#1E1B4B",
     "grad_top_right": "#312E81",
     "grad_bottom_left": "#4338CA",
     "grad_bottom": "#6D5CE8",
-    # Card
-    "card_bg": THEME["surface"],
-    "card_border": THEME["border"],
+    "card_bg": "#FFFFFF",
+    "card_border": "#E2E8F0",
+    "input_bg": "#F8FAFC",
+    "input_border": "#CBD5E1",
     "card_shadow": THEME["overlay"],
-    # Acento
     "accent": THEME["primary"],
     "accent_hover": THEME["primary_hover"],
     "accent_soft": THEME["primary_soft"],
     "accent_medium": THEME["primary_medium"],
-    # Texto
-    "text_primary": THEME["text"],
-    "text_muted": THEME["text_secondary"],
-    "text_light": THEME["text_muted"],
-    # Estados
+    "text_primary": "#14162B",
+    "text_muted": "#5B5E76",
+    "text_light": "#7C7F97",
     "success": THEME["success"],
     "danger": THEME["danger"],
     "warning": THEME["warning"],
@@ -71,6 +65,13 @@ def _lerp_color(c1_hex: str, c2_hex: str, t: float) -> str:
     g = int(g1 + (g2 - g1) * t)
     b = int(b1 + (b2 - b1) * t)
     return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _criar_imagem_arredondada(largura: int, altura: int, raio: int, cor: str) -> ImageTk.PhotoImage:
+    img = Image.new("RGBA", (largura, altura), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    draw.rounded_rectangle([0, 0, largura - 1, altura - 1], radius=raio, fill=cor)
+    return ImageTk.PhotoImage(img)
 
 
 CARD_W, CARD_H = 444, 720
@@ -122,11 +123,9 @@ _CHIP_HEIGHT = 30
 
 
 # —————————————————————————————————————————————
-#  Campo de entrada refinado (label flutuante + estados visuais)
+#  Campo de entrada refinado (Ajustado para cores claras)
 # —————————————————————————————————————————————
 class LoginInputField(ctk.CTkFrame):
-    """Campo de entrada com label, ícone e estados normal/foco/erro/sucesso."""
-
     def __init__(
         self,
         parent: ctk.CTkBaseClass,
@@ -138,19 +137,19 @@ class LoginInputField(ctk.CTkFrame):
         super().__init__(parent, fg_color="transparent")
         self._password = password
         self._show_pass = False
-        self._border_normal = THEME["border"]
-        self._border_focus = THEME["primary"]
+        self._border_normal = _LOGIN_PALETTE["input_border"]
+        self._border_focus = _LOGIN_PALETTE["accent"]
         self._border_error = THEME["danger"]
         self._border_success = THEME["success"]
-        self._bg_normal = THEME["bg_alt"]
-        self._bg_focus = THEME["surface"]
+        self._bg_normal = _LOGIN_PALETTE["input_bg"]
+        self._bg_focus = _LOGIN_PALETTE["card_bg"]
         self._state = "normal"
 
         self._label = ctk.CTkLabel(
             self,
             text=label,
             font=themed_font("caption", "bold"),
-            text_color=THEME["text_secondary"],
+            text_color=_LOGIN_PALETTE["text_primary"],
             anchor="w",
         )
         self._label.pack(fill="x", padx=spacing("sm"), pady=(0, spacing("label_gap")))
@@ -170,17 +169,17 @@ class LoginInputField(ctk.CTkFrame):
                 self._box,
                 text=icon,
                 font=themed_font("body"),
-                text_color=THEME["text_secondary"],
+                text_color=_LOGIN_PALETTE["text_muted"],
                 width=_ENTRY_ICON_WIDTH,
             ).grid(row=0, column=0, padx=(spacing("sm"), 0), pady=spacing("md"))
 
         self.entry = ctk.CTkEntry(
             self._box,
             placeholder_text=placeholder,
-            placeholder_text_color=THEME["text_muted"],
-            fg_color=self._bg_normal,
+            placeholder_text_color=_LOGIN_PALETTE["text_light"],
+            fg_color="transparent",
             border_width=0,
-            text_color=THEME["text"],
+            text_color=_LOGIN_PALETTE["text_primary"],
             font=themed_font("body"),
             height=42,
             show="●" if password else "",
@@ -194,8 +193,8 @@ class LoginInputField(ctk.CTkFrame):
                 width=_EYE_BTN_WIDTH,
                 height=_EYE_BTN_HEIGHT,
                 fg_color="transparent",
-                hover_color=self._bg_normal,
-                text_color=THEME["text_secondary"],
+                hover_color=_LOGIN_PALETTE["accent_soft"],
+                text_color=_LOGIN_PALETTE["text_muted"],
                 font=themed_font("body"),
                 command=self._toggle_show,
                 corner_radius=RADIUS["button"],
@@ -218,11 +217,9 @@ class LoginInputField(ctk.CTkFrame):
         self.entry.bind("<FocusOut>", self._on_focus_out)
 
     def get(self) -> str:
-        """Retorna o texto atual do campo."""
         return self.entry.get()
 
     def set_error(self, msg: str = "") -> None:
-        """Aplica estado visual de erro ao campo."""
         self._state = "error"
         self._box.configure(border_color=self._border_error, fg_color=THEME["danger_soft"])
         self._label.configure(text_color=THEME["danger"])
@@ -231,22 +228,20 @@ class LoginInputField(ctk.CTkFrame):
         )
 
     def set_success(self) -> None:
-        """Aplica estado visual de sucesso ao campo."""
         self._state = "success"
         self._box.configure(border_color=self._border_success, fg_color=THEME["success_soft"])
         self._label.configure(text_color=THEME["success"])
         self._msg.configure(text="")
 
     def clear_state(self) -> None:
-        """Reseta o campo para o estado normal."""
         self._state = "normal"
         self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
-        self._label.configure(text_color=THEME["text_secondary"])
+        self._label.configure(text_color=_LOGIN_PALETTE["text_primary"])
         self._msg.configure(text="")
 
     def _on_focus_in(self, _=None) -> None:
         self._box.configure(border_color=self._border_focus, fg_color=self._bg_focus)
-        self._label.configure(text_color=THEME["primary"])
+        self._label.configure(text_color=_LOGIN_PALETTE["accent"])
 
     def _on_focus_out(self, _=None) -> None:
         if self._state == "error":
@@ -257,7 +252,7 @@ class LoginInputField(ctk.CTkFrame):
             self._label.configure(text_color=THEME["success"])
         else:
             self._box.configure(border_color=self._border_normal, fg_color=self._bg_normal)
-            self._label.configure(text_color=THEME["text_secondary"])
+            self._label.configure(text_color=_LOGIN_PALETTE["text_primary"])
 
     def _toggle_show(self) -> None:
         self._show_pass = not self._show_pass
@@ -304,18 +299,13 @@ class LoginFrame(ctk.CTkFrame):
     def _on_destroy(self, _event=None) -> None:
         self._alive = False
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  FUNDO —” gradiente diagonal (com debounce de redimensionamento)
-    # ••••••••••••••••••••••••••••••••••••••
     def _posicionar_card(self) -> None:
-        """Reposiciona o card no centro do canvas."""
         if getattr(self, "_shake_active", False):
             return
         if hasattr(self, "card"):
             self.card.place(relx=0.5, rely=0.5, anchor="center")
 
     def _on_configure(self, event=None) -> None:
-        """Debounce de redimensionamento para redesenhar o fundo."""
         if self._bg_draw_job:
             self.after_cancel(self._bg_draw_job)
         self._bg_draw_job = self.after(_BG_RESIZE_DEBOUNCE_MS, self._desenhar_fundo)
@@ -336,7 +326,6 @@ class LoginFrame(ctk.CTkFrame):
         return photo
 
     def _generate_gradient_pil(self, w: int, h: int) -> "Image.Image":
-        """Gera imagem PIL com gradiente diagonal para o fundo."""
         top_l = self.palette["grad_top_left"]
         top_r = self.palette["grad_top_right"]
         bot = self.palette["grad_bottom"]
@@ -351,7 +340,6 @@ class LoginFrame(ctk.CTkFrame):
         return img
 
     def _show_bg_placeholder(self, w: int, h: int) -> None:
-        """Mostra cor sólida como placeholder enquanto o gradiente é gerado."""
         self.canvas.delete("bg")
         self.canvas.create_rectangle(
             0, 0, w, h, fill=self.palette["grad_top_left"], outline="", tags="bg"
@@ -361,7 +349,6 @@ class LoginFrame(ctk.CTkFrame):
         self._elevar_elementos()
 
     def _apply_gradient(self, w: int, h: int, photo: ImageTk.PhotoImage) -> None:
-        """Aplica gradiente já pronto ao canvas, incluindo glows decorativos."""
         self.canvas.delete("bg")
         self.canvas.create_image(0, 0, anchor="nw", image=photo, tags="bg")
         self.canvas.image_bg = photo
@@ -398,7 +385,6 @@ class LoginFrame(ctk.CTkFrame):
             pass
 
     def _desenhar_fundo(self, event=None) -> None:
-        """Redesenha o fundo com debounce, gerando gradiente em background se necessário."""
         self._bg_draw_job = None
         w = self.winfo_width()
         h = self.winfo_height()
@@ -410,7 +396,6 @@ class LoginFrame(ctk.CTkFrame):
         self._last_bg_size = (w, h)
 
         self._t_draw_start = time.perf_counter()
-
         self._show_bg_placeholder(w, h)
 
         cached = self._gradient_cache.get((w, h))
@@ -444,14 +429,12 @@ class LoginFrame(ctk.CTkFrame):
         )
 
     def _schedule_lazy_gradient_preload(self) -> None:
-        """Agenda pré-carregamento de gradientes para tamanhos comuns."""
         common_sizes = [(1024, 768), (1280, 720), (800, 600)]
         self._lazy_gradient_sizes: list[tuple[int, int]] = common_sizes
         self._lazy_gradient_index: int = 0
         self.after_idle(self._generate_next_gradient)
 
     def _generate_next_gradient(self) -> None:
-        """Gera próximo gradiente da fila de pré-carregamento."""
         if self._lazy_gradient_index >= len(self._lazy_gradient_sizes):
             return
         if not self._alive or not self.winfo_exists():
@@ -477,7 +460,6 @@ class LoginFrame(ctk.CTkFrame):
             self.after_idle(self._generate_next_gradient)
 
     def _elevar_elementos(self) -> None:
-        """Eleva bolhas, botão de música e card para garantir ordem de renderização."""
         for b in self.bolhas:
             if b.get("id"):
                 self.canvas.tag_raise(b["id"])
@@ -487,7 +469,6 @@ class LoginFrame(ctk.CTkFrame):
             self.card.lift()
 
     def _criar_bolhas(self) -> None:
-        """Cria as bolhas decorativas flutuantes no canvas."""
         for _ in range(_BUBBLE_COUNT):
             x = random.randint(0, 1400)
             y = random.randint(50, 900)
@@ -532,7 +513,6 @@ class LoginFrame(ctk.CTkFrame):
             )
 
     def _animar_bolhas(self) -> None:
-        """Loop de animação das bolhas; auto-encerra quando o frame for destruído."""
         if not self._alive or not self.winfo_exists():
             return
 
@@ -573,147 +553,163 @@ class LoginFrame(ctk.CTkFrame):
         self.after(_ANIMATION_FPS, self._animar_bolhas)
 
     def _criar_card_login(self) -> None:
-        """Cria o frame do card de login e seu conteúdo interno."""
-        self.card = ctk.CTkFrame(
-            self,
-            width=CARD_W,
-            height=CARD_H,
-            corner_radius=_CARD_CORNER_RADIUS,
-            fg_color=_LOGIN_PALETTE["card_bg"],
-            border_width=0,
-        )
-        self.card.place(relx=0.5, rely=0.5, anchor="center")
-        self.card.pack_propagate(False)
-        self.card.lift()
-
-        self._card = self.card
-
-        inner = ctk.CTkFrame(self.card, fg_color="transparent")
-        inner.pack(fill="both", expand=True, padx=spacing("xxl"), pady=spacing("xl"))
-
-        header = ctk.CTkFrame(inner, fg_color="transparent")
-        header.pack(fill="x", pady=(0, 18))
-
-        badge = ctk.CTkFrame(
-            header,
-            corner_radius=RADIUS["pill"],
-            fg_color=self.palette["accent_soft"],
-        )
-        badge.pack(pady=(0, 10))
-        ctk.CTkLabel(
-            badge,
-            text="Acesso seguro · Plataforma SerPleno",
-            font=themed_font("caption", "bold"),
-            text_color=self.palette["accent"],
-        ).pack(padx=(16, 16), pady=(6, 6))
-
-        icon_bg = ctk.CTkFrame(
-            header,
-            width=_ICON_BG_SIZE,
-            height=_ICON_BG_SIZE,
-            corner_radius=RADIUS["avatar"],
-            fg_color=self.palette["accent_soft"],
-        )
-        icon_bg.pack(pady=(0, 10))
-        icon_bg.pack_propagate(False)
-        ctk.CTkLabel(
-            icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color=_ICON_TEXT_COLOR
-        ).place(relx=0.5, rely=0.5, anchor="center")
-
-        ctk.CTkLabel(
-            header,
-            text="SerPleno",
-            font=themed_font("h2", "bold"),
-            text_color=self.palette["text_primary"],
-        ).pack(pady=(0, 4))
-
-        ctk.CTkLabel(
-            header,
-            text="Bem-estar, acompanhamento escolar e comunicação integrada",
-            font=themed_font("body"),
-            text_color=self.palette["text_muted"],
-        ).pack()
-
-        info_row = ctk.CTkFrame(inner, fg_color="transparent")
-        info_row.pack(fill="x", pady=(0, 16))
-        for text in [
-            f"{ICONS['lock']} LGPD",
-            f"{ICONS['alert']} Acesso rápido",
-            f"{ICONS['user']} Apoio contínuo",
-        ]:
-            chip = ctk.CTkFrame(
-                info_row,
-                height=_CHIP_HEIGHT,
-                corner_radius=RADIUS["pill"],
-                fg_color=THEME["bg_alt"],
+            """Cria o frame do card de login e seu conteúdo interno de forma organizada."""
+            # Container principal do Card com cantos arredondados nativos
+            self.card = ctk.CTkFrame(
+                self,
+                width=CARD_W,
+                height=CARD_H,
+                fg_color=self.palette["card_bg"],
+                corner_radius=_CARD_CORNER_RADIUS,
+                border_width=1,
+                border_color=self.palette["card_border"],
             )
-            chip.pack(side="left", padx=(0, 8))
-            chip.pack_propagate(False)
+            self.card.place(relx=0.5, rely=0.5, anchor="center")
+            self.card.pack_propagate(False)
+            self.card.lift()
+
+            self._card = self.card
+
+            # Frame interno com padding para afastar os elementos das bordas
+            inner = ctk.CTkFrame(self.card, fg_color="transparent")
+            inner.pack(fill="both", expand=True, padx=32, pady=28)
+
+            # ---------------------------------------------------------
+            # HEADER (Badge, Ícone, Título e Subtítulo)
+            # ---------------------------------------------------------
+            header = ctk.CTkFrame(inner, fg_color="transparent")
+            header.pack(fill="x", pady=(0, 12))
+
+            badge = ctk.CTkFrame(
+                header,
+                corner_radius=RADIUS["pill"],
+                fg_color=self.palette["accent_soft"],
+            )
+            badge.pack(pady=(0, 10))
             ctk.CTkLabel(
-                chip, text=text, font=themed_font("caption"), text_color=THEME["text_secondary"]
+                badge,
+                text="Acesso seguro · Plataforma SerPleno",
+                font=themed_font("caption", "bold"),
+                text_color=self.palette["accent"],
+            ).pack(padx=16, pady=6)
+
+            icon_bg = ctk.CTkFrame(
+                header,
+                width=_ICON_BG_SIZE,
+                height=_ICON_BG_SIZE,
+                corner_radius=RADIUS["avatar"],
+                fg_color=self.palette["accent_soft"],
+            )
+            icon_bg.pack(pady=(0, 8))
+            icon_bg.pack_propagate(False)
+            ctk.CTkLabel(
+                icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color=_ICON_TEXT_COLOR
             ).place(relx=0.5, rely=0.5, anchor="center")
 
-        Divider(inner).pack(fill="x", pady=(0, 20))
+            ctk.CTkLabel(
+                header,
+                text="SerPleno",
+                font=themed_font("h2", "bold"),
+                text_color=self.palette["text_primary"],
+            ).pack(pady=(0, 2))
 
-        self.input_user = LoginInputField(
-            inner, "Usuário", placeholder="Seu nome de usuário", icon=ICONS["user"]
-        )
-        self.input_user.pack(fill="x", pady=(0, 12))
+            ctk.CTkLabel(
+                header,
+                text="Bem-estar, acompanhamento escolar e comunicação integrada",
+                font=themed_font("caption"),
+                text_color=self.palette["text_muted"],
+                wraplength=360,
+                justify="center",
+            ).pack(pady=(0, 10))
 
-        self.input_pass = LoginInputField(
-            inner, "Senha", placeholder="Sua senha", icon=ICONS["lock"], password=True
-        )
-        self.input_pass.pack(fill="x", pady=(0, 4))
+            # ---------------------------------------------------------
+            # CHIPS DE INFORMAÇÃO
+            # ---------------------------------------------------------
+            info_row = ctk.CTkFrame(inner, fg_color="transparent")
+            info_row.pack(pady=(0, 12))
 
-        self.lbl_erro = ctk.CTkLabel(
-            inner,
-            text="",
-            text_color=self.palette["danger"],
-            font=themed_font("body"),
-            anchor="center",
-            wraplength=_ERRO_WRAPLENGTH,
-        )
-        self.lbl_erro.pack(pady=(12, 0))
+            for text in [
+                f"{ICONS['lock']} LGPD",
+                f"{ICONS['alert']} Rápido",
+                f"{ICONS['user']} Apoio",
+            ]:
+                chip = ctk.CTkFrame(
+                    info_row,
+                    height=_CHIP_HEIGHT,
+                    corner_radius=RADIUS["pill"],
+                    fg_color=self.palette["input_bg"],
+                )
+                chip.pack(side="left", padx=4)
+                ctk.CTkLabel(
+                    chip, text=text, font=themed_font("caption"), text_color=self.palette["text_muted"]
+                ).pack(padx=10, pady=4)
 
-        self.btn_entrar = PrimaryButton(
-            inner,
-            text="Entrar",
-            command=self._fazer_login,
-            height=48,
-            corner_radius=RADIUS["lg"],
-        )
-        self.btn_entrar.pack(fill="x", pady=(14, 8))
+            Divider(inner).pack(fill="x", pady=(0, 16))
 
-        _termos_btn = ctk.CTkButton(
-            inner,
-            text=f"{ICONS['lock']} Termos de Privacidade",
-            command=self._abrir_termos,
-            fg_color="transparent",
-            hover_color=self.palette["accent_soft"],
-            text_color=self.palette["accent"],
-            border_width=1,
-            border_color=self.palette["accent_medium"],
-            corner_radius=RADIUS["button"],
-            height=36,
-            font=themed_font("caption", "bold"),
-            anchor="center",
-        )
-        _termos_btn.pack(fill="x", pady=(6, 0))
+            # ---------------------------------------------------------
+            # CAMPOS DE FORMULÁRIO E AÇÕES
+            # ---------------------------------------------------------
+            self.input_user = LoginInputField(
+                inner, "Usuário", placeholder="Seu nome de usuário", icon=ICONS["user"]
+            )
+            self.input_user.pack(fill="x", pady=(0, 12))
 
-        self.entry_user = self.input_user.entry
-        self.entry_pass = self.input_pass.entry
-        self.entry_user.bind("<Return>", lambda _: self._fazer_login())
-        self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
-        self.entry_user.focus_set()
+            self.input_pass = LoginInputField(
+                inner, "Senha", placeholder="Sua senha", icon=ICONS["lock"], password=True
+            )
+            self.input_pass.pack(fill="x", pady=(0, 8))
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  TOGGLE DE MÚSICA (canto inferior direito)
-    # ••••••••••••••••••••••••••••••••••••••
+            self.lbl_erro = ctk.CTkLabel(
+                inner,
+                text="",
+                text_color=self.palette["danger"],
+                font=themed_font("caption"),
+                anchor="center",
+                wraplength=_ERRO_WRAPLENGTH,
+            )
+            self.lbl_erro.pack(fill="x", pady=(0, 8))
+
+            self.btn_entrar = PrimaryButton(
+                inner,
+                text="Entrar",
+                command=self._fazer_login,
+                height=46,
+                corner_radius=RADIUS["lg"],
+            )
+            self.btn_entrar.pack(fill="x", pady=(0, 8))
+
+            _termos_btn = ctk.CTkButton(
+                inner,
+                text=f"{ICONS['lock']} Termos de Privacidade",
+                command=self._abrir_termos,
+                fg_color="transparent",
+                hover_color=self.palette["accent_soft"],
+                text_color=self.palette["accent"],
+                border_width=1,
+                border_color=self.palette["accent_medium"],
+                corner_radius=RADIUS["button"],
+                height=36,
+                font=themed_font("caption", "bold"),
+                anchor="center",
+            )
+            _termos_btn.pack(fill="x")
+
+            # Mapeamento e atalhos
+            self.entry_user = self.input_user.entry
+            self.entry_pass = self.input_pass.entry
+            self.entry_user.bind("<Return>", lambda _: self._fazer_login())
+            self.entry_pass.bind("<Return>", lambda _: self._fazer_login())
+            self.entry_user.focus_set()
+
+            
     def _criar_music_toggle(self) -> None:
-        """Cria botão flutuante de play/pause de música no canto inferior direito."""
         self.music_var = ctk.StringVar(value="off")
         self._music_btn_frame = ctk.CTkFrame(
-            self, fg_color="transparent", width=_MUSIC_BTN_SIZE, height=_MUSIC_BTN_SIZE
+            self,
+            fg_color=self.palette["card_bg"],
+            corner_radius=_MUSIC_BTN_RADIUS,
+            width=_MUSIC_BTN_SIZE,
+            height=_MUSIC_BTN_SIZE,
         )
         self._music_btn_frame.place(
             relx=1.0, rely=1.0, anchor="se", x=-_MUSIC_BTN_MARGIN, y=-_MUSIC_BTN_MARGIN
@@ -725,23 +721,23 @@ class LoginFrame(ctk.CTkFrame):
             text=ICONS["music"],
             width=_MUSIC_BTN_INNER_SIZE,
             height=_MUSIC_BTN_INNER_SIZE,
-            corner_radius=_MUSIC_BTN_RADIUS,
+            corner_radius=RADIUS["button"],
             font=themed_font("h3"),
-            fg_color=_LOGIN_PALETTE["card_bg"],
-            hover_color=_LOGIN_PALETTE["accent_soft"],
-            text_color=_LOGIN_PALETTE["text_muted"],
+            fg_color="transparent",
+            hover_color=self.palette["accent_soft"],
+            text_color=self.palette["text_muted"],
             border_width=0,
             command=self._toggle_music,
             cursor="hand2",
         )
         self._music_btn.place(relx=0.5, rely=0.5, anchor="center")
+
         if not _IS_WINDOWS:
             from ser_pleno.presentation.components.ui_components import Tooltip
 
             Tooltip(self._music_btn, "Música de fundo disponível apenas no Windows")
 
     def _ajustar_botao_musica(self, event=None) -> None:
-        """Reposiona o botão de música dentro do frame container."""
         if hasattr(self, "_music_btn_frame") and self._music_btn_frame.winfo_exists():
             w = self._music_btn_frame.winfo_width()
             h = self._music_btn_frame.winfo_height()
@@ -752,7 +748,6 @@ class LoginFrame(ctk.CTkFrame):
                     pass
 
     def _toggle_music(self) -> None:
-        """Alterna play/pause da música de fundo via WinMM (apenas Windows)."""
         if not _IS_WINDOWS:
             return
         is_playing = getattr(self, "_music_playing", False)
@@ -767,7 +762,7 @@ class LoginFrame(ctk.CTkFrame):
                 self._mci_send(f'open "{path}" type mpegvideo alias serpleno_bgm')
                 self._mci_send("play serpleno_bgm repeat")
                 self._music_playing = True
-                self._music_btn.configure(text=ICONS["music"], text_color=THEME["primary"])
+                self._music_btn.configure(text=ICONS["music"], text_color=self.palette["accent"])
             except Exception as e:
                 logger.warning("Erro ao tocar música: %s", e)
         else:
@@ -775,23 +770,17 @@ class LoginFrame(ctk.CTkFrame):
                 self._mci_send("stop serpleno_bgm")
                 self._mci_send("close serpleno_bgm")
                 self._music_playing = False
-                self._music_btn.configure(text=ICONS["music"], text_color=THEME["text_secondary"])
+                self._music_btn.configure(text=ICONS["music"], text_color=self.palette["text_muted"])
             except Exception:
                 pass
 
     def _mci_send(self, cmd: str) -> None:
-        """Envia comando MCI para o driver WinMM do Windows."""
         ctypes.windll.winmm.mciSendStringA(cmd.encode("utf-8"), None, 0, None)
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  LÓGICA DE LOGIN
-    # ••••••••••••••••••••••••••••••••••••••
     def fazer_login(self) -> None:
-        """Interface pública para iniciar o fluxo de autenticação."""
         self._fazer_login()
 
     def _fazer_login(self) -> None:
-        """Valida credenciais e aciona o controller de autenticação."""
         if self._is_loading:
             return
 
@@ -845,7 +834,6 @@ class LoginFrame(ctk.CTkFrame):
         )
 
     def _shake_card(self) -> None:
-        """Anima o card com shake horizontal para indicar erro de credenciais."""
         self._shake_active = True
 
         def shake(step: int = 0) -> None:
@@ -863,7 +851,6 @@ class LoginFrame(ctk.CTkFrame):
         shake()
 
     def _on_login_success(self, user: dict, login_start: float | None = None) -> None:
-        """Prossegue para o sistema principal após autenticação bem-sucedida."""
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text="")
@@ -872,7 +859,6 @@ class LoginFrame(ctk.CTkFrame):
         )
 
     def _on_login_failure(self, msg: str) -> None:
-        """Exibe mensagem de erro e reaplica estado visual de falha."""
         self._is_loading = False
         self._set_idle_state()
         self.lbl_erro.configure(text=f"{ICONS['cross']}•  {msg}", text_color=self.palette["danger"])
@@ -881,14 +867,9 @@ class LoginFrame(ctk.CTkFrame):
         self._shake_card()
 
     def _set_idle_state(self) -> None:
-        """Restaura botão de login para o estado ocioso."""
         self.btn_entrar.configure(text="Entrar", state="normal")
 
-    # ••••••••••••••••••••••••••••••••••••••
-    #  POLÍTICA DE PRIVACIDADE
-    # ••••••••••••••••••••••••••••••••••••••
     def _abrir_modal(self, titulo: str, texto: str, largura: int, altura: int) -> None:
-        """Abre modal genérico com ícone, título, texto e botão de confirmação."""
         top = ctk.CTkToplevel(self)
         top.title(titulo)
         top.geometry(f"{largura}x{altura}")
@@ -945,7 +926,6 @@ class LoginFrame(ctk.CTkFrame):
         ).pack()
 
     def _abrir_politica(self) -> None:
-        """Abre modal com a Política de Privacidade."""
         self._abrir_modal(
             titulo="Política de Privacidade",
             texto=(
@@ -959,7 +939,6 @@ class LoginFrame(ctk.CTkFrame):
         )
 
     def _abrir_termos(self) -> None:
-        """Abre modal com os Termos de Privacidade."""
         self._abrir_modal(
             titulo="Termos de Privacidade",
             texto=(
