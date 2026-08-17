@@ -4,7 +4,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
-from ser_pleno.application.services.pedidos_ajuda import ServicoPedidosAjuda, _map_help_request
+from ser_pleno.features.pedidos_ajuda.service import ServicoPedidosAjuda, _map_help_request
 
 
 class TestMapHelpRequest:
@@ -80,7 +80,7 @@ class TestMapHelpRequest:
 
 
 class TestServicoPedidosAjuda:
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_listar_pedidos_local(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -98,7 +98,7 @@ class TestServicoPedidosAjuda:
         assert len(result["data"]) == 1
         assert result["data"][0]["type"] == "suporte"
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_listar_pedidos_com_filtro(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -113,7 +113,7 @@ class TestServicoPedidosAjuda:
         assert result["success"] is True
         mock_repo.listar_pedidos_ajuda.assert_called_once_with(status="pending")
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_marcar_visto_local(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -129,7 +129,7 @@ class TestServicoPedidosAjuda:
         assert result["message"] == "Pedido marcado como visto"
         mock_repo.atualizar_status.assert_called_once_with(1, "viewed")
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_iniciar_atendimento_local(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -145,7 +145,7 @@ class TestServicoPedidosAjuda:
         assert result["message"] == "Atendimento iniciado"
         mock_repo.atualizar_status.assert_called_once_with(1, "in_progress")
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_resolver_pedido_local(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -161,7 +161,7 @@ class TestServicoPedidosAjuda:
         assert result["message"] == "Pedido resolvido"
         mock_repo.atualizar_status.assert_called_once_with(1, "resolved")
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_responder_pedido_local(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -177,7 +177,7 @@ class TestServicoPedidosAjuda:
         assert result["message"] == "Resposta enviada"
         mock_repo.responder_pedido.assert_called_once_with(1, "Minha resposta", status="resolved")
 
-    @patch("ser_pleno.application.services.pedidos_ajuda.get_operation_config")
+    @patch("ser_pleno.features.pedidos_ajuda.service.get_operation_config")
     def test_contar_pendentes(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False

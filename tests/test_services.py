@@ -6,15 +6,15 @@ from unittest.mock import MagicMock, patch
 import json
 
 from ser_pleno.application.services.autenticacao import ServicoAutenticacao
-from ser_pleno.application.services.dashboard import ServicoDashboard
-from ser_pleno.application.services.estudantes import ServicoEstudante
-from ser_pleno.application.services.agendamentos import ServicoAgendamento
-from ser_pleno.application.services.bem_estar import ServicoBemEstar
-from ser_pleno.application.services.triagem import ServicoTriagem
-from ser_pleno.application.services.comunicacao import ServicoComunicacao
-from ser_pleno.application.services.configuracoes import ServicoConfiguracoes
-from ser_pleno.application.services.relatorios import ServicoRelatorio
-from ser_pleno.application.services.orientacoes import ServicoOrientacoes
+from ser_pleno.features.dashboard.service import ServicoDashboard
+from ser_pleno.features.estudantes.service import ServicoEstudante
+from ser_pleno.features.agenda.service import ServicoAgendamento
+from ser_pleno.features.bem_estar.service import ServicoBemEstar
+from ser_pleno.features.triagem.service import ServicoTriagem
+from ser_pleno.features.comunicacao.service import ServicoComunicacao
+from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+from ser_pleno.features.relatorio.service import ServicoRelatorio
+from ser_pleno.features.orientacoes.service import ServicoOrientacoes
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ class TestServices:
         assert resp["user"]["username"] == "user"
         mock_repo_instance.obter_usuario_por_username.assert_called_with("user")
 
-    @patch("ser_pleno.application.services.estudantes.ClienteAPI")
+    @patch("ser_pleno.features.estudantes.service.ClienteAPI")
     def test_student_service(self, MockClienteAPI):
         service = ServicoEstudante()
         assert service is not None
@@ -271,7 +271,7 @@ class TestServicoDashboard:
         result = service.obter_notificacoes_alertas()
         assert len(result) == 1
 
-    @patch("ser_pleno.application.services.dashboard.get_operation_config")
+    @patch("ser_pleno.features.dashboard.service.get_operation_config")
     def test_obter_notificacoes_ajuda_sem_api(self, mock_get_config):
         mock_config = MagicMock()
         mock_config.should_use_api.return_value = False
@@ -281,7 +281,7 @@ class TestServicoDashboard:
         result = service.obter_notificacoes_ajuda()
         assert result == []
 
-    @patch("ser_pleno.application.services.dashboard.ClienteAPI")
+    @patch("ser_pleno.features.dashboard.service.ClienteAPI")
     def test_obter_notificacoes_ajuda_com_api(self, mock_api_cls):
         mock_api = MagicMock()
         mock_api.get.return_value = {"success": True, "data": [{"id": 1}]}
@@ -293,7 +293,7 @@ class TestServicoDashboard:
         result = service.obter_notificacoes_ajuda()
         assert len(result) == 1
 
-    @patch("ser_pleno.application.services.dashboard.ClienteAPI")
+    @patch("ser_pleno.features.dashboard.service.ClienteAPI")
     def test_marcar_notificacao_ajuda_como_lida(self, mock_api_cls):
         mock_api = MagicMock()
         mock_api_cls.return_value = mock_api
@@ -301,7 +301,7 @@ class TestServicoDashboard:
         service = ServicoDashboard()
         service._api = mock_api
 
-        with patch("ser_pleno.application.services.dashboard.get_operation_config") as mock_cfg:
+        with patch("ser_pleno.features.dashboard.service.get_operation_config") as mock_cfg:
             mock_cfg.return_value.should_use_api.return_value = True
             service.marcar_notificacao_como_lida(1, tipo="ajuda")
 
@@ -928,7 +928,7 @@ class TestServicoOrientacoes:
         mock_repo.criar_orientacao.return_value = 2
         service.repo = mock_repo
 
-        with patch("ser_pleno.application.services.orientacoes.datetime") as mock_dt:
+        with patch("ser_pleno.features.orientacoes.service.datetime") as mock_dt:
             mock_dt.datetime.now.return_value.strftime.return_value = "2024-01-01"
             result = service.duplicar_orientacao(1)
 

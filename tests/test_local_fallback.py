@@ -79,33 +79,33 @@ def mock_local_cache():
 
 class TestReadFallback:
     def test_estudante_listar_cai_para_local(self, mysql_error, mock_local_cache):
-        from ser_pleno.repositories.estudantes import EstudanteRepository
+        from ser_pleno.features.estudantes.repo import EstudanteRepository
         repo = EstudanteRepository()
 
         with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
-            with patch("ser_pleno.repositories.estudantes.local_cache", mock_local_cache):
+            with patch("ser_pleno.features.estudantes.repo.local_cache", mock_local_cache):
                 resultado = repo.listar()
 
         assert isinstance(resultado, list)
         mock_local_cache.list_students.assert_called_once()
 
     def test_agendamentos_listar_proximos_cai_para_local(self, mysql_error, mock_local_cache):
-        from ser_pleno.repositories.agendamentos import AgendamentoRepository
+        from ser_pleno.features.agenda.repo import AgendamentoRepository
         repo = AgendamentoRepository()
 
         with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
-            with patch("ser_pleno.repositories.agendamentos.local_cache", mock_local_cache):
+            with patch("ser_pleno.features.agenda.repo.local_cache", mock_local_cache):
                 resultado = repo.listar_proximos(limite=5)
 
         assert isinstance(resultado, list)
         mock_local_cache.list_all.assert_called_once()
 
     def test_triagem_listar_cai_para_local(self, mysql_error, mock_local_cache):
-        from ser_pleno.repositories.triagem import TriagemRepository
+        from ser_pleno.features.triagem.repo import TriagemRepository
         repo = TriagemRepository()
 
         with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=mysql_error):
-            with patch("ser_pleno.repositories.triagem.local_cache", mock_local_cache):
+            with patch("ser_pleno.features.triagem.repo.local_cache", mock_local_cache):
                 resultado = repo.listar()
 
         assert isinstance(resultado, list)
@@ -118,7 +118,7 @@ class TestReadFallback:
 
 class TestWriteFallback:
     def test_estudante_criar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.estudantes import EstudanteRepository
+        from ser_pleno.features.estudantes.repo import EstudanteRepository
         repo = EstudanteRepository()
 
         student = {
@@ -131,8 +131,8 @@ class TestWriteFallback:
         mock_local_cache.upsert_student.return_value = None
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.estudantes.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.estudantes.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.estudantes.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.estudantes.repo.queue_sync") as mock_queue:
                     resultado = repo.criar(
                         student["nome"], student["email"],
                         student["has_medical_report"], student["requires_attention"],
@@ -143,12 +143,12 @@ class TestWriteFallback:
         assert "id" in mock_local_cache.upsert_student.call_args[0][0]
 
     def test_agendamento_criar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.agendamentos import AgendamentoRepository
+        from ser_pleno.features.agenda.repo import AgendamentoRepository
         repo = AgendamentoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.agendamentos.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.agendamentos.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.agenda.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.agenda.repo.queue_sync") as mock_queue:
                     resultado = repo.criar_agendamento(
                         id_aluno=1,
                         data_hora="2025-01-01 10:00",
@@ -165,12 +165,12 @@ class TestWriteFallback:
         mock_local_cache.upsert_appointment.assert_called_once()
 
     def test_agendamento_atualizar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.agendamentos import AgendamentoRepository
+        from ser_pleno.features.agenda.repo import AgendamentoRepository
         repo = AgendamentoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.agendamentos.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.agendamentos.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.agenda.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.agenda.repo.queue_sync") as mock_queue:
                     resultado = repo.atualizar_agendamento(
                         id_agendamento=1,
                         id_aluno=1,
@@ -187,24 +187,24 @@ class TestWriteFallback:
         mock_local_cache.upsert_appointment.assert_called_once()
 
     def test_agendamento_deletar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.agendamentos import AgendamentoRepository
+        from ser_pleno.features.agenda.repo import AgendamentoRepository
         repo = AgendamentoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.agendamentos.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.agendamentos.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.agenda.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.agenda.repo.queue_sync") as mock_queue:
                     resultado = repo.deletar_agendamento(id_agendamento=1)
 
         assert resultado is not None
         mock_local_cache.delete.assert_called_once_with("appointments", "id", 1)
 
     def test_comunicacao_enviar_mensagem_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.comunicacao import ComunicacaoRepository
+        from ser_pleno.features.comunicacao.repo import ComunicacaoRepository
         repo = ComunicacaoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.comunicacao.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.comunicacao.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.comunicacao.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.comunicacao.repo.queue_sync") as mock_queue:
                     resultado = repo.enviar_mensagem(
                         usuario_id=1, destinatario_id=2, texto="Oi"
                     )
@@ -213,12 +213,12 @@ class TestWriteFallback:
         mock_local_cache.upsert_message.assert_called_once()
 
     def test_orientacao_criar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.orientacoes import OrientacaoRepository
+        from ser_pleno.features.orientacoes.repo import OrientacaoRepository
         repo = OrientacaoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.orientacoes.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.orientacoes.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.orientacoes.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.orientacoes.repo.queue_sync") as mock_queue:
                     resultado = repo.criar_orientacao(
                         student_id=1,
                         title="Titulo",
@@ -235,12 +235,12 @@ class TestWriteFallback:
         mock_local_cache.upsert_orientation.assert_called_once()
 
     def test_triagem_criar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.triagem import TriagemRepository
+        from ser_pleno.features.triagem.repo import TriagemRepository
         repo = TriagemRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.triagem.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.triagem.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.triagem.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.triagem.repo.queue_sync") as mock_queue:
                     resultado = repo.criar({
                         "student_id": 1,
                         "form_id": 1,
@@ -252,24 +252,24 @@ class TestWriteFallback:
         mock_local_cache.upsert_screening.assert_called_once()
 
     def test_relatorio_deletar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.relatorios import RelatorioRepository
+        from ser_pleno.features.relatorio.repo import RelatorioRepository
         repo = RelatorioRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.relatorios.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.relatorios.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.relatorio.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.relatorio.repo.queue_sync") as mock_queue:
                     resultado = repo.deletar_relatorio(id_relatorio=1)
 
         assert resultado is not None
         mock_local_cache.delete.assert_called_once_with("reports", "id", 1)
 
     def test_configuracoes_atualizar_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.configuracoes import ConfiguracoesRepository
+        from ser_pleno.features.configuracoes.repo import ConfiguracoesRepository
         repo = ConfiguracoesRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.configuracoes.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.configuracoes.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.configuracoes.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.configuracoes.repo.queue_sync") as mock_queue:
                     resultado = repo.atualizar_configuracoes({
                         "user_id": 1, "theme": "dark", "notifications": "{}"
                     })
@@ -278,24 +278,24 @@ class TestWriteFallback:
         mock_local_cache.upsert_user_preferences.assert_called_once()
 
     def test_alerta_marcar_lido_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.comunicacao import ComunicacaoRepository
+        from ser_pleno.features.comunicacao.repo import ComunicacaoRepository
         repo = ComunicacaoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.comunicacao.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.comunicacao.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.comunicacao.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.comunicacao.repo.queue_sync") as mock_queue:
                     resultado = repo.marcar_alerta_lido(id_alerta=1)
 
         assert resultado is not None
         mock_local_cache.update.assert_called_once_with("alerts", {"is_read": 1}, "id", 1)
 
     def test_mensagem_marcar_lida_cai_para_local(self, mock_local_cache):
-        from ser_pleno.repositories.comunicacao import ComunicacaoRepository
+        from ser_pleno.features.comunicacao.repo import ComunicacaoRepository
         repo = ComunicacaoRepository()
 
         with patch("ser_pleno.repositories.base.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.comunicacao.local_cache", mock_local_cache):
-                with patch("ser_pleno.repositories.comunicacao.queue_sync") as mock_queue:
+            with patch("ser_pleno.features.comunicacao.repo.local_cache", mock_local_cache):
+                with patch("ser_pleno.features.comunicacao.repo.queue_sync") as mock_queue:
                     resultado = repo.marcar_mensagem_lida(mensagem_id=1)
 
         assert resultado is not None
@@ -365,11 +365,11 @@ class TestSeedService:
 
 class TestReadFallbackDecorator:
     def test_local_fallback_logs_structured(self, mock_local_cache):
-        from ser_pleno.repositories.estudantes import EstudanteRepository
+        from ser_pleno.features.estudantes.repo import EstudanteRepository
         repo = EstudanteRepository()
 
         with patch("ser_pleno.infrastructure.db.query_helpers.execute_query", side_effect=Exception("MySQL server has gone away")):
-            with patch("ser_pleno.repositories.estudantes.local_cache", mock_local_cache):
+            with patch("ser_pleno.features.estudantes.repo.local_cache", mock_local_cache):
                 with patch("ser_pleno.repositories.fallback.logger") as mock_logger:
                     repo.listar()
                     mock_logger.warning.assert_called()

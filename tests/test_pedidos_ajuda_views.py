@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import customtkinter as ctk
 
-from ser_pleno.presentation.views.pedidos_ajuda import PedidosAjudaFrame, ResponderModal
+from ser_pleno.ui.views.pedidos_ajuda import PedidosAjudaFrame, ResponderModal
 
 
 class TestPedidosAjudaFrame:

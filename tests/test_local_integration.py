@@ -140,13 +140,13 @@ class TestAlunoEmailSeed:
 class TestStudentNameEnrichment:
     def test_local_listar_proximos_enriches_student_name(self, tmp_db_path):
         from ser_pleno.infrastructure.local.local_cache import LocalCache, local_cache
-        from ser_pleno.repositories.agendamentos import AgendamentoRepository
+        from ser_pleno.features.agenda.repo import AgendamentoRepository
 
         cache = LocalCache.__new__(LocalCache)
         cache.DB_FILE = tmp_db_path
         cache._ensure_tables()
         # Rebind module-level local_cache for the repository import
-        import ser_pleno.repositories.agendamentos as ag_mod
+        import ser_pleno.features.agenda.repo as ag_mod
         ag_mod.local_cache = cache
 
         cache.upsert_student({"id": 1, "nome": "Maria", "email": "maria@teste"})
@@ -160,12 +160,12 @@ class TestStudentNameEnrichment:
 
     def test_local_listar_checkins_enriches_student_name(self, tmp_db_path):
         from ser_pleno.infrastructure.local.local_cache import LocalCache
-        from ser_pleno.repositories.bem_estar import BemEstarRepository
+        from ser_pleno.features.bem_estar.repo import BemEstarRepository
 
         cache = LocalCache.__new__(LocalCache)
         cache.DB_FILE = tmp_db_path
         cache._ensure_tables()
-        import ser_pleno.repositories.bem_estar as be_mod
+        import ser_pleno.features.bem_estar.repo as be_mod
         be_mod.local_cache = cache
 
         cache.upsert_student({"id": 1, "nome": "Joao", "email": "joao@teste"})
