@@ -94,13 +94,13 @@ def ensure_spec_exists(name: str, onefile: bool, windowed: bool) -> Path:
             if item.is_file():
                 datas_lines.append(f'    (r"{item}", "config"),')
 
-    assets_dir = PROJECT_ROOT / "src" / "ser_pleno" / "assets"
+    assets_dir = PROJECT_ROOT / "assets"
     if assets_dir.exists():
-        datas_lines.append(f'    (r"{assets_dir}", "ser_pleno/assets"),')
+        datas_lines.append(f'    (r"{assets_dir}", "assets"),')
 
-    sql_dir = PROJECT_ROOT / "src" / "ser_pleno" / "sql"
+    sql_dir = PROJECT_ROOT / "sql"
     if sql_dir.exists():
-        datas_lines.append(f'    (r"{sql_dir}", "ser_pleno/sql"),')
+        datas_lines.append(f'    (r"{sql_dir}", "sql"),')
 
     datas_block = "\n".join(datas_lines) if datas_lines else ""
 
