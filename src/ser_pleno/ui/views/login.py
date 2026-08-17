@@ -134,7 +134,7 @@ class LoginInputField(ctk.CTkFrame):
         )
         input_container.pack(fill="x")
 
-        left_icon = "👤" if "usuário" in label_text.lower() else "🔒" if password else icon
+        left_icon = ICONS["person"] if "usuário" in label_text.lower() else ICONS["lock"] if password else icon
         ctk.CTkLabel(
             input_container,
             text=left_icon,
@@ -157,7 +157,7 @@ class LoginInputField(ctk.CTkFrame):
         if password:
             self.btn_toggle = ctk.CTkButton(
                 input_container,
-                text="👁",
+                text=ICONS["eye"],
                 width=30,
                 fg_color="transparent",
                 hover_color=self.palette["accent_soft"],
@@ -496,7 +496,7 @@ class LoginFrame(ctk.CTkFrame):
         )
         icon_bg.pack(pady=(0, 8))
         icon_bg.pack_propagate(False)
-        ctk.CTkLabel(icon_bg, text="🧠", font=themed_font("h2"), text_color=_ICON_TEXT_COLOR).place(
+        ctk.CTkLabel(icon_bg, text=ICONS["brain"], font=themed_font("h2"), text_color=_ICON_TEXT_COLOR).place(
             relx=0.5, rely=0.5, anchor="center"
         )
 
@@ -519,7 +519,7 @@ class LoginFrame(ctk.CTkFrame):
         info_row = ctk.CTkFrame(inner, fg_color="transparent", bg_color="transparent")
         info_row.pack(pady=(0, 12))
 
-        for text in ["🔒 LGPD", "⚡ Rápido", "🤝 Apoio"]:
+        for text in [f"{ICONS['shield']} LGPD", f"{ICONS['lightning']} Rápido", f"{ICONS['handshake']} Apoio"]:
             chip = ctk.CTkFrame(
                 info_row,
                 height=_CHIP_HEIGHT,
@@ -564,7 +564,7 @@ class LoginFrame(ctk.CTkFrame):
 
         _termos_btn = ctk.CTkButton(
             inner,
-            text="🛡️ Termos de Privacidade",
+            text=f"{ICONS['shield']} Termos de Privacidade",
             command=self._abrir_termos,
             fg_color="transparent",
             hover_color=self.palette["accent_soft"],

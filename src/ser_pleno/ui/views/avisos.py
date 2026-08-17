@@ -253,7 +253,7 @@ class PublicacaoModal(BaseModal):
         self.f_data_ag = FormField(row3, f"{ICONS['calendar']}  Agendamento", placeholder="YYYY-MM-DD")
         self.f_data_ag.grid(row=0, column=0, sticky="ew", padx=(0, 6))
 
-        self.f_horario_evento = FormField(row3, f"{ICONS['chart']}  Horário evento", placeholder="YYYY-MM-DD HH:MM")
+        self.f_horario_evento = FormField(row3, f"{ICONS['clock']}  Horário evento", placeholder="YYYY-MM-DD HH:MM")
         self.f_horario_evento.grid(row=0, column=1, sticky="ew", padx=(6, 0))
 
         self.f_layout = FormField(scroll, f"{ICONS['layout']}  Layout", values=["single", "grid-2", "grid-3", "grid-4"], initial="single")
@@ -624,13 +624,12 @@ class AvisosFrame(BaseViewFrame):
         actions = []
         if is_admin:
             actions.append(
-                PrimaryButton(
-                    parent,
-                    text=f"{ICONS['add']}  Nova Publicação",
-                    command=self._abrir_modal_novo,
-                    height=36,
-                    width=180,
-                )
+                {
+                    "text": f"{ICONS['add']}  Nova Publicação",
+                    "command": self._abrir_modal_novo,
+                    "height": 36,
+                    "width": 180,
+                }
             )
 
         super().__init__(

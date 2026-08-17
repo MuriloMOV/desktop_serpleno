@@ -445,7 +445,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         actions = [
             ("Novo Agendamento", ICONS["calendar"], self._quick_novo_agendamento),
-            ("Nova Triagem", ICONS["document"], self._quick_nova_triagem),
+            ("Nova Triagem", ICONS["add"], self._quick_nova_triagem),
             ("Enviar Mensagem", ICONS["send"], self._quick_enviar_mensagem),
             ("Ver Alertas", ICONS["bell"], self._abrir_notificacoes_alertas),
         ]
@@ -776,7 +776,7 @@ class DashboardFrame(ctk.CTkFrame):
             self._alert_card.destroy()
         card = Card(
             self.right_col,
-            title=f"{ICONS['danger']}  Estudantes em Alerta",
+            title=f"{ICONS['alert']}  Estudantes em Alerta",
             padding=(spacing("sm"), spacing("xs")),
         )
         card.pack(fill="x", pady=(0, spacing("md")))
@@ -801,7 +801,7 @@ class DashboardFrame(ctk.CTkFrame):
             self._recent_card.destroy()
         card = Card(
             self.right_col,
-            title=f"{ICONS['check']}  Atendimentos Recentes",
+            title=f"{ICONS['clock']}  Atendimentos Recentes",
             padding=(spacing("sm"), spacing("xs")),
         )
         card.pack(fill="x", pady=(0, spacing("md")))

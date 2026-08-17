@@ -155,7 +155,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
 
         GhostButton(
             bar,
-            text=f"{ICONS['list']}  Formulários",
+            text=f"{ICONS['document']}  Formulários",
             command=self._modal_listar_formularios,
             height=40,
             corner_radius=RADIUS["button"],
@@ -174,7 +174,7 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             (
                 "Total de Triagens",
                 "0",
-                ICONS["chart"],
+                ICONS["document"],
                 THEME["kpi_blue"],
                 THEME["kpi_blue_soft"],
                 "Registros",

@@ -26,7 +26,7 @@ MENU_ITEMS = [
      "header": ("Bem-estar", "Monitoramento e apoio emocional")},
     {"key": "analise",       "label": "Analise",           "icon": ICONS["search"],
      "header": ("Analise", "Triagem e classificacao")},
-    {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["empty"],
+    {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["document"],
      "header": ("Relatorios", "Indicadores e exportacoes")},
     {"key": "comunicacao",   "label": "Comunicacao",       "icon": ICONS["chat"],
      "header": ("Comunicacao", "Mensagens internas e suporte")},
