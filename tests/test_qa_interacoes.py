@@ -386,6 +386,7 @@ class TestOrientacoesQA:
             mock_svc = MockDashboard.return_value
             mock_svc.criar_orientacao.return_value = {"success": True}
             view = OrientacoesFrame(app, controller)
+            view._build_form_nova_lazy()
             view.f_titulo.insert(0, "Orientação Teste")
             view.f_conteudo.insert("1.0", "Conteúdo teste")
             view.f_tema.widget.set("Geral")
@@ -404,6 +405,7 @@ class TestOrientacoesQA:
     def test_editar_orientacao_popula_form(self, app, controller):
         with patch("ser_pleno.ui.views.orientacoes.ServicoOrientacoes") as MockDashboard:
             view = OrientacoesFrame(app, controller)
+            view._build_form_nova_lazy()
             o = {
                 "id": 1,
                 "title": "Título",
@@ -632,6 +634,7 @@ class TestComunicacaoQA:
         with patch("ser_pleno.ui.views.comunicacao.ServicoComunicacao") as MockDashboard:
             controller.usuario_logado_id = 1
             view = ComunicacaoFrame(app, controller)
+            view._build_chat_area_lazy()
             assert view is not None
             assert hasattr(view, "entry_mensagem")
             assert hasattr(view, "btn_enviar")
@@ -641,6 +644,7 @@ class TestComunicacaoQA:
         with patch("ser_pleno.ui.views.comunicacao.ServicoComunicacao") as MockDashboard:
             controller.usuario_logado_id = 1
             view = ComunicacaoFrame(app, controller)
+            view._build_chat_area_lazy()
             view.conversa_ativa = None
             view.entry_mensagem.insert(0, "Olá")
             view.enviar_mensagem()
@@ -652,6 +656,7 @@ class TestComunicacaoQA:
             mock_svc.enviar_mensagem_grupo.return_value = {"success": True}
             controller.usuario_logado_id = 1
             view = ComunicacaoFrame(app, controller)
+            view._build_chat_area_lazy()
             view.conversa_ativa = {"role": "group", "id": 1}
             view.entry_mensagem.insert(0, "Mensagem grupo")
             with (

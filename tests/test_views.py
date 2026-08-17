@@ -110,6 +110,7 @@ class TestViews:
         controller.usuario_logado_id = 1
 
         view = ComunicacaoFrame(app, controller)
+        view._build_chat_area_lazy()
 
         assert hasattr(view, "entry_mensagem")
 
