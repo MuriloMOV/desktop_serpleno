@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-and-release:
+    name: Build and Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-build.txt
+          python -m pip install -e .
+
+      - name: Ruff lint
+        run: ruff check src/ser_pleno tests
+
+      - name: Mypy type check
+        run: mypy src/ser_pleno
+
+      - name: Pytest
+        run: pytest tests/ -v --tb=short
+
+      - name: Build executable
+        run: python scripts/build_exe.py --name SerPleno --onefile --windowed
+
+      - name: Prepare release assets
+        run: |
+          $version = "${{ github.ref_name }}"
+          $releaseDir = "releases/$version"
+          New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+
+          $distDir = "dist"
+          if (Test-Path "$distDir\SerPleno.exe") {
+            Copy-Item "$distDir\SerPleno.exe" "$releaseDir/"
+            Write-Host "Copied: $distDir\SerPleno.exe"
+          }
+          if (Test-Path "$distDir\SerPleno\SerPleno.exe") {
+            Copy-Item "$distDir\SerPleno" "$releaseDir/SerPleno" -Recurse -Force
+            Write-Host "Copied: $distDir\SerPleno"
+          }
+          if (Test-Path "$distDir\_internal") {
+            Copy-Item "$distDir\_internal" "$releaseDir\_internal" -Recurse -Force
+            Write-Host "Copied: $distDir\_internal"
+          }
+
+          $assets = @("assets", "config", "sql")
+          foreach ($a in $assets) {
+            if (Test-Path $a) {
+              Copy-Item $a "$releaseDir/" -Recurse -Force
+              Write-Host "Copied asset: $a"
+            }
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            releases/${{ github.ref_name }}/**/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
