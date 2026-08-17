@@ -120,6 +120,8 @@ class SyncService:
     _lock = threading.RLock()
     _running: bool = False
     _thread: Optional[threading.Thread] = None
+    _fk_warning_counts: Dict[str, int] = {}
+    _fk_warning_reset: float = 0.0
 
     def __new__(cls):
         if cls._instance is None:
@@ -474,18 +476,27 @@ class SyncService:
             if fk_value is None:
                 continue
             if isinstance(fk_value, int) and fk_value < 0:
-                logger.debug(
-                    "FK local nao reconciliada ignorada: %s.%s=%s em %s.%s",
-                    fk_name, fk_value, table, pk_column, entity,
-                )
                 continue
             try:
                 row = fetch_one(f"SELECT 1 FROM {table} WHERE {pk_column} = %s", (fk_value,))
                 if not row:
-                    logger.warning(
-                        "FK pai ausente: %s.%s=%s nao encontrado em %s.%s; pulando %s",
-                        fk_name, fk_value, table, pk_column, entity, data.get("id"),
-                    )
+                    warning_key = f"{entity}.{fk_name}={fk_value}"
+                    now = time.time()
+                    if now - self._fk_warning_reset > 60:
+                        self._fk_warning_counts.clear()
+                        self._fk_warning_reset = now
+                    count = self._fk_warning_counts.get(warning_key, 0) + 1
+                    self._fk_warning_counts[warning_key] = count
+                    if count <= 3:
+                        logger.warning(
+                            "FK pai ausente: %s.%s=%s nao encontrado em %s.%s; pulando %s",
+                            fk_name, fk_value, table, pk_column, entity, data.get("id"),
+                        )
+                    elif count == 4:
+                        logger.warning(
+                            "FK pai ausente repetida (%s): %s.%s=%s; suprimindo avisos por 60s",
+                            warning_key, fk_name, fk_value, table,
+                        )
                     return False
             except Exception as exc:
                 logger.debug("Falha ao verificar FK %s.%s: %s", table, pk_column, exc)

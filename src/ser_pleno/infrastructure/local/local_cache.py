@@ -19,6 +19,7 @@ TABLE_WHITELIST = {
     "appointments",
     "orientations",
     "screenings",
+    "screeningforms",
     "mural_posts",
     "sync_queue",
     "wellness_mood",
