@@ -58,12 +58,12 @@ Copy-Item .env.example .env
 Edite `.env` com as credenciais do ambiente de destino:
 
 ```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=usuario
-DB_PASSWORD=senha
-DB_NAME=ser_pleno
-API_URL=https://api.serpleno.com.br
+SERPLENO_API_URL=http://127.0.0.1:8000
+SERPLENO_DB_HOST=roundhouse.proxy.rlwy.net
+SERPLENO_DB_PORT=13953
+SERPLENO_DB_USER=root
+SERPLENO_DB_PASSWORD=sua_senha_railway
+SERPLENO_DB_NAME=railway
 ```
 
 O `.env` é empacotado automaticamente dentro do executável.

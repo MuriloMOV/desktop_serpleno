@@ -49,11 +49,11 @@ O executável usa exclusivamente as variáveis definidas no `.env` para conexão
 
 ```env
 SERPLENO_API_URL=http://127.0.0.1:8000
-SERPLENO_DB_HOST=127.0.0.1
-SERPLENO_DB_PORT=3306
-SERPLENO_DB_USER=serpleno
-SERPLENO_DB_PASSWORD=sua_senha_aqui
-SERPLENO_DB_NAME=ser_pleno
+SERPLENO_DB_HOST=roundhouse.proxy.rlwy.net
+SERPLENO_DB_PORT=13953
+SERPLENO_DB_USER=root
+SERPLENO_DB_PASSWORD=sua_senha_railway
+SERPLENO_DB_NAME=railway
 ```
 
 ### 3.3 Criar e ativar venv
@@ -259,16 +259,16 @@ python -m pip install -e .
    ```
 
 2. Teste a conexão manualmente:
-   ```powershell
-   mysql -h 127.0.0.1 -P 3306 -u serpleno -p
-   ```
+    ```powershell
+    mysql -h roundhouse.proxy.rlwy.net -P 13953 -u root -p
+    ```
 
 3. Ajuste o usuário no MySQL:
-   ```sql
-   CREATE USER IF NOT EXISTS 'serpleno'@'localhost' IDENTIFIED BY 'sua_senha';
-   GRANT ALL PRIVILEGES ON ser_pleno.* TO 'serpleno'@'localhost';
-   FLUSH PRIVILEGES;
-   ```
+    ```sql
+    CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY 'sua_senha_railway';
+    GRANT ALL PRIVILEGES ON railway.* TO 'root'@'%';
+    FLUSH PRIVILEGES;
+    ```
 
 4. Atualize a senha no `.env` e rebuild.
 

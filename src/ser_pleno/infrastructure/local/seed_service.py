@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -22,6 +23,7 @@ SEED_TABLES: List[Tuple[str, str, str, str, Dict[str, str]]] = [
     ("agendamento", "appointments", "upsert_appointment", "updated_at", {}),
     ("desktop_orientation", "orientations", "upsert_orientation", "updated_at", {"psychologist_id": "psychologist"}),
     ("desktop_screening", "screenings", "upsert_screening", "updated_at", {}),
+    ("desktop_screeningform", "screeningforms", "upsert_screening_form", "updated_at", {}),
     ("mural_posts", "mural_posts", "upsert_mural_post", "updated_at", {}),
     ("desktop_alert", "alerts", "upsert_alert", "created_at", {}),
     ("desktop_message", "messages", "upsert_message", "timestamp", {}),
@@ -37,6 +39,7 @@ SEED_COLUMNS: Dict[str, set] = {
     "agendamento": {"id", "student_id", "data_hora", "motivo", "status", "local", "profissional", "laudo", "origem", "updated_at"},
     "desktop_orientation": {"id", "student_id", "title", "theme", "session_date", "content", "is_markdown", "motivational_message", "action_plan", "psychologist_id", "updated_at"},
     "desktop_screening": {"id", "student_id", "form_id", "status", "priority", "scheduled_date", "responses", "observations", "recommendations", "requires_followup", "followup_date", "updated_at"},
+    "desktop_screeningform": {"id", "name", "is_active", "created_at", "updated_at"},
     "mural_posts": {"id", "titulo", "conteudo", "autor", "publicado_em", "ativo", "categoria", "data_agendamento", "link_externo", "blocos", "layout", "horario_evento", "local_fisico", "created_at", "updated_at"},
     "desktop_alert": {"id", "alert_type", "message", "created_at", "is_read"},
     "desktop_message": {"id", "sender_id", "text", "timestamp", "read", "caminho_arquivo", "tipo_arquivo", "recipient_id"},
@@ -45,6 +48,15 @@ SEED_COLUMNS: Dict[str, set] = {
     "desktop_wellnesscheckin": {"id", "student_id", "overall_wellbeing", "check_in_date", "check_in_type", "responses", "attention_areas", "recommendations", "follow_up_needed", "follow_up_date", "professional_notes", "conducted_by_id"},
     "help_requests": {"id", "aluno_id", "tipo", "mensagem", "prioridade", "status", "localizacao", "dados_extras", "created_at", "updated_at", "viewed_at", "resolved_at", "resposta_enviada", "resposta_em", "resposta_lida", "atendimento_finalizado"},
 }
+
+
+_MYSQL_RESERVED_WORDS = {"read", "order", "group", "key", "status"}
+
+
+def _quote_mysql_identifier(column: str) -> str:
+    if column in _MYSQL_RESERVED_WORDS:
+        return f"`{column}`"
+    return column
 
 
 def _filter_columns(row: Dict[str, Any], mysql_table: str) -> Dict[str, Any]:
@@ -86,20 +98,28 @@ def sync_critical_entities(since: Optional[str] = None) -> Dict[str, Any]:
     }
 
     for mysql_table, sqlite_table, upsert_method, ts_field, renames in SEED_TABLES:
+        t0 = time.perf_counter()
         try:
+            allowed = SEED_COLUMNS.get(mysql_table)
             if mysql_table == "aluno":
+                aluno_cols = {"id_aluno", "nome", "has_medical_report", "requires_attention", "updated_at"}
+                aluno_columns = [f"a.{c}" for c in allowed if c in aluno_cols] if allowed else ["a.*"]
+                user_columns = [f"u.{c}" for c in allowed if c == "email"] if allowed else []
+                columns = ", ".join(aluno_columns + user_columns)
                 query = (
-                    "SELECT a.id_aluno, a.nome, u.email AS email, "
-                    "a.has_medical_report, a.requires_attention, a.updated_at "
-                    "FROM aluno a "
+                    f"SELECT {columns} FROM aluno a "
                     "LEFT JOIN auth_user u ON a.user_id = u.id"
                 )
-                params = ()
+                params: tuple = ()
                 if last_sync:
                     query += f" WHERE a.{ts_field} > %s"
                     params = (last_sync,)
             else:
-                query = f"SELECT * FROM {mysql_table}"
+                if allowed:
+                    columns = ", ".join(_quote_mysql_identifier(c) for c in allowed)
+                else:
+                    columns = "*"
+                query = f"SELECT {columns} FROM {mysql_table}"
                 params = ()
                 if last_sync:
                     query += f" WHERE {ts_field} > %s"
@@ -108,6 +128,10 @@ def sync_critical_entities(since: Optional[str] = None) -> Dict[str, Any]:
             rows = fetch_all(query, params)
             if not rows:
                 results["skipped"] += 1
+                logger.debug(
+                    "Seed [%s -> %s]: 0 linhas (%.1fms)",
+                    mysql_table, sqlite_table, (time.perf_counter() - t0) * 1000,
+                )
                 continue
 
             upsert_fn = getattr(local_cache, upsert_method)
@@ -115,7 +139,7 @@ def sync_critical_entities(since: Optional[str] = None) -> Dict[str, Any]:
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                filtered = _filter_columns(row, mysql_table)
+                filtered = _filter_columns(row, mysql_table) if allowed else row
                 if not _has_data(filtered):
                     continue
                 cleaned = _rename_keys(filtered, renames)
@@ -124,8 +148,8 @@ def sync_critical_entities(since: Optional[str] = None) -> Dict[str, Any]:
 
             results["synced"] += count
             logger.info(
-                "Seed [%s -> %s]: %d linhas sincronizadas (ts_field=%s)",
-                mysql_table, sqlite_table, count, ts_field,
+                "Seed [%s -> %s]: %d linhas sincronizadas (%.1fms)",
+                mysql_table, sqlite_table, count, (time.perf_counter() - t0) * 1000,
             )
 
         except Exception as exc:

@@ -39,9 +39,6 @@ debug.log
 config/ser_pleno_local.db
 config/ser_pleno_local.db-wal
 config/ser_pleno_local.db-shm
-src/ser_pleno/config/ser_pleno_local.db
-src/ser_pleno/config/ser_pleno_local.db-wal
-src/ser_pleno/config/ser_pleno_local.db-shm
 *.db
 *.db-wal
 *.db-shm
@@ -50,7 +47,7 @@ src/ser_pleno/config/ser_pleno_local.db-shm
 src/ser_pleno/sync_queue.json
 src/ser_pleno/user_profile.json
 src/ser_pleno/logs/
-src/ser_pleno/config/fallback_metrics.json
+config/fallback_metrics.json
 
 # Secrets (não versionar)
 *.pem

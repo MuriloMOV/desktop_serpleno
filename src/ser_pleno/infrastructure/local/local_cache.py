@@ -155,6 +155,15 @@ class LocalCache:
                     followup_date TEXT,
                     updated_at TEXT
                 );
+                CREATE TABLE IF NOT EXISTS screeningforms (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT,
+                    form_type TEXT,
+                    version TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    created_at TEXT,
+                    updated_at TEXT
+                );
                 CREATE TABLE IF NOT EXISTS mural_posts (
                     id INTEGER PRIMARY KEY,
                     titulo TEXT,
@@ -523,6 +532,15 @@ class LocalCache:
             where = "student_id=?"
             params = (student_id,)
         return self.list_all("screenings", where_clause=where, params=params)
+
+    # Screening forms
+
+    def upsert_screening_form(self, form: Dict[str, Any]) -> None:
+        form["updated_at"] = datetime.now().isoformat()
+        self.upsert("screeningforms", form)
+
+    def list_screening_forms(self) -> List[Dict[str, Any]]:
+        return self.list_all("screeningforms", where_clause="is_active=1", params=(1,))
 
     # Mural
 

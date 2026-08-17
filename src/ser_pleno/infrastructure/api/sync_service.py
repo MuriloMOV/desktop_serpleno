@@ -25,7 +25,7 @@ from ser_pleno.config.operation_mode import (
     OperationConfig, OperationMode, get_operation_config
 )
 from ser_pleno.infrastructure.local.local_cache import local_cache
-from ser_pleno.repositories.base import is_local_id, execute_non_query, fetch_all
+from ser_pleno.repositories.base import is_local_id, execute_non_query, fetch_all, fetch_one
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +35,21 @@ MYSQL_TABLE_WHITELIST = {
     "agendamento",
     "desktop_orientation",
     "desktop_screening",
+    "desktop_screeningform",
     "desktop_message",
     "desktop_report",
     "desktop_alert",
+    "auth_user",
+}
+
+
+_QUEUE_ENTITY_PRIORITY = {
+    "auth_user": 1,
+    "students": 2,
+    "messages": 3,
+    "appointments": 4,
+    "orientations": 5,
+    "screenings": 6,
 }
 
 
@@ -356,26 +368,33 @@ class SyncService:
             return
 
         logger.info("Aplicando %d operacoes offline no MySQL local", len(pending))
+
+        pending_sorted = sorted(
+            pending,
+            key=lambda item: _QUEUE_ENTITY_PRIORITY.get(item.get("entity", ""), 99),
+        )
+
+        id_reconciliation: Dict[int, int] = {}
         applied = 0
-        for item in pending:
+        for item in pending_sorted:
             try:
-                success = self._apply_queue_item_to_mysql(item)
+                success = self._apply_queue_item_to_mysql(item, id_reconciliation)
                 if success:
-                    self.queue.remove(item['id'])
+                    self.queue.remove(item["id"])
                     applied += 1
                 else:
-                    self.queue.increment_attempt(item['id'])
+                    self.queue.increment_attempt(item["id"])
             except Exception as exc:
                 logger.error("Erro ao aplicar item da fila no MySQL: %s", exc)
-                self.queue.increment_attempt(item['id'])
+                self.queue.increment_attempt(item["id"])
 
         logger.info("Sync fila->MySQL: %d/%d aplicados", applied, len(pending))
 
-    def _apply_queue_item_to_mysql(self, item: Dict[str, Any]) -> bool:
+    def _apply_queue_item_to_mysql(self, item: Dict[str, Any], id_reconciliation: Optional[Dict[int, int]] = None) -> bool:
         """Aplica uma operacao da fila no MySQL local."""
-        operation = item.get('operation')
-        entity = item.get('entity')
-        raw_data = item.get('data')
+        operation = item.get("operation")
+        entity = item.get("entity")
+        raw_data = item.get("data")
 
         if isinstance(raw_data, str):
             try:
@@ -388,18 +407,20 @@ class SyncService:
         if not entity or not operation:
             return False
 
-        # user_preferences não existe no schema MySQL atual; remove da fila sem erro.
+        if id_reconciliation is not None:
+            data = self._reconcile_fk_ids(entity, data, id_reconciliation)
+
         if entity == "user_preferences":
-            logger.debug("Sync entferido para entidade sem tabela MySQL: user_preferences")
+            logger.debug("Sync removido para entidade sem tabela MySQL: user_preferences")
             return True
 
         try:
-            if operation == 'create':
-                return self._apply_create_to_mysql(entity, data)
-            elif operation == 'update':
-                return self._apply_update_to_mysql(entity, data, item.get('entity_id'))
-            elif operation == 'delete':
-                return self._apply_delete_to_mysql(entity, item.get('entity_id'))
+            if operation == "create":
+                return self._apply_create_to_mysql(entity, data, id_reconciliation)
+            elif operation == "update":
+                return self._apply_update_to_mysql(entity, data, item.get("entity_id"))
+            elif operation == "delete":
+                return self._apply_delete_to_mysql(entity, item.get("entity_id"))
             else:
                 logger.warning("Operacao desconhecida na fila: %s", operation)
                 return True
@@ -407,64 +428,135 @@ class SyncService:
             logger.error("Falha ao aplicar %s %s no MySQL: %s", operation, entity, exc)
             return False
 
-    def _apply_create_to_mysql(self, entity: str, data: Dict[str, Any]) -> bool:
+    def _reconcile_fk_ids(self, entity: str, data: Dict[str, Any], id_reconciliation: Dict[int, int]) -> Dict[str, Any]:
+        """Substitui IDs locais por IDs MySQL ja reconciliados."""
+        if not id_reconciliation:
+            return data
+
+        fk_fields = {
+            "appointments": ["student_id"],
+            "orientations": ["student_id"],
+            "screenings": ["student_id", "form_id"],
+            "messages": ["sender_id", "recipient_id"],
+            "reports": ["generated_by_id"],
+            "alerts": [],
+        }
+        fields = fk_fields.get(entity, [])
+        for field in fields:
+            value = data.get(field)
+            if isinstance(value, int) and value in id_reconciliation:
+                data[field] = id_reconciliation[value]
+        return data
+
+    def _check_fk_parents_exist(self, entity: str, data: Dict[str, Any]) -> bool:
+        """Verifica se os registros pai referenciados existem no MySQL local."""
+        checks = {
+            "messages": [
+                ("auth_user", "id", data.get("sender_id"), "sender_id"),
+                ("auth_user", "id", data.get("recipient_id"), "recipient_id"),
+            ],
+            "appointments": [
+                ("aluno", "id_aluno", data.get("student_id"), "student_id"),
+            ],
+            "orientations": [
+                ("aluno", "id_aluno", data.get("student_id"), "student_id"),
+            ],
+            "screenings": [
+                ("aluno", "id_aluno", data.get("student_id"), "student_id"),
+                ("desktop_screeningform", "id", data.get("form_id"), "form_id"),
+            ],
+            "reports": [
+                ("auth_user", "id", data.get("generated_by_id"), "generated_by_id"),
+            ],
+        }
+        table_checks = checks.get(entity, [])
+        for table, pk_column, fk_value, fk_name in table_checks:
+            if fk_value is None:
+                continue
+            if isinstance(fk_value, int) and fk_value < 0:
+                logger.debug(
+                    "FK local nao reconciliada ignorada: %s.%s=%s em %s.%s",
+                    fk_name, fk_value, table, pk_column, entity,
+                )
+                continue
+            try:
+                row = fetch_one(f"SELECT 1 FROM {table} WHERE {pk_column} = %s", (fk_value,))
+                if not row:
+                    logger.warning(
+                        "FK pai ausente: %s.%s=%s nao encontrado em %s.%s; pulando %s",
+                        fk_name, fk_value, table, pk_column, entity, data.get("id"),
+                    )
+                    return False
+            except Exception as exc:
+                logger.debug("Falha ao verificar FK %s.%s: %s", table, pk_column, exc)
+                return False
+        return True
+
+    def _apply_create_to_mysql(self, entity: str, data: Dict[str, Any], id_reconciliation: Optional[Dict[int, int]] = None) -> bool:
         """Aplica INSERT no MySQL local."""
+        try:
+            if entity == "auth_user":
+                return self._apply_create_auth_user_to_mysql(data, id_reconciliation)
+            if entity == "students":
+                return self._apply_create_student_to_mysql(data, id_reconciliation)
+        except Exception as exc:
+            logger.error("Erro ao executar CREATE para %s: %s", entity, exc)
+            return False
+
+        if not self._check_fk_parents_exist(entity, data):
+            return False
+
         queries = {
-            'students': (
-                "INSERT INTO aluno (nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention, created_at, updated_at, minigame_blocked) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)",
-                (
-                    data.get('nome'),
-                    data.get('professor_responsavel') or 'Não informado',
-                    data.get('status') or 'ativo',
-                    int(data.get('priority_level') or 0),
-                    json.dumps(data.get('tags')) if data.get('tags') is not None else "[]",
-                    _shorten_avatar(data.get('avatar')),
-                    int(data.get('dark_mode') or 0),
-                    int(data.get('notifications_enabled') if data.get('notifications_enabled') is not None else 1),
-                    int(data.get('has_medical_report', 0)),
-                    int(data.get('requires_attention', 0)),
-                    int(data.get('minigame_blocked', 0)),
-                ),
-            ),
-            'appointments': (
+            "appointments": (
                 "INSERT INTO agendamento (student_id, data_hora, motivo, status, local, profissional, laudo, origem, created_at, updated_at) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
-                (data.get('student_id'), data.get('data_hora'), data.get('motivo'), data.get('status'),
-                 data.get('local'), data.get('profissional'), data.get('laudo'), data.get('origem')),
+                (data.get("student_id"), data.get("data_hora"), data.get("motivo"), data.get("status"),
+                 data.get("local"), data.get("profissional"), data.get("laudo"), data.get("origem")),
             ),
-            'orientations': (
+            "orientations": (
                 "INSERT INTO desktop_orientation (student_id, title, theme, session_date, content, is_markdown, motivational_message, action_plan, psychologist_id, created_at, updated_at) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
-                (data.get('student_id'), data.get('title'), data.get('theme'), data.get('session_date'),
-                 data.get('content'), int(data.get('is_markdown', 0)), data.get('motivational_message'),
-                 data.get('action_plan'), int(data.get('psychologist')) if str(data.get('psychologist') or '').isdigit() else None),
+                (data.get("student_id"), data.get("title"), data.get("theme"), data.get("session_date"),
+                 data.get("content"), int(data.get("is_markdown", 0)), data.get("motivational_message"),
+                 data.get("action_plan"), int(data.get("psychologist")) if str(data.get("psychologist") or "").isdigit() else None),
             ),
-            'screenings': (
+            "screenings": (
                 "INSERT INTO desktop_screening (student_id, form_id, status, priority, scheduled_date, responses, observations, recommendations, requires_followup, followup_date, created_at, updated_at) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())",
-                (data.get('student_id'), data.get('form_id'), data.get('status'), data.get('priority'),
-                 data.get('scheduled_date'), data.get('responses', '{}'), data.get('observations', ''),
-                 data.get('recommendations', ''), int(data.get('requires_followup', 0)), data.get('followup_date')),
+                (data.get("student_id"), data.get("form_id"), data.get("status"), data.get("priority"),
+                 data.get("scheduled_date"), data.get("responses", "{}"), data.get("observations", ""),
+                 data.get("recommendations", ""), int(data.get("requires_followup", 0)), data.get("followup_date")),
             ),
-            'messages': (
+            "messages": (
                 "INSERT INTO desktop_message (sender_id, recipient_id, text, timestamp, `read`, caminho_arquivo, tipo_arquivo) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (data.get('sender_id'), data.get('recipient_id'), data.get('text'),
-                 data.get('timestamp', datetime.now().isoformat()), int(data.get('read', 0)),
-                 data.get('caminho_arquivo'), data.get('tipo_arquivo')),
+                (data.get("sender_id"), data.get("recipient_id"), data.get("text"),
+                 data.get("timestamp", datetime.now().isoformat()), int(data.get("read", 0)),
+                 data.get("caminho_arquivo"), data.get("tipo_arquivo")),
             ),
-            'reports': (
+            "reports": (
                 "INSERT INTO desktop_report (name, report_type, format, generated_at, parameters, data, file_path, file_size, is_public, expires_at, generated_by_id) "
                 "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                (data.get('name'), data.get('report_type'), data.get('format'),
-                 data.get('generated_at', datetime.now().isoformat()), data.get('parameters', '{}'),
-                 data.get('data', '{}'), data.get('file_path'), data.get('file_size'),
-                 int(data.get('is_public', 0)), data.get('expires_at'), data.get('generated_by_id')),
+                (data.get("name"), data.get("report_type"), data.get("format"),
+                 data.get("generated_at", datetime.now().isoformat()), data.get("parameters", "{}"),
+                 data.get("data", "{}"), data.get("file_path"), data.get("file_size"),
+                 int(data.get("is_public", 0)), data.get("expires_at"), data.get("generated_by_id")),
             ),
-            'alerts': (
+            "alerts": (
                 "UPDATE desktop_alert SET is_read = 1 WHERE id = %s",
-                (data.get('id'),),
+                (data.get("id"),),
+            ),
+            "desktop_screeningform": (
+                "INSERT INTO desktop_screeningform (id, name, description, questions, is_active, created_at, updated_at) "
+                "VALUES (%s, %s, %s, %s, %s, NOW(), NOW()) "
+                "ON DUPLICATE KEY UPDATE name = VALUES(name), description = VALUES(description), questions = VALUES(questions), is_active = VALUES(is_active)",
+                (
+                    data.get("id"),
+                    data.get("name"),
+                    data.get("description", ""),
+                    json.dumps(data.get("questions")) if data.get("questions") is not None else "[]",
+                    int(data.get("is_active", 1)),
+                ),
             ),
         }
 
@@ -475,11 +567,103 @@ class SyncService:
         query, params = queries[entity]
         try:
             execute_non_query(query, params)
-            logger.debug("CREATE aplicado no MySQL: %s %s", entity, data.get('id'))
+            logger.debug("CREATE aplicado no MySQL: %s %s", entity, data.get("id"))
             return True
         except Exception as exc:
             logger.error("Erro ao executar CREATE para %s: %s", entity, exc)
             return False
+
+    def _apply_create_auth_user_to_mysql(self, data: Dict[str, Any], id_reconciliation: Optional[Dict[int, int]]) -> bool:
+        local_id = data.get("id")
+        if isinstance(local_id, int) and local_id < 0:
+            query = (
+                "INSERT INTO auth_user (id, username, email, password, first_name, last_name, is_staff, is_superuser, is_active, last_login) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL) "
+                "ON DUPLICATE KEY UPDATE username = VALUES(username)"
+            )
+            params = (
+                local_id,
+                data.get("username"),
+                data.get("email"),
+                data.get("password", ""),
+                data.get("first_name", ""),
+                data.get("last_name", ""),
+                int(data.get("is_staff", 0)),
+                int(data.get("is_superuser", 0)),
+                int(data.get("is_active", 1)),
+            )
+            execute_non_query(query, params)
+            if id_reconciliation is not None:
+                id_reconciliation[local_id] = local_id
+            logger.debug("CREATE auth_user aplicado no MySQL: %s", local_id)
+            return True
+
+        query = (
+            "INSERT INTO auth_user (username, email, password, first_name, last_name, is_staff, is_superuser, is_active, last_login) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NULL)"
+        )
+        params = (
+            data.get("username"),
+            data.get("email"),
+            data.get("password", ""),
+            data.get("first_name", ""),
+            data.get("last_name", ""),
+            int(data.get("is_staff", 0)),
+            int(data.get("is_superuser", 0)),
+            int(data.get("is_active", 1)),
+        )
+        execute_non_query(query, params)
+        logger.debug("CREATE auth_user aplicado no MySQL")
+        return True
+
+    def _apply_create_student_to_mysql(self, data: Dict[str, Any], id_reconciliation: Optional[Dict[int, int]]) -> bool:
+        local_id = data.get("id")
+        if isinstance(local_id, int) and local_id < 0:
+            query = (
+                "INSERT INTO aluno (id_aluno, nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention, created_at, updated_at, minigame_blocked) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s) "
+                "ON DUPLICATE KEY UPDATE nome = VALUES(nome)"
+            )
+            params = (
+                local_id,
+                data.get("nome"),
+                data.get("professor_responsavel") or "Não informado",
+                data.get("status") or "ativo",
+                int(data.get("priority_level") or 0),
+                json.dumps(data.get("tags")) if data.get("tags") is not None else "[]",
+                _shorten_avatar(data.get("avatar")),
+                int(data.get("dark_mode") or 0),
+                int(data.get("notifications_enabled") if data.get("notifications_enabled") is not None else 1),
+                int(data.get("has_medical_report", 0)),
+                int(data.get("requires_attention", 0)),
+                int(data.get("minigame_blocked", 0)),
+            )
+            execute_non_query(query, params)
+            if id_reconciliation is not None:
+                id_reconciliation[local_id] = local_id
+            logger.debug("CREATE student aplicado no MySQL: %s", local_id)
+            return True
+
+        query = (
+            "INSERT INTO aluno (nome, professor_responsavel, status, priority_level, tags, avatar, dark_mode, notifications_enabled, has_medical_report, requires_attention, created_at, updated_at, minigame_blocked) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)"
+        )
+        params = (
+            data.get("nome"),
+            data.get("professor_responsavel") or "Não informado",
+            data.get("status") or "ativo",
+            int(data.get("priority_level") or 0),
+            json.dumps(data.get("tags")) if data.get("tags") is not None else "[]",
+            _shorten_avatar(data.get("avatar")),
+            int(data.get("dark_mode") or 0),
+            int(data.get("notifications_enabled") if data.get("notifications_enabled") is not None else 1),
+            int(data.get("has_medical_report", 0)),
+            int(data.get("requires_attention", 0)),
+            int(data.get("minigame_blocked", 0)),
+        )
+        execute_non_query(query, params)
+        logger.debug("CREATE student aplicado no MySQL")
+        return True
 
     def _apply_update_to_mysql(self, entity: str, data: Dict[str, Any], entity_id: Any) -> bool:
         """Aplica UPDATE no MySQL local."""
@@ -495,17 +679,31 @@ class SyncService:
             return False
 
         table_map = {
-            'students': 'aluno',
-            'appointments': 'agendamento',
-            'orientations': 'desktop_orientation',
-            'screenings': 'desktop_screening',
-            'messages': 'desktop_message',
-            'reports': 'desktop_report',
-            'alerts': 'desktop_alert',
+            "students": "aluno",
+            "appointments": "agendamento",
+            "orientations": "desktop_orientation",
+            "screenings": "desktop_screening",
+            "messages": "desktop_message",
+            "reports": "desktop_report",
+            "alerts": "desktop_alert",
+            "auth_user": "auth_user",
+            "desktop_screeningform": "desktop_screeningform",
+        }
+
+        pk_column_map = {
+            "students": "id_aluno",
+            "appointments": "id",
+            "orientations": "id",
+            "screenings": "id",
+            "messages": "id",
+            "reports": "id",
+            "alerts": "id",
+            "auth_user": "id",
+            "desktop_screeningform": "id",
         }
 
         tables_with_updated_at = {
-            'students', 'appointments', 'orientations', 'screenings',
+            "students", "appointments", "orientations", "screenings",
         }
 
         table = table_map.get(entity)
@@ -515,10 +713,11 @@ class SyncService:
 
         validate_mysql_table_name(table)
 
-        set_clause = ', '.join(updates)
+        pk_column = pk_column_map.get(entity, "id")
+        set_clause = ", ".join(updates)
         if entity in tables_with_updated_at:
             set_clause += ", updated_at = NOW()"
-        query = f"UPDATE {table} SET {set_clause} WHERE id = %s"
+        query = f"UPDATE {table} SET {set_clause} WHERE {pk_column} = %s"
         params.append(entity_id)
 
         try:
@@ -532,13 +731,27 @@ class SyncService:
     def _apply_delete_to_mysql(self, entity: str, entity_id: Any) -> bool:
         """Aplica DELETE no MySQL local."""
         table_map = {
-            'students': 'aluno',
-            'appointments': 'agendamento',
-            'orientations': 'desktop_orientation',
-            'screenings': 'desktop_screening',
-            'messages': 'desktop_message',
-            'reports': 'desktop_report',
-            'alerts': 'desktop_alert',
+            "students": "aluno",
+            "appointments": "agendamento",
+            "orientations": "desktop_orientation",
+            "screenings": "desktop_screening",
+            "messages": "desktop_message",
+            "reports": "desktop_report",
+            "alerts": "desktop_alert",
+            "auth_user": "auth_user",
+            "desktop_screeningform": "desktop_screeningform",
+        }
+
+        pk_column_map = {
+            "students": "id_aluno",
+            "appointments": "id",
+            "orientations": "id",
+            "screenings": "id",
+            "messages": "id",
+            "reports": "id",
+            "alerts": "id",
+            "auth_user": "id",
+            "desktop_screeningform": "id",
         }
 
         table = table_map.get(entity)
@@ -548,7 +761,8 @@ class SyncService:
 
         validate_mysql_table_name(table)
 
-        query = f"DELETE FROM {table} WHERE id = %s"
+        pk_column = pk_column_map.get(entity, "id")
+        query = f"DELETE FROM {table} WHERE {pk_column} = %s"
         try:
             execute_non_query(query, (entity_id,))
             logger.debug("DELETE aplicado no MySQL: %s.%s", entity, entity_id)

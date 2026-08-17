@@ -13,3 +13,19 @@ def get_project_root() -> str:
             )
         )
     )
+
+
+def get_assets_dir() -> str:
+    return os.path.join(get_project_root(), "assets")
+
+
+def get_config_dir() -> str:
+    return os.path.join(get_project_root(), "config")
+
+
+def get_sql_dir() -> str:
+    return os.path.join(get_project_root(), "sql")
+
+
+def get_docs_dir() -> str:
+    return os.path.join(get_project_root(), "docs")
