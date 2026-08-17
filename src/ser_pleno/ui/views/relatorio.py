@@ -131,15 +131,31 @@ class RelatorioFrame(BaseViewFrame):
         self._chart_data = []
         self._todos_relatorios: list[dict] = []
         self._selecionados: set[int] = set()
+        self._heavy_built = False
+        self.filtro_tipo = None
+        self.filtro_busca = None
+        self.filtro_data_inicio = None
+        self.filtro_data_fim = None
+        self.reports_container = None
+        self._bulk_bar = None
+        self._bulk_count_lbl = None
+        self._select_all_var = None
 
         self._criar_cards_relatorios_rapidos()
         self._criar_kpis()
         self._criar_grid_central()
+
+        self.after_idle(self._build_heavy_sections)
+        self.after_idle(self._carregar_dados)
+        log_view_init_ms("relatorio", self._t0, widget_ref=self)
+
+    def _build_heavy_sections(self):
+        if self._heavy_built:
+            return
+        self._heavy_built = True
         self._criar_secao_exportacao()
         self._criar_lista_relatorios()
         self._criar_secao_templates()
-        self._carregar_dados()
-        log_view_init_ms("relatorio", self._t0, widget_ref=self)
 
     def _extract_items(self, res_data):
         if isinstance(res_data, list):
@@ -862,7 +878,7 @@ class RelatorioFrame(BaseViewFrame):
         )
 
     def _filtrar_relatorios(self):
-        tipo = self.filtro_tipo.get()
+        tipo = self.filtro_tipo.get() if self.filtro_tipo is not None else "Todos os tipos"
         tipo_map = {
             "Todos os tipos": None,
             "Geral": "geral",
@@ -872,9 +888,9 @@ class RelatorioFrame(BaseViewFrame):
             "Triagens": "triagens",
             "Estatísticas": "estatisticas",
         }
-        search = self.filtro_busca.get().strip() or None
-        data_inicio = self.filtro_data_inicio.get().strip() or None
-        data_fim = self.filtro_data_fim.get().strip() or None
+        search = self.filtro_busca.get().strip() or None if self.filtro_busca is not None else None
+        data_inicio = self.filtro_data_inicio.get().strip() or None if self.filtro_data_inicio is not None else None
+        data_fim = self.filtro_data_fim.get().strip() or None if self.filtro_data_fim is not None else None
 
         def fetch():
             return self.servico_relatorio.listar_relatorios(
@@ -1844,7 +1860,8 @@ class RelatorioFrame(BaseViewFrame):
         self._carregar_templates()
 
     def _filtrar_por_tipo(self, tipo: str):
-        self.filtro_tipo.set(tipo)
+        if self.filtro_tipo is not None:
+            self.filtro_tipo.set(tipo)
         self._filtrar_relatorios()
 
     def _baixar_relatorio(self, report: dict):

@@ -53,6 +53,23 @@ class EstudantesFrame(ctk.CTkFrame):
         self._item_widgets: dict = {}
         self._filter_after_id = None
         self._current_user_role: str | None = None
+        self._detail_panel_ready = False
+        self.btn_editar = None
+        self.btn_bloquear = None
+        self.btn_desbloquear = None
+        self.btn_suspicious = None
+        self.btn_log = None
+        self.lbl_nome_det = None
+        self.lbl_curso_det = None
+        self.status_bar = None
+        self.lbl_status_icon = None
+        self.lbl_status_det = None
+        self.tabs = None
+        self.tab_perfil = None
+        self.tab_intervencoes = None
+        self.tab_agenda = None
+        self._av_slot = None
+        self._hero_av = None
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
@@ -60,7 +77,8 @@ class EstudantesFrame(ctk.CTkFrame):
         self._criar_toolbar_acoes()
         self._criar_conteudo()
 
-        self.load_data()
+        self.after_idle(self._build_detail_panel_lazy)
+        self.after_idle(self.load_data)
         log_view_init_ms("estudantes", self._t0, widget_ref=self)
 
     def _get_current_user_role(self) -> str | None:
@@ -122,7 +140,20 @@ class EstudantesFrame(ctk.CTkFrame):
         wrap.grid_rowconfigure(0, weight=1)
 
         self._criar_sidebar(wrap)
-        self._criar_painel_detalhes(wrap)
+        self._detail_panel_placeholder = ctk.CTkFrame(wrap, fg_color="transparent")
+        self._detail_panel_placeholder.grid(row=0, column=1, sticky="nsew")
+
+    def _build_detail_panel_lazy(self):
+        if self._detail_panel_ready:
+            return
+        self._detail_panel_ready = True
+        placeholder = getattr(self, "_detail_panel_placeholder", None)
+        if placeholder is not None and placeholder.winfo_exists():
+            placeholder.destroy()
+        parent = placeholder.master if placeholder is not None else None
+        if parent is None:
+            return
+        self._criar_painel_detalhes(parent)
 
     def _criar_sidebar(self, parent):
         sidebar = Card(parent, width=320)
@@ -824,25 +855,45 @@ class EstudantesFrame(ctk.CTkFrame):
         )
 
     def selecionar_estudante(self, st: dict, widget=None):
+        self._selecionado = st
         for w in self.scroll_list.winfo_children():
             w.configure(fg_color=THEME["bg_alt"])
         if widget:
             widget.configure(fg_color=THEME["primary_soft"])
 
-        self._selecionado = st
+        if not getattr(self, "_detail_panel_ready", False):
+            self._build_detail_panel_lazy()
+
+        if getattr(self, "_detail_panel_ready", False):
+            self._atualizar_painel_detalhes(st)
+        else:
+            self.after_idle(lambda: self._atualizar_painel_detalhes(st))
+
+    def _atualizar_painel_detalhes(self, st: dict):
+        if not self.winfo_exists():
+            return
+        if not getattr(self, "_detail_panel_ready", False):
+            return
+        if self._selecionado != st:
+            return
+
         nome = st.get("name", "N/A")
         curso = st.get("course", "Sem curso")
         atenção = st.get("requires_attention", False)
         sid = st.get("id")
 
         av_color = get_avatar_color(nome)
-        for w in self._av_slot.winfo_children():
-            w.destroy()
-        av = Avatar(self._av_slot, initials=nome[:2], size=60, color=av_color)
-        av.pack(expand=True)
+        if self._av_slot is not None and self._av_slot.winfo_exists():
+            for w in self._av_slot.winfo_children():
+                w.destroy()
+            av = Avatar(self._av_slot, initials=nome[:2], size=60, color=av_color)
+            av.pack(expand=True)
+            self._hero_av = av
 
-        self.lbl_nome_det.configure(text=nome)
-        self.lbl_curso_det.configure(text=curso)
+        if self.lbl_nome_det is not None and self.lbl_nome_det.winfo_exists():
+            self.lbl_nome_det.configure(text=nome)
+        if self.lbl_curso_det is not None and self.lbl_curso_det.winfo_exists():
+            self.lbl_curso_det.configure(text=curso)
 
         def apply_detail(detail):
             if not self.winfo_exists():
@@ -905,37 +956,50 @@ class EstudantesFrame(ctk.CTkFrame):
                 )
 
             if d.get("minigame_blocked"):
-                self.status_bar.configure(fg_color=THEME["danger_soft"])
-                self.lbl_status_icon.configure(
-                    text=ICONS["status_dot"], text_color=THEME["danger"]
-                )
-                self.lbl_status_det.configure(
-                    text="Minigames bloqueados",
-                    text_color=THEME["danger"],
-                )
-                self.btn_bloquear.pack_forget()
-                self.btn_desbloquear.pack(side="left", padx=(0, 6))
-            else:
-                if atenção:
+                if self.status_bar is not None and self.status_bar.winfo_exists():
                     self.status_bar.configure(fg_color=THEME["danger_soft"])
+                if self.lbl_status_icon is not None and self.lbl_status_icon.winfo_exists():
                     self.lbl_status_icon.configure(
                         text=ICONS["status_dot"], text_color=THEME["danger"]
                     )
+                if self.lbl_status_det is not None and self.lbl_status_det.winfo_exists():
                     self.lbl_status_det.configure(
-                        text="Requer atendimento prioritário",
+                        text="Minigames bloqueados",
                         text_color=THEME["danger"],
                     )
+                if self.btn_bloquear is not None and self.btn_bloquear.winfo_exists():
+                    self.btn_bloquear.pack_forget()
+                if self.btn_desbloquear is not None and self.btn_desbloquear.winfo_exists():
+                    self.btn_desbloquear.pack(side="left", padx=(0, 6))
+            else:
+                if atenção:
+                    if self.status_bar is not None and self.status_bar.winfo_exists():
+                        self.status_bar.configure(fg_color=THEME["danger_soft"])
+                    if self.lbl_status_icon is not None and self.lbl_status_icon.winfo_exists():
+                        self.lbl_status_icon.configure(
+                            text=ICONS["status_dot"], text_color=THEME["danger"]
+                        )
+                    if self.lbl_status_det is not None and self.lbl_status_det.winfo_exists():
+                        self.lbl_status_det.configure(
+                            text="Requer atendimento prioritário",
+                            text_color=THEME["danger"],
+                        )
                 else:
-                    self.status_bar.configure(fg_color=THEME["success_soft"])
-                    self.lbl_status_icon.configure(
-                        text=ICONS["status_dot"], text_color=THEME["success"]
-                    )
-                    self.lbl_status_det.configure(
-                        text="Sem alertas — situação normal",
-                        text_color=THEME["success"],
-                    )
-                self.btn_desbloquear.pack_forget()
-                self.btn_bloquear.pack(side="left", padx=(0, 6))
+                    if self.status_bar is not None and self.status_bar.winfo_exists():
+                        self.status_bar.configure(fg_color=THEME["success_soft"])
+                    if self.lbl_status_icon is not None and self.lbl_status_icon.winfo_exists():
+                        self.lbl_status_icon.configure(
+                            text=ICONS["status_dot"], text_color=THEME["success"]
+                        )
+                    if self.lbl_status_det is not None and self.lbl_status_det.winfo_exists():
+                        self.lbl_status_det.configure(
+                            text="Sem alertas — situação normal",
+                            text_color=THEME["success"],
+                        )
+                if self.btn_desbloquear is not None and self.btn_desbloquear.winfo_exists():
+                    self.btn_desbloquear.pack_forget()
+                if self.btn_bloquear is not None and self.btn_bloquear.winfo_exists():
+                    self.btn_bloquear.pack(side="left", padx=(0, 6))
 
         def fetch_detail():
             return self.servico_estudantes.obter_estudante(sid)
@@ -956,26 +1020,34 @@ class EstudantesFrame(ctk.CTkFrame):
         )
 
         if atenção:
-            self.status_bar.configure(fg_color=THEME["danger_soft"])
-            self.lbl_status_icon.configure(
-                text=ICONS["status_dot"], text_color=THEME["danger"]
-            )
-            self.lbl_status_det.configure(
-                text="Requer atendimento prioritário",
-                text_color=THEME["danger"],
-            )
+            if self.status_bar is not None and self.status_bar.winfo_exists():
+                self.status_bar.configure(fg_color=THEME["danger_soft"])
+            if self.lbl_status_icon is not None and self.lbl_status_icon.winfo_exists():
+                self.lbl_status_icon.configure(
+                    text=ICONS["status_dot"], text_color=THEME["danger"]
+                )
+            if self.lbl_status_det is not None and self.lbl_status_det.winfo_exists():
+                self.lbl_status_det.configure(
+                    text="Requer atendimento prioritário",
+                    text_color=THEME["danger"],
+                )
         else:
-            self.status_bar.configure(fg_color=THEME["success_soft"])
-            self.lbl_status_icon.configure(
-                text=ICONS["status_dot"], text_color=THEME["success"]
-            )
-            self.lbl_status_det.configure(
-                text="Sem alertas — situação normal",
-                text_color=THEME["success"],
-            )
+            if self.status_bar is not None and self.status_bar.winfo_exists():
+                self.status_bar.configure(fg_color=THEME["success_soft"])
+            if self.lbl_status_icon is not None and self.lbl_status_icon.winfo_exists():
+                self.lbl_status_icon.configure(
+                    text=ICONS["status_dot"], text_color=THEME["success"]
+                )
+            if self.lbl_status_det is not None and self.lbl_status_det.winfo_exists():
+                self.lbl_status_det.configure(
+                    text="Sem alertas — situação normal",
+                    text_color=THEME["success"],
+                )
 
-        self.btn_desbloquear.pack_forget()
-        self.btn_bloquear.pack(side="left", padx=(0, 6))
+        if self.btn_desbloquear is not None and self.btn_desbloquear.winfo_exists():
+            self.btn_desbloquear.pack_forget()
+        if self.btn_bloquear is not None and self.btn_bloquear.winfo_exists():
+            self.btn_bloquear.pack(side="left", padx=(0, 6))
 
     def _carregar_aba_intervencoes(self, student_id: int):
         for w in self.tab_int_inner.winfo_children():

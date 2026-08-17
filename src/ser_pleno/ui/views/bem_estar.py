@@ -1,36 +1,36 @@
 import logging
-import customtkinter as ctk
 from datetime import datetime
-from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+
+import customtkinter as ctk
+
 from ser_pleno.features.bem_estar.service import ServicoBemEstar
 from ser_pleno.ui.components.icons import ICONS, MOOD_EMOJIS, MOOD_LABELS
 from ser_pleno.ui.components.ui_components import (
+    Avatar,
+    Card,
+    DangerButton,
     Divider,
     EmptyState,
     GhostButton,
-    Card,
-    Avatar,
     KPICard,
     PrimaryButton,
-    DangerButton,
-    Toast,
     SectionCard,
+    Toast,
 )
-from ser_pleno.utils.avatar_utils import get_avatar_color
-from ser_pleno.utils.mood import mood_emoji_from_score
-from ser_pleno.utils.widget_batch import WidgetBatchBuilder
-
 from ser_pleno.ui.theme import (
-    THEME,
-    SPACING,
-    RADIUS,
     FONT_FAMILY,
-    themed_font,
+    RADIUS,
+    SPACING,
+    THEME,
     blend_color,
+    themed_font,
 )
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.ui.views.base import _ErrorModal
-
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.utils.mood import mood_emoji_from_score
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 _RISK_COLS = [
     ("Crítico", THEME["critico"], THEME["critico_soft"], "critico"),
@@ -703,20 +703,45 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._challenge_modal: _ChallengeFormModal | None = None
         self._editing_challenge_id: int | None = None
         self._current_user_id: int = 1
+        self._lazy_sections_ready: bool = False
 
-        content = ctk.CTkFrame(self, fg_color="transparent")
-        content.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+        self._student_search: ctk.CTkEntry | None = None
+        self._student_list_body: ctk.CTkScrollableFrame | None = None
+        self._profile_avatar: ctk.CTkFrame | None = None
+        self._profile_name: ctk.CTkLabel | None = None
+        self._profile_course: ctk.CTkLabel | None = None
+        self._mini_chart_canvas: ctk.CTkCanvas | None = None
+        self._detail_tabs: ctk.CTkTabview | None = None
+        self._tab_history: str | None = None
+        self._tab_checkins: str | None = None
+        self._tab_challenges: str | None = None
+        self._history_body: ctk.CTkScrollableFrame | None = None
+        self._checkins_detail_body: ctk.CTkScrollableFrame | None = None
+        self._challenges_detail_body: ctk.CTkScrollableFrame | None = None
+        self._checkins_body: ctk.CTkFrame | None = None
 
-        self._criar_toolbar(content)
-        self._criar_kpis(content)
-        self._criar_secao_grafico(content)
+        self._content = ctk.CTkFrame(self, fg_color="transparent")
+        self._content.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
+
+        self._criar_toolbar(self._content)
+        self._criar_kpis(self._content)
+        self._criar_secao_grafico(self._content)
+
+        self.after_idle(self._build_lazy_sections)
+        self.after_idle(self.load_data)
+        log_view_init_ms("bem_estar", self._t0, widget_ref=self)
+
+    def _build_lazy_sections(self):
+        if getattr(self, "_lazy_sections_ready", False):
+            return
+        self._lazy_sections_ready = True
+        content = getattr(self, "_content", None)
+        if content is None or not content.winfo_exists():
+            return
         self._criar_area_estudante(content)
         self._criar_visao_risco_ui(content)
         self._criar_lista_checkins_ui(content)
-
-        self.load_data()
-        self.after(120, self._carregar_lista_estudantes)
-        log_view_init_ms("bem_estar", self._t0, widget_ref=self)
+        self.after(0, self._carregar_lista_estudantes)
 
     def _criar_toolbar(self, content):
         bar = ctk.CTkFrame(content, fg_color="transparent")
@@ -1013,11 +1038,10 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
     def _renderizar_lista_estudantes(self, lista: list):
-        if hasattr(self, "_student_list_body"):
-            for w in self._student_list_body.winfo_children():
-                w.destroy()
-        if not hasattr(self, "_student_list_body"):
+        if not hasattr(self, "_student_list_body") or self._student_list_body is None or not self._student_list_body.winfo_exists():
             return
+        for w in self._student_list_body.winfo_children():
+            w.destroy()
         if not lista:
             EmptyState(
                 self._student_list_body,
@@ -1108,9 +1132,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                     student_name = student_info.get("name", "Estudante")
                 elif isinstance(data, list):
                     entries = data
-            if hasattr(self, "_profile_name"):
+            if hasattr(self, "_profile_name") and self._profile_name is not None and self._profile_name.winfo_exists():
                 self._profile_name.configure(text=student_name)
-            if hasattr(self, "_profile_avatar"):
+            if hasattr(self, "_profile_avatar") and self._profile_avatar is not None and self._profile_avatar.winfo_exists():
                 for w in self._profile_avatar.winfo_children():
                     w.destroy()
                 Avatar(
@@ -1119,7 +1143,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                     size=48,
                     color=get_avatar_color(student_name),
                 ).pack(expand=True)
-            if hasattr(self, "_mini_chart_canvas") and entries:
+            if hasattr(self, "_mini_chart_canvas") and self._mini_chart_canvas is not None and entries:
                 self._draw_mini_chart(entries)
 
         def on_error(exc):
@@ -1174,7 +1198,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._draw_mini_chart(getattr(self, "_chart_data", []))
 
     def _carregar_historico_estudante(self, student_id):
-        if not hasattr(self, "_history_body"):
+        if not hasattr(self, "_history_body") or self._history_body is None or not self._history_body.winfo_exists():
             return
         for w in self._history_body.winfo_children():
             w.destroy()
@@ -1252,7 +1276,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         ).grid(row=1, column=1, sticky="w", pady=(2, 0))
 
     def _carregar_checkins_estudante(self, student_id):
-        if not hasattr(self, "_checkins_detail_body"):
+        if not hasattr(self, "_checkins_detail_body") or self._checkins_detail_body is None or not self._checkins_detail_body.winfo_exists():
             return
         for w in self._checkins_detail_body.winfo_children():
             w.destroy()
@@ -1349,7 +1373,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             ).grid(row=3, column=0, sticky="w", pady=(2, 0))
 
     def _carregar_desafios_estudante(self, student_id=None):
-        if not hasattr(self, "_challenges_detail_body"):
+        if not hasattr(self, "_challenges_detail_body") or self._challenges_detail_body is None or not self._challenges_detail_body.winfo_exists():
             return
         for w in self._challenges_detail_body.winfo_children():
             w.destroy()
@@ -1982,6 +2006,8 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             }
 
     def populate_risks(self, risks: list):
+        if not self.colunas_risco:
+            return
         for col in self.colunas_risco.values():
             for w in col["content"].winfo_children():
                 w.destroy()
@@ -2066,7 +2092,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._checkins_body = card.body
 
     def populate_checkins(self, checkins: list):
-        if not hasattr(self, "_checkins_body"):
+        if not hasattr(self, "_checkins_body") or self._checkins_body is None or not self._checkins_body.winfo_exists():
             return
         for w in self._checkins_body.winfo_children():
             w.destroy()

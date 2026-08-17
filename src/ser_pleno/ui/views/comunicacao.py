@@ -82,12 +82,21 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self._ws_client: WebSocketChatClient | None = None
         self._ws_connected = False
 
+        self.lbl_chat_nome = None
+        self.lbl_chat_status = None
+        self._header_av_slot = None
+        self.msg_area = None
+        self.entry_mensagem = None
+        self.btn_clip = None
+        self.btn_enviar = None
+        self.modal_arquivos = None
+
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self._criar_sidebar()
-        self._criar_chat_area()
-        self.carregar_contatos()
+        self.after_idle(self._build_chat_area_lazy)
+        self.after_idle(self.carregar_contatos)
         self._iniciar_atualizacao_periodica()
         self.bind("<Destroy>", self._on_destroy)
         log_view_init_ms("comunicacao", self._t0, widget_ref=self)
@@ -143,17 +152,17 @@ class ComunicacaoFrame(ctk.CTkFrame):
 
     def _on_ws_open(self):
         self._ws_connected = True
-        if hasattr(self, "lbl_chat_status"):
+        if self.lbl_chat_status is not None and self.lbl_chat_status.winfo_exists():
             self.lbl_chat_status.configure(text="Online (WebSocket)")
 
     def _on_ws_close(self):
         self._ws_connected = False
-        if hasattr(self, "lbl_chat_status"):
+        if self.lbl_chat_status is not None and self.lbl_chat_status.winfo_exists():
             self.lbl_chat_status.configure(text="Reconectando...")
 
     def _on_ws_error(self, exc):
         self._ws_connected = False
-        if hasattr(self, "lbl_chat_status"):
+        if self.lbl_chat_status is not None and self.lbl_chat_status.winfo_exists():
             self.lbl_chat_status.configure(text="Erro na conexão")
 
     def _on_ws_message(self, msg: dict) -> None:
@@ -425,15 +434,19 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.conversa_atual = None
         self.mensagens = []
 
-        self.lbl_chat_nome.configure(text="Selecione uma conversa")
-        self.lbl_chat_status.configure(text="Online")
+        if self.lbl_chat_nome is not None and self.lbl_chat_nome.winfo_exists():
+            self.lbl_chat_nome.configure(text="Selecione uma conversa")
+        if self.lbl_chat_status is not None and self.lbl_chat_status.winfo_exists():
+            self.lbl_chat_status.configure(text="Online")
 
-        for w in self._header_av_slot.winfo_children():
-            w.destroy()
-        _make_avatar(self._header_av_slot, "AN", THEME["primary"], 42).pack()
+        if self._header_av_slot is not None and self._header_av_slot.winfo_exists():
+            for w in self._header_av_slot.winfo_children():
+                w.destroy()
+            _make_avatar(self._header_av_slot, "AN", THEME["primary"], 42).pack()
 
-        for w in self.msg_area.winfo_children():
-            w.destroy()
+        if self.msg_area is not None and self.msg_area.winfo_exists():
+            for w in self.msg_area.winfo_children():
+                w.destroy()
 
     def selecionar_conversa(self, contato: dict, item_widget=None):
         for w in self.scroll_contacts.winfo_children():
@@ -448,17 +461,20 @@ class ComunicacaoFrame(ctk.CTkFrame):
         nome = contato["name"]
         papel = contato["role"]
 
-        self.lbl_chat_nome.configure(text=nome)
-        self.lbl_chat_status.configure(
-            text="Conectando..." if not self._ws_connected else "Online (WebSocket)"
-        )
+        if self.lbl_chat_nome is not None and self.lbl_chat_nome.winfo_exists():
+            self.lbl_chat_nome.configure(text=nome)
+        if self.lbl_chat_status is not None and self.lbl_chat_status.winfo_exists():
+            self.lbl_chat_status.configure(
+                text="Conectando..." if not self._ws_connected else "Online (WebSocket)"
+            )
 
-        av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
-        av_init = nome[:2].upper() if papel != "group" else ICONS["group"]
-        for w in self._header_av_slot.winfo_children():
-            w.destroy()
-        av = _make_avatar(self._header_av_slot, av_init, av_color, size=42)
-        av.pack(expand=True)
+        if self._header_av_slot is not None and self._header_av_slot.winfo_exists():
+            av_color = _CHAT_AVATAR_COLORS.get(papel, THEME["primary"])
+            av_init = nome[:2].upper() if papel != "group" else ICONS["group"]
+            for w in self._header_av_slot.winfo_children():
+                w.destroy()
+            av = _make_avatar(self._header_av_slot, av_init, av_color, size=42)
+            av.pack(expand=True)
 
         if papel == "group":
             self._connect_ws_group()
@@ -467,7 +483,9 @@ class ComunicacaoFrame(ctk.CTkFrame):
 
         self.carregar_mensagens()
 
-    def _criar_chat_area(self):
+    def _build_chat_area_lazy(self):
+        if not hasattr(self, "winfo_exists") or not self.winfo_exists():
+            return
         chat = ctk.CTkFrame(self, fg_color=THEME["bg"], corner_radius=0)
         chat.grid(row=0, column=1, sticky="nsew")
         chat.grid_rowconfigure(1, weight=1)
@@ -685,10 +703,11 @@ class ComunicacaoFrame(ctk.CTkFrame):
             btn.grid(row=row_i + 1, column=col_i, padx=spacing("xs"), pady=spacing("xs"))
 
     def toggle_modal_arquivos(self):
-        if self.modal_arquivos.winfo_manager():
-            self.modal_arquivos.grid_remove()
-        else:
-            self.modal_arquivos.grid()
+        if self.modal_arquivos is not None and self.modal_arquivos.winfo_exists():
+            if self.modal_arquivos.winfo_manager():
+                self.modal_arquivos.grid_remove()
+            else:
+                self.modal_arquivos.grid()
 
     def carregar_mensagens(self):
         if not self.conversa_ativa or not hasattr(self, "winfo_exists") or not self.winfo_exists():
@@ -718,7 +737,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
                     logger.error("Erro ao marcar como lida: %s", e)
 
     def atualizar_area_mensagens(self):
-        if not hasattr(self, "msg_area") or not self.msg_area.winfo_exists():
+        if self.msg_area is None or not self.msg_area.winfo_exists():
             return
         for w in self.msg_area.winfo_children():
             if w.winfo_exists():
@@ -745,6 +764,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.after(50, lambda: self.msg_area._parent_canvas.yview_moveto(1.0))
 
     def criar_mensagem(self, msg: dict):
+        if self.msg_area is None or not self.msg_area.winfo_exists():
+            return
         is_mine = msg["sender_id"] == self.usuario_logado_id
         remetente = "Eu" if is_mine else self.obter_nome_remetente(msg["sender_id"])
 
@@ -891,7 +912,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
             ).pack(pady=3)
 
     def enviar_mensagem(self):
-        txt = self.entry_mensagem.get().strip()
+        txt = self.entry_mensagem.get().strip() if self.entry_mensagem is not None else ""
         if not txt or not self.conversa_ativa:
             return
         try:
@@ -916,7 +937,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
                 )
             if res["success"]:
                 self.carregar_mensagens()
-                self.entry_mensagem.delete(0, "end")
+                if self.entry_mensagem is not None and self.entry_mensagem.winfo_exists():
+                    self.entry_mensagem.delete(0, "end")
                 self.carregar_contador_nao_lidas()
                 self.atualizar_lista_contatos()
         except Exception as e:
@@ -951,7 +973,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
                 )
             if res["success"]:
                 self.carregar_mensagens()
-            self.modal_arquivos.grid_remove()
+            if self.modal_arquivos is not None and self.modal_arquivos.winfo_exists():
+                self.modal_arquivos.grid_remove()
         except Exception as e:
             logger.error("Erro ao enviar arquivo: %s", e)
 

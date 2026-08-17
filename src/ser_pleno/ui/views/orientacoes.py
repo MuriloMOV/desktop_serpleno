@@ -311,11 +311,17 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._orientacoes_page_size = 20
         self._orientacoes_rendered_count = 0
         self._btn_mais: Optional[ctk.CTkButton] = None
+        self._form_nova_built = False
+        self._estatisticas_built = False
+        self._filtros_built = False
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
         self._criar_conteudo()
+        self.after_idle(self._build_form_nova_lazy)
+        self.after_idle(self._build_area_estatisticas_lazy)
+        self.after_idle(self._build_area_filtros_lazy)
         self._carregar_dados()
         self._carregar_estudantes()
         log_view_init_ms("orientacoes", self._t0, widget_ref=self)
@@ -493,10 +499,6 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._area_filtros.grid(row=1, column=0, sticky="nsew")
         self._area_filtros.grid_remove()
 
-        self._construir_form_nova(self._area_nova)
-        self._construir_area_estatisticas(self._area_estatisticas)
-        self._construir_area_filtros(self._area_filtros)
-
         self._hist_placeholder = ctk.CTkLabel(
             self._area_historico,
             text="Selecione um estudante para ver as orientações",
@@ -513,20 +515,34 @@ class OrientacoesFrame(ctk.CTkFrame):
                 fg_color=O["accent"] if ativo else O["accent_soft"],
                 text_color=THEME["text_on_primary"] if ativo else O["accent"],
             )
-        self._area_nova.grid_remove()
-        self._area_historico.grid_remove()
-        self._area_estatisticas.grid_remove()
-        self._area_filtros.grid_remove()
+        if self._area_nova is not None and self._area_nova.winfo_exists():
+            self._area_nova.grid_remove()
+        if self._area_historico is not None and self._area_historico.winfo_exists():
+            self._area_historico.grid_remove()
+        if self._area_estatisticas is not None and self._area_estatisticas.winfo_exists():
+            self._area_estatisticas.grid_remove()
+        if self._area_filtros is not None and self._area_filtros.winfo_exists():
+            self._area_filtros.grid_remove()
 
         if key == "historico":
-            self._area_historico.grid()
+            if self._area_historico is not None and self._area_historico.winfo_exists():
+                self._area_historico.grid()
         elif key == "nova":
-            self._area_nova.grid()
+            if not self._form_nova_built:
+                self._build_form_nova_lazy()
+            if self._area_nova is not None and self._area_nova.winfo_exists():
+                self._area_nova.grid()
         elif key == "estatisticas":
-            self._area_estatisticas.grid()
+            if not self._estatisticas_built:
+                self._build_area_estatisticas_lazy()
+            if self._area_estatisticas is not None and self._area_estatisticas.winfo_exists():
+                self._area_estatisticas.grid()
             self._carregar_estatisticas()
         elif key == "filtros":
-            self._area_filtros.grid()
+            if not self._filtros_built:
+                self._build_area_filtros_lazy()
+            if self._area_filtros is not None and self._area_filtros.winfo_exists():
+                self._area_filtros.grid()
 
     def _construir_form_nova(self, parent: Any) -> None:
         card = ctk.CTkFrame(
@@ -890,6 +906,8 @@ class OrientacoesFrame(ctk.CTkFrame):
             ).pack(side="right", padx=(0, 6))
 
     def _atualizar_badge_estudante(self) -> None:
+        if self._badge_estudante_content is None or not self._badge_estudante_content.winfo_exists():
+            return
         clear_children(self._badge_estudante_content)
         if not self._selected_student:
             ctk.CTkLabel(
@@ -1042,7 +1060,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         )
 
     def _carregar_estatisticas(self) -> None:
-        if not hasattr(self, "_stats_total_label"):
+        if not getattr(self, "_estatisticas_built", False):
+            self._build_area_estatisticas_lazy()
+        if self._stats_total_label is None or not self._stats_total_label.winfo_exists():
             return
         aluno_id = (
             self._selected_student.get("id") if self._selected_student else None
@@ -1299,6 +1319,10 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._filtros_info.pack(anchor="w")
 
     def _aplicar_filtros(self) -> None:
+        if not self._filtros_built:
+            self._build_area_filtros_lazy()
+        if self._f_tema_filtro is None or not self._f_tema_filtro.winfo_exists():
+            return
         tema = self._f_tema_filtro.get()
         data_inicio = self._f_data_inicio.get().strip()
         data_fim = self._f_data_fim.get().strip()
@@ -1336,11 +1360,18 @@ class OrientacoesFrame(ctk.CTkFrame):
         )
 
     def _limpar_filtros(self) -> None:
-        self._f_tema_filtro.widget.set("Todos")
-        self._f_data_inicio.delete(0, "end")
-        self._f_data_fim.delete(0, "end")
-        self._f_busca_historico.delete(0, "end")
-        self._filtros_info.configure(text="")
+        if not self._filtros_built:
+            self._build_area_filtros_lazy()
+        if self._f_tema_filtro is not None and self._f_tema_filtro.winfo_exists():
+            self._f_tema_filtro.widget.set("Todos")
+        if self._f_data_inicio is not None and self._f_data_inicio.winfo_exists():
+            self._f_data_inicio.delete(0, "end")
+        if self._f_data_fim is not None and self._f_data_fim.winfo_exists():
+            self._f_data_fim.delete(0, "end")
+        if self._f_busca_historico is not None and self._f_busca_historico.winfo_exists():
+            self._f_busca_historico.delete(0, "end")
+        if self._filtros_info is not None and self._filtros_info.winfo_exists():
+            self._filtros_info.configure(text="")
         self._carregar_dados()
 
     def _carregar_dados(self) -> None:
@@ -1592,20 +1623,23 @@ class OrientacoesFrame(ctk.CTkFrame):
             self._btn_mais.pack(pady=12)
 
     def _salvar_orientacao(self) -> None:
+        if not self._form_nova_built:
+            self._build_form_nova_lazy()
+        if self.f_titulo is None or not self.f_titulo.winfo_exists():
+            return
         titulo = self.f_titulo.get().strip()
-        conteudo = self.f_conteudo.get().strip()
         if not titulo:
             self.f_titulo.set_error("Título é obrigatório")
             return
 
         dados = {
             "title": titulo,
-            "content": conteudo,
-            "theme": self.f_tema.get(),
-            "session_date": self.f_data.get().strip(),
-            "referral": self.f_encaminhamento.get().strip(),
-            "notes": self.f_obs.get().strip(),
-            "motivational_message": self.f_mensagem.get().strip(),
+            "content": self.f_conteudo.get().strip() if self.f_conteudo is not None and self.f_conteudo.winfo_exists() else "",
+            "theme": self.f_tema.get() if self.f_tema is not None and self.f_tema.winfo_exists() else "Geral",
+            "session_date": self.f_data.get().strip() if self.f_data is not None and self.f_data.winfo_exists() else "",
+            "referral": self.f_encaminhamento.get().strip() if self.f_encaminhamento is not None and self.f_encaminhamento.winfo_exists() else "",
+            "notes": self.f_obs.get().strip() if self.f_obs is not None and self.f_obs.winfo_exists() else "",
+            "motivational_message": self.f_mensagem.get().strip() if self.f_mensagem is not None and self.f_mensagem.winfo_exists() else "",
             "student_id": (
                 self._selected_student.get("id")
                 if self._selected_student
@@ -1688,6 +1722,8 @@ class OrientacoesFrame(ctk.CTkFrame):
             self._renderizar_anexos_selecionados()
 
     def _renderizar_anexos_selecionados(self) -> None:
+        if self._anexos_lista is None or not self._anexos_lista.winfo_exists():
+            return
         clear_children(self._anexos_lista)
         if not self._anexos_selecionados:
             ctk.CTkLabel(
@@ -1800,6 +1836,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         return f"{tamanho:.1f} {unidades[i]}"
 
     def _abrir_dialogo_templates(self) -> None:
+        if not self._form_nova_built:
+            self._build_form_nova_lazy()
         templates = self.servico_orientacoes.get_presets()
         if not templates:
             self._show_error("Nenhum modelo disponível", title="Modelos")
@@ -1825,9 +1863,12 @@ class OrientacoesFrame(ctk.CTkFrame):
         def usar_template(chave: str):
             res = self.servico_orientacoes.usar_template(chave, student_id)
             if res:
-                self.f_titulo.insert(0, res.get("title", ""))
-                self.f_conteudo.insert("1.0", res.get("content", ""))
-                self.f_tema.widget.set(res.get("theme", "Geral"))
+                if self.f_titulo is not None and self.f_titulo.winfo_exists():
+                    self.f_titulo.insert(0, res.get("title", ""))
+                if self.f_conteudo is not None and self.f_conteudo.winfo_exists():
+                    self.f_conteudo.insert("1.0", res.get("content", ""))
+                if self.f_tema is not None and self.f_tema.winfo_exists():
+                    self.f_tema.widget.set(res.get("theme", "Geral"))
             modal.destroy()
 
         for chave, info in templates.items():
@@ -1892,24 +1933,33 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._modal_detalhe(o)
 
     def _editar_orientacao(self, o: Dict[str, Any]) -> None:
+        if not self._form_nova_built:
+            self._build_form_nova_lazy()
         self._orientacao_editando_id = o.get("id")
         self._anexos_existentes_ids.clear()
         self._anexos_selecionados.clear()
         self._action_plan_itens.clear()
 
-        self.f_titulo.delete(0, "end")
-        self.f_titulo.insert(0, o.get("title", ""))
-        self.f_conteudo.delete("1.0", "end")
-        self.f_conteudo.insert("1.0", o.get("content", ""))
-        self.f_tema.widget.set(o.get("theme", "Geral"))
-        self.f_data.delete(0, "end")
-        self.f_data.insert(0, (o.get("session_date") or "")[:10])
-        self.f_encaminhamento.delete(0, "end")
-        self.f_encaminhamento.insert(0, o.get("referral", "") or "")
-        self.f_obs.delete("1.0", "end")
-        self.f_obs.insert("1.0", o.get("notes", "") or "")
-        self.f_mensagem.delete(0, "end")
-        self.f_mensagem.insert(0, o.get("motivational_message", "") or "")
+        if self.f_titulo is not None and self.f_titulo.winfo_exists():
+            self.f_titulo.delete(0, "end")
+            self.f_titulo.insert(0, o.get("title", ""))
+        if self.f_conteudo is not None and self.f_conteudo.winfo_exists():
+            self.f_conteudo.delete("1.0", "end")
+            self.f_conteudo.insert("1.0", o.get("content", ""))
+        if self.f_tema is not None and self.f_tema.winfo_exists():
+            self.f_tema.widget.set(o.get("theme", "Geral"))
+        if self.f_data is not None and self.f_data.winfo_exists():
+            self.f_data.delete(0, "end")
+            self.f_data.insert(0, (o.get("session_date") or "")[:10])
+        if self.f_encaminhamento is not None and self.f_encaminhamento.winfo_exists():
+            self.f_encaminhamento.delete(0, "end")
+            self.f_encaminhamento.insert(0, o.get("referral", "") or "")
+        if self.f_obs is not None and self.f_obs.winfo_exists():
+            self.f_obs.delete("1.0", "end")
+            self.f_obs.insert("1.0", o.get("notes", "") or "")
+        if self.f_mensagem is not None and self.f_mensagem.winfo_exists():
+            self.f_mensagem.delete(0, "end")
+            self.f_mensagem.insert(0, o.get("motivational_message", "") or "")
 
         ap = o.get("action_plan", [])
         if isinstance(ap, list):
@@ -2323,6 +2373,27 @@ class OrientacoesFrame(ctk.CTkFrame):
             on_error=lambda e: self._show_error(str(e)),
             widget_ref=self,
         )
+
+    def _build_form_nova_lazy(self) -> None:
+        if self._form_nova_built:
+            return
+        self._form_nova_built = True
+        if self._area_nova is not None and self._area_nova.winfo_exists():
+            self._construir_form_nova(self._area_nova)
+
+    def _build_area_estatisticas_lazy(self) -> None:
+        if self._estatisticas_built:
+            return
+        self._estatisticas_built = True
+        if self._area_estatisticas is not None and self._area_estatisticas.winfo_exists():
+            self._construir_area_estatisticas(self._area_estatisticas)
+
+    def _build_area_filtros_lazy(self) -> None:
+        if self._filtros_built:
+            return
+        self._filtros_built = True
+        if self._area_filtros is not None and self._area_filtros.winfo_exists():
+            self._construir_area_filtros(self._area_filtros)
 
     def _confirmar(self, mensagem: str) -> bool:
         modal = ctk.CTkToplevel(self)
