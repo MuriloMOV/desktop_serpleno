@@ -11,31 +11,52 @@ from ser_pleno.repositories.base import (
     generate_local_id,
 )
 from ser_pleno.infrastructure.api.sync_service import queue_sync
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AutenticacaoRepository:
-    @with_local_fallback("_local_obter_usuario_por_username")
     def obter_usuario_por_username(self, username):
-        query = "SELECT * FROM auth_user WHERE username = %s"
-        return fetch_one(query, (username,))
+        _local_rows = local_cache.list_all("auth_users", where_clause="username=?", params=(username,))
+        if _local_rows:
+            return _local_rows[0]
+        try:
+            query = "SELECT * FROM auth_user WHERE username = %s"
+            return fetch_one(query, (username,))
+        except Exception as exc:
+            logger.debug("MySQL indisponivel para obter_usuario_por_username: %s", exc)
+            return None
 
     def _local_obter_usuario_por_username(self, username):
         rows = local_cache.list_all("auth_users", where_clause="username=?", params=(username,))
         return rows[0] if rows else None
 
-    @with_local_fallback("_local_obter_usuario_por_id")
     def obter_usuario_por_id(self, user_id):
-        query = "SELECT * FROM auth_user WHERE id = %s"
-        return fetch_one(query, (user_id,))
+        _local_rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
+        if _local_rows:
+            return _local_rows[0]
+        try:
+            query = "SELECT * FROM auth_user WHERE id = %s"
+            return fetch_one(query, (user_id,))
+        except Exception as exc:
+            logger.debug("MySQL indisponivel para obter_usuario_por_id: %s", exc)
+            return None
 
     def _local_obter_usuario_por_id(self, user_id):
         rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
         return rows[0] if rows else None
 
-    @with_local_fallback("_local_obter_senha_usuario")
     def obter_senha_usuario(self, user_id):
-        query = "SELECT password FROM auth_user WHERE id = %s"
-        return fetch_one(query, (user_id,))
+        _local_rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
+        if _local_rows:
+            return {"password": _local_rows[0].get("password", "")}
+        try:
+            query = "SELECT password FROM auth_user WHERE id = %s"
+            return fetch_one(query, (user_id,))
+        except Exception as exc:
+            logger.debug("MySQL indisponivel para obter_senha_usuario: %s", exc)
+            return None
 
     def _local_obter_senha_usuario(self, user_id):
         rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))

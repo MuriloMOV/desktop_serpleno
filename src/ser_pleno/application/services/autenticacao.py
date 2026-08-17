@@ -95,13 +95,13 @@ class ServicoAutenticacao:
     
     def login(self, usuario, senha):
         """
-        Realiza login via banco local (prioritário) com fallback para API.
-        A API só é tentada se o login local falhar, evitando delays desnecessários.
+        Realiza login via cache local SQLite (prioritario) com fallback para MySQL.
+        O cache local e instantaneo; MySQL so e consultado se o usuario nao
+        existir no SQLite, evitando delays desnecessarios de rede/IO.
         """
         try:
             result = self._login_local(usuario, senha)
             if result.get("success"):
-                # Estabelece sessão Django em background sem bloquear o login.
                 self._try_establish_session_async(usuario, senha)
                 return result
             return result
@@ -176,12 +176,13 @@ class ServicoAutenticacao:
     
     def _login_local(self, usuario, senha):
         """
-        Realiza login consultando diretamente o banco MySQL (fallback).
+        Realiza login consultando primeiro o cache SQLite local (instantaneo),
+        com fallback para MySQL apenas se o usuario nao for encontrado localmente.
         """
         try:
             user = self.repo.obter_usuario_por_username(usuario)
             if user:
-                hash_value = user['password']
+                hash_value = user.get('password') or user.get('password_hash', '')
                 if hash_value.startswith('pbkdf2_sha256$'):
                     valid = django_pbkdf2_sha256.verify(senha, hash_value)
                 elif hash_value.startswith('pbkdf2_sha1$'):
