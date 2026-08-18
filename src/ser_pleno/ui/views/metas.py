@@ -227,7 +227,7 @@ class GoalCard(ctk.CTkFrame):
 
         prog_color = THEME["warning"] if self._is_overdue else color
         prog_fill = ctk.CTkFrame(prog_bg, fg_color=prog_color, corner_radius=999, height=8)
-        prog_fill.place(x=0, y=0, relwidth=progress / 100, height=8)
+        prog_fill.place(x=0, y=0, relwidth=progress / 100)
 
         ctk.CTkLabel(
             prog_frame,
@@ -276,13 +276,13 @@ class MetasFrame(ctk.CTkFrame):
         self._filter_after_id = None
         self._stats: dict = {}
         self._overdue_count = 0
+        self._metas_atrasadas: list = []
 
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(1, weight=1)
 
         self._criar_kpis()
-        self._criar_filtros()
-        self._criar_lista()
+        self._criar_tabs()
         self.load_data()
         log_view_init_ms("metas", self._t0, widget_ref=self)
 
@@ -342,11 +342,34 @@ class MetasFrame(ctk.CTkFrame):
         self._kpi_urgentes.grid(row=0, column=4, padx=(6, 0), sticky="nsew")
 
     # ——————————————————————————————————————————————————————————————————————
+    #  Tabs
+    # ——————————————————————————————————————————————————————————————————————
+    def _criar_tabs(self):
+        self.tabs = ctk.CTkTabview(
+            self,
+            fg_color="transparent",
+            segmented_button_fg_color=THEME["bg_alt"],
+            segmented_button_selected_color=THEME["primary"],
+            segmented_button_selected_hover_color=THEME["primary_hover"],
+            text_color=THEME["text_secondary"],
+            text_color_disabled=THEME["text_muted"],
+            corner_radius=RADIUS["lg"],
+        )
+        self.tabs.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
+
+        self.tab_metas = self.tabs.add("Metas")
+        self.tab_atrasadas = self.tabs.add("Atrasadas")
+
+        self._criar_filtros()
+        self._criar_lista_metas()
+        self._criar_lista_atrasadas()
+
+    # ——————————————————————————————————————————————————————————————————————
     #  Filtros
     # ——————————————————————————————————————————————————————————————————————
     def _criar_filtros(self):
-        filter_frame = ctk.CTkFrame(self, fg_color="transparent")
-        filter_frame.grid(row=1, column=0, sticky="ew", padx=SPACING["page_x"], pady=(0, 4))
+        filter_frame = ctk.CTkFrame(self.tab_metas, fg_color="transparent")
+        filter_frame.pack(fill="x", pady=(0, 4))
         filter_frame.grid_columnconfigure(0, weight=1)
 
         right = ctk.CTkFrame(filter_frame, fg_color="transparent")
@@ -444,24 +467,39 @@ class MetasFrame(ctk.CTkFrame):
     # ——————————————————————————————————————————————————————————————————————
     #  Lista
     # ——————————————————————————————————————————————————————————————————————
-    def _criar_lista(self):
+    def _criar_lista_metas(self):
         self.scroll_list = ctk.CTkScrollableFrame(
-            self,
+            self.tab_metas,
             fg_color="transparent",
             scrollbar_button_color=THEME["border_strong"],
             scrollbar_button_hover_color=THEME["text_muted"],
         )
-        self.scroll_list.grid(
-            row=2, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, SPACING["page_y"])
-        )
+        self.scroll_list.pack(fill="both", expand=True)
 
         self.lbl_count = ctk.CTkLabel(
-            self,
+            self.tab_metas,
             text="0 metas",
             font=themed_font("caption"),
             text_color=THEME["text_muted"],
         )
-        self.lbl_count.grid(row=3, column=0, pady=(0, 10))
+        self.lbl_count.pack(anchor="w", pady=(0, 4))
+
+    def _criar_lista_atrasadas(self):
+        self.scroll_atrasadas = ctk.CTkScrollableFrame(
+            self.tab_atrasadas,
+            fg_color="transparent",
+            scrollbar_button_color=THEME["border_strong"],
+            scrollbar_button_hover_color=THEME["text_muted"],
+        )
+        self.scroll_atrasadas.pack(fill="both", expand=True)
+
+        self.lbl_count_atrasadas = ctk.CTkLabel(
+            self.tab_atrasadas,
+            text="0 metas atrasadas",
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"],
+        )
+        self.lbl_count_atrasadas.pack(anchor="w", pady=(0, 4))
 
     # ——————————————————————————————————————————————————————————————————————
     #  Dados
@@ -469,10 +507,11 @@ class MetasFrame(ctk.CTkFrame):
     def load_data(self):
         self._carregar_estatisticas()
         self._carregar_metas()
+        self._carregar_atrasadas()
 
     def _carregar_estatisticas(self):
         def fetch():
-            return self.servico_metas.obter_estatisticas()
+            return self.servico_metas.obter_stats()
 
         def on_success(result):
             if result.get("success"):
@@ -574,6 +613,54 @@ class MetasFrame(ctk.CTkFrame):
             batch.add(
                 lambda m=m: GoalCard(
                     self.scroll_list,
+                    goal=m,
+                    on_view=self._ver_meta,
+                    on_edit=self._editar_meta,
+                    on_delete=self._excluir_meta,
+                    on_progress=self._abrir_modal_progresso,
+                ).pack(fill="both", expand=True, pady=(0, 10))
+            )
+        batch.execute()
+
+    def _carregar_atrasadas(self):
+        def fetch():
+            return self.servico_metas.obter_atrasadas()
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            metas = []
+            if result.get("success"):
+                metas = result.get("data") or []
+            self._metas_atrasadas = metas
+            self._mostrar_atrasadas(metas)
+
+        def on_error(exc):
+            logger.error("Erro ao carregar metas atrasadas: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
+
+    def _mostrar_atrasadas(self, metas: list):
+        for w in self.scroll_atrasadas.winfo_children():
+            w.destroy()
+
+        if not metas:
+            EmptyState(
+                self.scroll_atrasadas,
+                icon=ICONS["check_circle"],
+                title="Nenhuma meta atrasada",
+                subtitle="Todas as metas estao em dia",
+            ).pack(pady=30)
+            self.lbl_count_atrasadas.configure(text="0 metas atrasadas")
+            return
+
+        self.lbl_count_atrasadas.configure(text=f"{len(metas)} meta{'s' if len(metas) != 1 else ''} atrasada{'s' if len(metas) != 1 else ''}")
+
+        batch = WidgetBatchBuilder(parent=self.scroll_atrasadas, batch_size=20)
+        for m in metas:
+            batch.add(
+                lambda m=m: GoalCard(
+                    self.scroll_atrasadas,
                     goal=m,
                     on_view=self._ver_meta,
                     on_edit=self._editar_meta,

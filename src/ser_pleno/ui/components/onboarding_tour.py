@@ -118,9 +118,12 @@ class OnboardingTourOverlay(ctk.CTkToplevel):
 
         self.overrideredirect(True)
         self.attributes("-topmost", True)
+        try:
+            self.attributes("-alpha", 0.85)
+        except Exception:
+            pass
         self.configure(fg_color=THEME["overlay"])
         self._bind_escape()
-
         self._bind_nav_keys()
         self.after(60, self._fit_screen)
 
@@ -139,7 +142,6 @@ class OnboardingTourOverlay(ctk.CTkToplevel):
             sw = self.winfo_screenwidth()
             sh = self.winfo_screenheight()
             self.geometry(f"{sw}x{sh}+0+0")
-            self.lower()
         except Exception:
             pass
 
@@ -163,12 +165,14 @@ class OnboardingTourOverlay(ctk.CTkToplevel):
 
             self._highlight_frame = ctk.CTkFrame(
                 self,
+                width=x2 - x1,
+                height=y2 - y1,
                 fg_color="transparent",
                 border_width=3,
                 border_color=THEME["brand_accent"],
                 corner_radius=RADIUS["md"],
             )
-            self._highlight_frame.place(x=x1, y=y1, width=x2 - x1, height=y2 - y1)
+            self._highlight_frame.place(x=x1, y=y1)
             self._highlight_frame.lift()
         except Exception as exc:
             logger.debug("highlight_widget falhou: %s", exc)
@@ -301,7 +305,7 @@ class OnboardingTourTooltip(ctk.CTkToplevel):
         progress_bg.pack_propagate(False)
         ratio = (self._step_index + 1) / self._total_steps
         fill = ctk.CTkFrame(progress_bg, fg_color=THEME["brand_accent"], corner_radius=RADIUS["xs"], height=4)
-        fill.place(x=0, y=0, relwidth=ratio, height=4)
+        fill.place(x=0, y=0, relwidth=ratio)
         fill.lift()
 
     def move_toward(self, widget):
@@ -358,21 +362,22 @@ class OnboardingTourController:
         self._overlay: Optional[OnboardingTourOverlay] = None
         self._tooltip: Optional[OnboardingTourTooltip] = None
         self._active: bool = False
+        self._move_job: Optional[str] = None
         self._build_steps()
 
     def _build_steps(self):
         menu_map = {item["key"]: item for item in MENU_ITEMS}
         tour_keys = [
-            "dashboard", "analytics", "estudantes", "agenda",
-            "bem_estar", "analise", "relatorios", "comunicacao",
+            "dashboard", "estudantes", "agenda", "bem_estar",
+            "wellness_challenges", "analise", "relatorios", "comunicacao",
             "orientacoes", "avisos", "configuracoes",
         ]
         descriptions = {
             "dashboard": "Visao consolidada com KPIs, agenda e alertas em um so lugar.",
-            "analytics": "Graficos e tendencias de desempenho para tomada de decisao.",
             "estudantes": "Cadastro, acompanhamento e historico de cada estudante.",
             "agenda": "Agendamentos, compromissos e disponibilidade de horarios.",
             "bem_estar": "Monitoramento emocional e dimensoes de bem-estar.",
+            "wellness_challenges": "Desafios de bem-estar para engajar os estudantes.",
             "analise": "Triagens, classificacoes e encaminhamentos.",
             "relatorios": "Indicadores consolidados e exportacao de relatorios.",
             "comunicacao": "Mensagens internas, chats e suporte.",
@@ -412,6 +417,7 @@ class OnboardingTourController:
         self._current_index = 0
         self._create_overlay_and_tooltip()
         self._show_step(0)
+        self._start_move_listener()
 
     def restart(self) -> None:
         self.stop()
@@ -420,9 +426,11 @@ class OnboardingTourController:
         self._current_index = 0
         self._create_overlay_and_tooltip()
         self._show_step(0)
+        self._start_move_listener()
 
     def stop(self) -> None:
         self._active = False
+        self._stop_move_listener()
         self._destroy_tooltip()
         self._destroy_overlay()
 
@@ -485,6 +493,39 @@ class OnboardingTourController:
     def _on_overlay_close(self):
         self._active = False
 
+    def _start_move_listener(self):
+        self._stop_move_listener()
+        self._move_job = self.app.after(100, self._tick_move)
+
+    def _stop_move_listener(self):
+        if self._move_job:
+            try:
+                self.app.after_cancel(self._move_job)
+            except Exception:
+                pass
+            self._move_job = None
+
+    def _tick_move(self):
+        if not self._active:
+            self._move_job = None
+            return
+        try:
+            self._reposition()
+        except Exception:
+            pass
+        self._move_job = self.app.after(100, self._tick_move)
+
+    def _reposition(self):
+        if not self._active or self._tooltip is None or not self._tooltip.winfo_exists():
+            return
+        step = self._steps[self._current_index]
+        target = self._get_menu_button(step.key)
+        if target is None:
+            target = self._find_target_widget(step.key)
+        if target and self._overlay is not None and self._overlay.winfo_exists():
+            self._overlay.highlight_widget(target)
+        self._tooltip.move_toward(target)
+
     def _show_step(self, index: int):
         if not self._active or index >= len(self._steps):
             return
@@ -494,12 +535,23 @@ class OnboardingTourController:
         self.navigation.show(step.key)
         self.app.update_idletasks()
 
-        target = self._find_target_widget(step.key)
-        if target is None or target == getattr(self.navigation, "_current_view", None):
+        target = self._get_menu_button(step.key)
+        if target is None:
+            target = self._find_target_widget(step.key)
+        if target is None:
             current_view = getattr(self.navigation, "_current_view", None)
             target = current_view if current_view and current_view.winfo_exists() else None
 
-        self._position_tooltip(step, target)
+        self.app.after_idle(lambda: self._position_tooltip(step, target))
+
+    def _get_menu_button(self, key: str):
+        try:
+            data = getattr(self.navigation, "menu_buttons", {}).get(key)
+            if not data:
+                return None
+            return data.get("btn")
+        except Exception:
+            return None
 
     def _find_target_widget(self, key: str):
         try:
@@ -559,4 +611,4 @@ class OnboardingTourController:
             self._tooltip._build()
         except Exception:
             pass
-        self.after(80, lambda: self._tooltip.move_toward(target_widget) if self._tooltip else None)
+        self.app.after(80, lambda: self._tooltip.move_toward(target_widget) if self._tooltip else None)
