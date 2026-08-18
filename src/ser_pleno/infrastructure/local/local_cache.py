@@ -38,6 +38,8 @@ TABLE_WHITELIST = {
     "report_templates",
     "shared_clinical_data",
     "auth_users",
+    "availability",
+    "interventions",
 }
 
 
@@ -192,6 +194,12 @@ class LocalCache:
                     attempts INTEGER DEFAULT 0,
                     last_attempt TEXT
                 );
+                CREATE TABLE IF NOT EXISTS availability (
+                    horario TEXT PRIMARY KEY,
+                    is_active INTEGER DEFAULT 1,
+                    dias TEXT DEFAULT 'segunda-terca-quarta-quinta-sexta',
+                    updated_at TEXT
+                );
                 CREATE TABLE IF NOT EXISTS wellness_mood (
                     id INTEGER PRIMARY KEY,
                     student_id INTEGER,
@@ -322,6 +330,23 @@ class LocalCache:
                     is_active INTEGER DEFAULT 1,
                     created_by_id INTEGER,
                     created_at TEXT,
+                    updated_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS interventions (
+                    id INTEGER PRIMARY KEY,
+                    student_id INTEGER,
+                    conducted_by_id INTEGER,
+                    date TEXT,
+                    intervention_type TEXT,
+                    duration_minutes INTEGER,
+                    intervention_notes TEXT,
+                    outcome TEXT DEFAULT 'pending',
+                    outcome_notes TEXT,
+                    follow_up_required INTEGER DEFAULT 0,
+                    follow_up_date TEXT,
+                    follow_up_completed INTEGER DEFAULT 0,
+                    is_confidential INTEGER DEFAULT 0,
+                    tags TEXT DEFAULT '[]',
                     updated_at TEXT
                 );
                 """
@@ -586,7 +611,6 @@ class LocalCache:
         return self.list_all("wellness_challenges")
 
     def upsert_wellness_challenge_assignment(self, assignment: Dict[str, Any]) -> None:
-        assignment["updated_at"] = datetime.now().isoformat()
         self.upsert("wellness_challenge_assignments", assignment)
 
     def list_wellness_challenge_assignments(self, student_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -615,6 +639,16 @@ class LocalCache:
             where = "status=?"
             params = (status,)
         return self.list_all("help_requests", where_clause=where, params=params)
+
+    def upsert_availability(self, data: Dict[str, Any]) -> None:
+        data["updated_at"] = datetime.now().isoformat()
+        self.upsert("availability", data, pk_field="horario")
+
+    def list_availability(self, where_clause: Optional[str] = None, params: tuple = ()) -> List[Dict[str, Any]]:
+        return self.list_all("availability", where_clause=where_clause, params=params)
+
+    def delete_availability(self, horario: str) -> None:
+        self.delete("availability", "horario", horario)
 
     # Alerts
 
@@ -705,6 +739,32 @@ class LocalCache:
             termo = busca.lower()
             rows = [r for r in rows if termo in r.get("student_name", "").lower()]
         return rows
+
+    # Interventions
+
+    def upsert_intervention(self, intervention: Dict[str, Any]) -> None:
+        intervention["updated_at"] = datetime.now().isoformat()
+        self.upsert("interventions", intervention)
+
+    def list_interventions(self, student_id: Optional[int] = None, date_from: Optional[str] = None, date_to: Optional[str] = None) -> List[Dict[str, Any]]:
+        where = None
+        params: tuple = ()
+        parts = []
+        if student_id:
+            parts.append("student_id=?")
+            params = params + (student_id,)
+        if date_from:
+            parts.append("date >= ?")
+            params = params + (date_from,)
+        if date_to:
+            parts.append("date <= ?")
+            params = params + (date_to,)
+        if parts:
+            where = " AND ".join(parts)
+        return self.list_all("interventions", where_clause=where, params=params)
+
+    def delete_intervention(self, intervention_id: int) -> None:
+        self.delete("interventions", "id", intervention_id)
 
 
 # Singleton do cache local SQLite.

@@ -801,7 +801,10 @@ class TestServicoRelatorio:
 
         result = service.exportar_estudantes()
         assert result["success"] is True
-        assert len(result["data"]) == 1
+        assert "data" in result
+        assert "content" in result["data"]
+        assert "format" in result["data"]
+        assert result["data"]["format"] == "csv"
 
     def test_exportar_agendamentos(self):
         service = ServicoRelatorio()
@@ -811,6 +814,8 @@ class TestServicoRelatorio:
 
         result = service.exportar_agendamentos()
         assert result["success"] is True
+        assert "data" in result
+        assert result["data"]["format"] == "csv"
 
     def test_exportar_triagens(self):
         service = ServicoRelatorio()
@@ -820,6 +825,20 @@ class TestServicoRelatorio:
 
         result = service.exportar_triagens()
         assert result["success"] is True
+        assert "data" in result
+        assert result["data"]["format"] == "csv"
+
+    def test_exportar_intervencoes(self):
+        service = ServicoRelatorio()
+        mock_repo = MagicMock()
+        mock_repo.exportar_intervencoes.return_value = [{"id": 1, "date": "2024-01-01"}]
+        service.repo = mock_repo
+
+        result = service.exportar_intervencoes()
+        assert result["success"] is True
+        assert "data" in result
+        assert result["data"]["format"] == "csv"
+        assert "content" in result["data"]
 
 
 # ---------------------------------------------------------------------------

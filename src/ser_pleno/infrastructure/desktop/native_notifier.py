@@ -33,13 +33,29 @@ except Exception:  # pragma: no cover
 class DesktopNotifier:
     """Envia notificações nativas do Windows e atualiza badge na taskbar."""
 
-    def __init__(self, app_name: str = "SerPleno", enabled: bool = True, sound_enabled: bool = True):
+    def __init__(
+        self,
+        app_name: str = "SerPleno",
+        enabled: bool = True,
+        sound_enabled: bool = True,
+        sound_path: str = "",
+        window: Any | None = None,
+    ):
         self.app_name = app_name
         self.enabled = enabled
         self.sound_enabled = sound_enabled
+        self.sound_path = sound_path
+        self._window = window
         self._last_count = 0
         self._lock = threading.Lock()
         self._toast = ToastNotifier() if _WIN10TOAST_AVAILABLE else None
+
+    def set_window(self, window: Any | None) -> None:
+        self._window = window
+
+    def set_sound_path(self, sound_path: str) -> None:
+        with self._lock:
+            self.sound_path = sound_path
 
     def set_enabled(self, enabled: bool) -> None:
         with self._lock:
@@ -99,8 +115,12 @@ class DesktopNotifier:
             self._last_count = count
         try:
             self._update_taskbar_overlay(count)
+            self._update_window_title(count)
         except Exception as exc:
             logger.debug("Falha ao atualizar badge da taskbar: %s", exc)
+
+    def clear_badge(self) -> None:
+        self.update_unread_badge(0)
 
     def _play_sound(self) -> None:
         with self._lock:
@@ -109,7 +129,10 @@ class DesktopNotifier:
         if not _IS_WINDOWS:
             return
         try:
-            winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            if self.sound_path:
+                winsound.PlaySound(self.sound_path, winsound.SND_FILENAME | winsound.SND_ASYNC)
+            else:
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
         except Exception as exc:
             logger.debug("Falha ao reproduzir som de notificação: %s", exc)
 
@@ -124,18 +147,17 @@ class DesktopNotifier:
             logger.debug("Falha no fallback de notificação: %s", exc)
 
     def _update_taskbar_overlay(self, count: int) -> None:
-        if not _IS_WINDOWS or count <= 0:
+        if count <= 0:
+            self._clear_taskbar_overlay()
+            return
+        hwnd = self._get_window_hwnd()
+        if not hwnd or not _IS_WINDOWS:
             return
         try:
             import ctypes
             from ctypes import wintypes
 
             user32 = ctypes.windll.user32
-            hwnd = ctypes.windll.kernel32.GetConsoleWindow()
-            if not hwnd:
-                hwnd = user32.GetForegroundWindow()
-            if not hwnd:
-                return
 
             try:
                 import pythoncom  # type: ignore
@@ -169,6 +191,73 @@ class DesktopNotifier:
                 logger.debug("Falha ao definir overlay via ITaskbarList3: %s", exc)
         except Exception as exc:
             logger.debug("Falha ao atualizar overlay da taskbar: %s", exc)
+
+    def _clear_taskbar_overlay(self) -> None:
+        hwnd = self._get_window_hwnd()
+        if not hwnd or not _IS_WINDOWS:
+            return
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            try:
+                import pythoncom  # type: ignore
+
+                pythoncom.CoInitialize()
+            except Exception:
+                pass
+
+            taskbar = ctypes.POINTER(wintypes.IUnknown)()
+            CLSID_TaskbarList = "{56FDF344-FD6D-11d0-958A-006097C9A090}"
+            IID_ITaskbarList3 = "{56FDF344-FD6D-11d0-958A-006097C9A090}"
+            try:
+                ctypes.oledll.ole32.CoCreateInstance(
+                    ctypes.c_char_p(CLSID_TaskbarList.encode("utf-8")),
+                    None,
+                    1,
+                    ctypes.c_char_p(IID_ITaskbarList3.encode("utf-8")),
+                    ctypes.byref(taskbar),
+                )
+            except Exception:
+                return
+
+            if not taskbar:
+                return
+
+            try:
+                TBPF_NOPROGRESS = 0
+                taskbar.contents[0].lpVtbl.contents[4](taskbar, TBPF_NOPROGRESS)
+                taskbar.contents[0].lpVtbl.contents[9](taskbar, hwnd)
+            except Exception as exc:
+                logger.debug("Falha ao limpar overlay via ITaskbarList3: %s", exc)
+        except Exception as exc:
+            logger.debug("Falha ao limpar overlay da taskbar: %s", exc)
+
+    def _update_window_title(self, count: int) -> None:
+        window = self._window
+        if window is None or not hasattr(window, "title"):
+            return
+        try:
+            base_title = getattr(window, "_original_title", None) or window.title()
+            if getattr(window, "_original_title", None) is None:
+                window._original_title = base_title
+            if count > 0:
+                window.title(f"{base_title} ({count})")
+            else:
+                window.title(base_title)
+        except Exception as exc:
+            logger.debug("Falha ao atualizar título da janela: %s", exc)
+
+    def _get_window_hwnd(self) -> int | None:
+        window = self._window
+        if window is None:
+            return None
+        try:
+            if hasattr(window, "winfo_id"):
+                return int(window.winfo_id())
+        except Exception:
+            pass
+        return None
 
 
 _notifier: DesktopNotifier | None = None

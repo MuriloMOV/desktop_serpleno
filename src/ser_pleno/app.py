@@ -48,6 +48,7 @@ from ser_pleno.ui.components.ui_components import (
 from ser_pleno.ui.navigation import NavigationManager
 from ser_pleno.ui.theme_manager import ThemeManager
 from ser_pleno.ui.views.login import LoginFrame
+from ser_pleno.ui.components.onboarding_tour import OnboardingTourController
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.theme import (
     ELEVATION,
@@ -61,6 +62,7 @@ from ser_pleno.ui.theme import (
     themed_font,
     toggle_mode,
 )
+from ser_pleno.infrastructure.desktop.native_notifier import get_desktop_notifier
 from ser_pleno.application.services.bootstrap import BootstrapService
 
 
@@ -96,6 +98,10 @@ class App(ctk.CTk):
         self.usuario_logado = None
         self.usuario_logado_id = None
         self.auth_service = None
+        self.onboarding_tour = None
+
+        self._desktop_notifier = get_desktop_notifier()
+        self._desktop_notifier.set_window(self)
 
         self._setup_window()
         self._setup_container()
@@ -191,8 +197,50 @@ class App(ctk.CTk):
 
         self._bootstrap.run_post_login_seed()
 
+        self._apply_saved_notification_settings()
+
+        self.onboarding_tour = OnboardingTourController(self, self.navigation)
+        if self.onboarding_tour.should_show():
+            self.after_idle(self._maybe_start_onboarding)
+
+    def _maybe_start_onboarding(self) -> None:
+        if not self.winfo_exists():
+            return
+        content_body = getattr(self, "content_body", None)
+        if content_body is None or not content_body.winfo_exists():
+            self.after_idle(self._maybe_start_onboarding)
+            return
+        if self.onboarding_tour is not None and self.onboarding_tour.should_show():
+            self.onboarding_tour.start()
+
     def _is_login_active(self) -> bool:
         return not hasattr(self.navigation, "sidebar") or not self.navigation.sidebar.winfo_exists()
+
+    def _apply_saved_notification_settings(self) -> None:
+        try:
+            from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+            servico = ServicoConfiguracoes(auth_service=self.auth_service)
+            res = servico.obter_configuracoes()
+            if not res.get("success") or not res.get("data"):
+                return
+            user_id = None
+            auth = getattr(servico, "_auth_service", None)
+            if auth and getattr(auth, "user", None):
+                user_id = auth.user.get("id")
+            for item in res["data"]:
+                if item.get("user_id") == user_id and user_id is not None:
+                    notifications = item.get("notifications")
+                    if notifications:
+                        import json
+                        try:
+                            notif = json.loads(notifications)
+                            sound_enabled = notif.get("Efeitos Sonoros", True)
+                            self._desktop_notifier.set_sound_enabled(bool(sound_enabled))
+                        except Exception:
+                            pass
+                    break
+        except Exception as exc:
+            logger.debug("Falha ao aplicar configurações de notificação: %s", exc)
 
     def _build_main_content(self) -> None:
         if not self.winfo_exists():
@@ -200,6 +248,22 @@ class App(ctk.CTk):
         self.navigation.create_content_area()
         self.navigation.precreate("dashboard")
         self.navigation.show("dashboard")
+        self._bind_global_search()
+
+    def _bind_global_search(self) -> None:
+        def _focus_search(_=None):
+            search = getattr(self.navigation.app, "global_search", None)
+            if search and hasattr(search, "focus"):
+                search.focus()
+        try:
+            self.bind_all("<Control-k>", _focus_search)
+            self.bind_all("<Control-K>", _focus_search)
+        except Exception:
+            pass
+
+    def reiniciar_onboarding(self) -> None:
+        if self.onboarding_tour is not None:
+            self.onboarding_tour.restart()
 
 
 if __name__ == "__main__":

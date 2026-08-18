@@ -25,10 +25,14 @@ def parse_br_date(value: str) -> Optional[str]:
     value = value.strip()
     if not value:
         return None
+    parts = value.split("/")
+    if len(parts) != 3:
+        return None
     try:
-        d, m, y = value.split("/")
-        return f"{y}-{m}-{d}"
-    except ValueError:
+        d, m, y = int(parts[0]), int(parts[1]), int(parts[2])
+        date(y, m, d)
+        return f"{y:04d}-{m:02d}-{d:02d}"
+    except (ValueError, TypeError):
         return None
 
 
@@ -39,7 +43,11 @@ def normalize_date(value: str) -> str:
     if not value:
         raise ValueError("Data inválida")
     if len(value) == 10 and value[4] == "-" and value[7] == "-":
-        return value
+        try:
+            date.fromisoformat(value)
+            return value
+        except ValueError:
+            raise ValueError("Data inválida")
     result = parse_br_date(value)
     if result is None:
         raise ValueError("Data inválida")
