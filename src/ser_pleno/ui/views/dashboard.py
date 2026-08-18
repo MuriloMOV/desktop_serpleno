@@ -345,6 +345,15 @@ class DashboardFrame(ctk.CTkFrame):
         except Exception:
             pass
 
+    def _show_success(self, message: str, duration: int = 3000) -> None:
+        try:
+            from ser_pleno.ui.components.ui_components import Toast
+            if hasattr(self, "_toast") and self._toast and self._toast.winfo_exists():
+                self._toast.destroy()
+            self._toast = Toast(self.winfo_toplevel(), message=message, status="success", duration=duration)
+        except Exception:
+            pass
+
     def _carregar_dados_serpleno(self):
         def fetch():
             mood = self.servico_analytics.obter_mood_timeline()
@@ -1323,7 +1332,7 @@ class DashboardFrame(ctk.CTkFrame):
         modal.title("Editar Perfil")
         modal.configure(fg_color=THEME["surface"])
         modal.resizable(False, False)
-        w, h = 480, 420
+        w, h = 480, 500
         sx = modal.winfo_screenwidth() // 2 - w // 2
         sy = modal.winfo_screenheight() // 2 - h // 2
         modal.geometry(f"{w}x{h}+{sx}+{sy}")
@@ -1348,33 +1357,78 @@ class DashboardFrame(ctk.CTkFrame):
         entry_senha = ctk.CTkEntry(card, placeholder_text="Nova senha (opcional)", show="*")
         entry_senha.pack(fill="x", pady=(0, spacing("sm")))
 
+        entry_confirmar_senha = ctk.CTkEntry(card, placeholder_text="Confirmar nova senha", show="*")
+        entry_confirmar_senha.pack(fill="x", pady=(0, spacing("sm")))
+
+        strength_label = ctk.CTkLabel(
+            card,
+            text="",
+            font=themed_font("overline"),
+            text_color=THEME["text_muted"],
+        )
+        strength_label.pack(anchor="w", pady=(0, spacing("sm")))
+
+        def _atualizar_forca(event=None):
+            senha = entry_senha.get().strip()
+            score = 0
+            if len(senha) >= 8:
+                score += 1
+            if any(c.islower() for c in senha):
+                score += 1
+            if any(c.isupper() for c in senha):
+                score += 1
+            if any(c.isdigit() for c in senha):
+                score += 1
+            if any(not c.isalnum() for c in senha):
+                score += 1
+            labels = {0: "", 1: "Fraca", 2: "Fraca", 3: "Média", 4: "Média", 5: "Forte"}
+            colors = {0: THEME["text_muted"], 1: THEME["danger"], 2: THEME["danger"], 3: THEME["warning"], 4: THEME["warning"], 5: THEME["success"]}
+            strength_label.configure(text=labels[score], text_color=colors[score])
+
+        entry_senha.bind("<KeyRelease>", _atualizar_forca)
+
         footer = ctk.CTkFrame(card, fg_color="transparent")
         footer.pack(fill="x", pady=(spacing("md"), 0))
+
+        def _senha_atende_policy(s):
+            if len(s) < 8:
+                return False
+            if not any(c.islower() for c in s):
+                return False
+            if not any(c.isupper() for c in s):
+                return False
+            if not any(c.isdigit() for c in s):
+                return False
+            if not any(not c.isalnum() for c in s):
+                return False
+            return True
 
         def _salvar():
             nome = entry_nome.get().strip()
             email = entry_email.get().strip()
             senha = entry_senha.get().strip()
+            confirmar = entry_confirmar_senha.get().strip()
             if not nome or not email:
                 self._show_error("Nome e email são obrigatórios.")
                 return
-            try:
-                user["first_name"] = nome
-                user["email"] = email
-                if senha:
-                    from ser_pleno.application.services.autenticacao import ServicoAutenticacao
+            if senha:
+                if senha != confirmar:
+                    self._show_error("As senhas não coincidem.")
+                    return
+                if not _senha_atende_policy(senha):
+                    self._show_error("A senha deve ter pelo menos 8 caracteres, incluindo maiúscula, minúscula, número e símbolo.")
+                    return
+                from ser_pleno.application.services.autenticacao import ServicoAutenticacao
 
-                    auth_service = ServicoAutenticacao(
-                        auth_service=getattr(self.controller, "auth_service", None)
-                    )
-                    res = auth_service.alterar_senha(user.get("password", ""), senha)
-                    if not res.get("success"):
-                        self._show_error(res.get("message", "Falha ao alterar senha."))
-                        return
-                self._show_success("Perfil atualizado.")
-                modal.destroy()
-            except Exception as e:
-                self._show_error(f"Falha ao atualizar perfil.\n{e}")
+                auth_service = ServicoAutenticacao(
+                    auth_service=getattr(self.controller, "auth_service", None)
+                )
+                res = auth_service.alterar_senha(user.get("password", ""), senha)
+                if not res.get("success"):
+                    self._show_error(res.get("message", "Falha ao alterar senha."))
+                    return
+            self._show_success("Perfil atualizado.")
+            modal.destroy()
 
         ctk.CTkButton(
             footer,
