@@ -132,6 +132,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_compartilhar")
     def compartilhar(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Compartilha dados clínicos com outro usuário via API ou repositório local."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_compartilhar(dados)
+
         def _api_call():
             resp = self._api.post("desktop/shared-data/share/", json=dados)
             if resp and resp.get("success") is not False:
@@ -159,6 +163,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_descompartilhar")
     def descompartilhar(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Descompartilha dados clínicos via API ou repositório local."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_descompartilhar(dados)
+
         def _api_call():
             resp = self._api.post("desktop/shared-data/unshare/", json=dados)
             if resp and resp.get("success") is not False:
@@ -184,6 +192,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_bulk_share")
     def bulk_share(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Compartilhamento em massa via API ou repositório local."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_bulk_share(dados)
+
         def _api_call():
             resp = self._api.post("desktop/shared-data/bulk/share/", json=dados)
             if resp and resp.get("success") is not False:
@@ -224,6 +236,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_bulk_unshare")
     def bulk_unshare(self, dados: Dict[str, Any]) -> Dict[str, Any]:
         """Descompartilhamento em massa via API ou repositório local."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_bulk_unshare(dados)
+
         def _api_call():
             resp = self._api.post("desktop/shared-data/bulk/unshare/", json=dados)
             if resp and resp.get("success") is not False:
@@ -260,6 +276,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_listar_estudantes_compartilhados_local")
     def listar_estudantes_compartilhados(self) -> Dict[str, Any]:
         """Lista estudantes compartilhados com o usuário atual."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando repositório local")
+            return self._listar_estudantes_compartilhados()
+
         def _api_call():
             resp = self._api.get("desktop/shared-data/students/")
             if (
@@ -305,6 +325,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_obter_historico_compartilhamento")
     def obter_historico_compartilhamento(self, student_id: int) -> Dict[str, Any]:
         """Obtém histórico de compartilhamento por estudante."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_obter_historico_compartilhamento(student_id)
+
         def _api_call():
             resp = self._api.get(f"desktop/shared-data/history/{student_id}/")
             if (
@@ -359,6 +383,10 @@ class ServicoCompartilhamentoDadosClinicos:
     @api_fallback("_fallback_obter_relatorio_compartilhamento")
     def obter_relatorio_compartilhamento(self) -> Dict[str, Any]:
         """Obtém relatório de compartilhamento."""
+        if not self._should_use_api():
+            logger.info("Modo independente: usando fallback local")
+            return self._fallback_obter_relatorio_compartilhamento()
+
         def _api_call():
             resp = self._api.get("desktop/shared-data/report/")
             if (
@@ -388,6 +416,22 @@ class ServicoCompartilhamentoDadosClinicos:
             import traceback
             logger.error(traceback.format_exc())
             return {"success": False, "error": str(e), "data": {}}
+
+    def obter_relatorio(self) -> Dict[str, Any]:
+        """Obtém relatório de compartilhamento."""
+        return self.obter_relatorio_compartilhamento()
+
+    def compartilhamento_massa(self, dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Compartilhamento em massa."""
+        return self.bulk_share(dados)
+
+    def descompartilhamento_massa(self, dados: Dict[str, Any]) -> Dict[str, Any]:
+        """Descompartilhamento em massa."""
+        return self.bulk_unshare(dados)
+
+    def obter_historico(self, student_id: int) -> Dict[str, Any]:
+        """Obtém histórico de compartilhamento por estudante."""
+        return self.obter_historico_compartilhamento(student_id)
 
     @property
     def _repo(self):

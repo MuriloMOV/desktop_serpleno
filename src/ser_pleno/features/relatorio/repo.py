@@ -220,3 +220,12 @@ class RelatorioRepository:
 
     def _local_exportar_triagens(self):
         return local_cache.list_screenings()
+
+    @with_local_fallback("_local_exportar_intervencoes")
+    def exportar_intervencoes(self):
+        """Exporta todas as intervencoes."""
+        query = "SELECT * FROM desktop_intervention ORDER BY date DESC"
+        return fetch_all(query)
+
+    def _local_exportar_intervencoes(self):
+        return local_cache.list_interventions()

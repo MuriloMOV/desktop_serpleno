@@ -259,16 +259,17 @@ class ServicoMetas:
             return {"success": False, "message": str(e)}
 
     @api_fallback("_fallback_registrar_progresso")
-    def registrar_progresso(self, id_meta, percentage, notes, recorded_by_id):
-        """Registra progresso em uma meta."""
+    def registrar_progresso(self, id_meta, percentage, notes, recorded_by_id=None):
         def _api_call():
+            payload = {
+                "percentage": percentage,
+                "notes": notes,
+            }
+            if recorded_by_id is not None:
+                payload["recorded_by_id"] = recorded_by_id
             resp = self._api.post(
-                f"desktop/goals/{id_meta}/progress/",
-                json={
-                    "percentage": percentage,
-                    "notes": notes,
-                    "recorded_by_id": recorded_by_id,
-                },
+                f"goals/{id_meta}/progress/",
+                json=payload,
             )
             if resp and resp.get("success") is not False:
                 return resp
@@ -276,7 +277,7 @@ class ServicoMetas:
 
         return _api_call()
 
-    def _fallback_registrar_progresso(self, id_meta, percentage, notes, recorded_by_id):
+    def _fallback_registrar_progresso(self, id_meta, percentage, notes, recorded_by_id=None):
         try:
             progress_id = self.repo.registrar_progresso(
                 id_meta, percentage, notes, recorded_by_id
@@ -330,6 +331,49 @@ class ServicoMetas:
             return {"success": True, "data": metas}
         except Exception as e:
             logger.error(f"Erro ao listar metas atrasadas: {e}")
+            return {"success": True, "data": []}
+
+    @api_fallback("_fallback_obter_stats")
+    def obter_stats(self):
+        def _api_call():
+            resp = self._api.get("goals/stats/")
+            if resp and resp.get("success") is not False and resp.get("data") is not None:
+                return resp
+            return None
+        return _api_call()
+
+    def _fallback_obter_stats(self):
+        try:
+            stats = self.repo.obter_estatisticas()
+            return {"success": True, "data": stats}
+        except Exception as e:
+            logger.error(f"Erro ao obter stats local: {e}")
+            return {
+                "success": True,
+                "data": {
+                    "total": 0,
+                    "by_status": [],
+                    "by_category": [],
+                    "by_priority": [],
+                    "overdue": 0,
+                },
+            }
+
+    @api_fallback("_fallback_obter_atrasadas")
+    def obter_atrasadas(self):
+        def _api_call():
+            resp = self._api.get("goals/overdue/")
+            if resp and resp.get("success") is not False and resp.get("data") is not None:
+                return resp
+            return None
+        return _api_call()
+
+    def _fallback_obter_atrasadas(self):
+        try:
+            metas = self.repo.listar_metas_atrasadas()
+            return {"success": True, "data": metas}
+        except Exception as e:
+            logger.error(f"Erro ao obter atrasadas local: {e}")
             return {"success": True, "data": []}
 
     def obter_estatisticas(self):

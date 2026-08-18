@@ -242,6 +242,12 @@ class ServicoOrientacoes:
     def duplicar_orientacao(self, id_orientacao: int, id_estudante: Optional[int] = None):
         """Duplica uma orientação existente."""
         try:
+            if self._should_use_api():
+                api_result = self._duplicar_orientacao_api(id_orientacao, id_estudante)
+                if api_result.get("success"):
+                    return api_result
+                logger.warning("Falha ao duplicar via API, usando repositório local")
+
             orientacao_resp = self.obter_orientacao(id_orientacao)
             if not orientacao_resp.get("success"):
                 return {"success": False, "message": "Orientação original não encontrada"}
@@ -261,6 +267,22 @@ class ServicoOrientacoes:
             return self.criar_orientacao(novos_dados)
         except Exception as e:
             logger.error(f"Erro ao duplicar orientação: {e}")
+            return {"success": False, "message": str(e)}
+
+    def _duplicar_orientacao_api(self, id_orientacao: int, id_estudante: Optional[int] = None):
+        try:
+            session = self._get_session()
+            endpoint = f"{self.base_url.rstrip('/')}/orientations/{id_orientacao}/duplicate/"
+            payload = {}
+            if id_estudante is not None:
+                payload["student_id"] = id_estudante
+            response = session.post(endpoint, json=payload, headers=self._get_headers(), timeout=15)
+            if response.ok:
+                data = response.json()
+                return {"success": True, "data": data.get("data", data), "message": "Orientação duplicada com sucesso"}
+            return {"success": False, "message": f"Erro na API: {response.status_code}"}
+        except Exception as e:
+            logger.warning(f"Erro ao duplicar via API: {e}")
             return {"success": False, "message": str(e)}
 
     def obter_estatisticas(self, id_estudante: Optional[int] = None):
@@ -466,6 +488,55 @@ class ServicoOrientacoes:
                 "psychologist": "Equipe SerPleno",
             }
             return self.criar_orientacao(dados)
+        except Exception as e:
+            logger.error(f"Erro ao usar template: {e}")
+            return {"success": False, "message": str(e)}
+
+    def listar_templates(self):
+        """Lista templates de orientação disponíveis."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/templates/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+            return {"success": True, "data": self.repo.obter_templates()}
+        except Exception as e:
+            logger.error(f"Erro ao listar templates: {e}")
+            return {"success": True, "data": self.repo.obter_templates()}
+
+    def listar_themes(self):
+        """Lista temas de orientação disponíveis."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/themes/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+            return {"success": True, "data": self.repo.obter_temas()}
+        except Exception as e:
+            logger.error(f"Erro ao listar themes: {e}")
+            return {"success": True, "data": self.repo.obter_temas()}
+
+    def usar_template(self, template_id, student_id=None):
+        """Usa um template para preencher campos da orientação."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/templates/use/"
+                payload = {"template_id": template_id}
+                if student_id is not None:
+                    payload["student_id"] = student_id
+                response = session.post(endpoint, json=payload, headers=self._get_headers(), timeout=15)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+                logger.warning(f"Falha ao usar template via API: {response.status_code}")
+            return {"success": True, "data": self.repo.usar_template(template_id, student_id)}
         except Exception as e:
             logger.error(f"Erro ao usar template: {e}")
             return {"success": False, "message": str(e)}

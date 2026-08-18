@@ -53,7 +53,10 @@ class ServicoPedidosAjuda:
                     params["status"] = status
                 response = self._api.get("help-requests/", params=params if params else None)
                 if response.get("success"):
-                    return {"success": True, "data": [_map_help_request(r) for r in response.get("data", [])]}
+                    return {
+                        "success": True,
+                        "data": [_map_help_request(r) for r in response.get("data", [])],
+                    }
             except Exception as e:
                 logger.error("Erro ao listar pedidos de ajuda via API: %s", e)
 
@@ -66,7 +69,10 @@ class ServicoPedidosAjuda:
             try:
                 response = self._api.get("help-requests/pendentes/")
                 if response.get("success"):
-                    return {"success": True, "data": [_map_help_request(r) for r in response.get("data", [])]}
+                    return {
+                        "success": True,
+                        "data": [_map_help_request(r) for r in response.get("data", [])],
+                    }
             except Exception as e:
                 logger.error("Erro ao listar pendentes via API: %s", e)
 
@@ -77,7 +83,9 @@ class ServicoPedidosAjuda:
         config = get_operation_config()
         if config.should_use_api():
             try:
-                response = self._api.post(f"help-requests/{pedido_id}/update/", json={"status": "viewed"})
+                response = self._api.post(
+                    f"help-requests/{pedido_id}/update/", json={"status": "viewed"},
+                )
                 if response.get("success"):
                     return {"success": True, "message": "Pedido marcado como visto"}
             except Exception as e:
@@ -90,7 +98,9 @@ class ServicoPedidosAjuda:
         config = get_operation_config()
         if config.should_use_api():
             try:
-                response = self._api.post(f"help-requests/{pedido_id}/update/", json={"status": "in_progress"})
+                response = self._api.post(
+                    f"help-requests/{pedido_id}/update/", json={"status": "in_progress"},
+                )
                 if response.get("success"):
                     return {"success": True, "message": "Atendimento iniciado"}
             except Exception as e:
@@ -103,7 +113,9 @@ class ServicoPedidosAjuda:
         config = get_operation_config()
         if config.should_use_api():
             try:
-                response = self._api.post(f"help-requests/{pedido_id}/update/", json={"status": "resolved"})
+                response = self._api.post(
+                    f"help-requests/{pedido_id}/update/", json={"status": "resolved"},
+                )
                 if response.get("success"):
                     return {"success": True, "message": "Pedido resolvido"}
             except Exception as e:
@@ -116,7 +128,10 @@ class ServicoPedidosAjuda:
         config = get_operation_config()
         if config.should_use_api():
             try:
-                response = self._api.post(f"help-requests/{pedido_id}/respond/", json={"response": resposta, "status": "resolved"})
+                response = self._api.post(
+                    f"help-requests/{pedido_id}/respond/",
+                    json={"response": resposta, "status": "resolved"},
+                )
                 if response.get("success"):
                     return {"success": True, "message": "Resposta enviada"}
             except Exception as e:

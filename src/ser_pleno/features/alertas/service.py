@@ -76,6 +76,9 @@ class ServicoAlertas:
                 params[param_key] = val
         return params
 
+    def listar_criticos(self):
+        return self.get_alertas_criticos()
+
     def get_alertas_criticos(self):
         cached = self._critical_cache.get()
         if cached is not None:

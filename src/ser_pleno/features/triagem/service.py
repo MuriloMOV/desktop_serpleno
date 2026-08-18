@@ -1,13 +1,37 @@
-# -*- coding: utf-8 -*-
-"""Service de Triagem —” orquestrador, sem SQL inline."""
+"""Service de Triagem — orquestrador, sem SQL inline."""
+
+import logging
 
 from ser_pleno.features.triagem.repo import TriagemRepository
+from ser_pleno.infrastructure.api.api import ClienteAPI
+from ser_pleno.utils.api_fallback import api_fallback
 from ser_pleno.utils.mappers import safe_str
+
+logger = logging.getLogger(__name__)
 
 
 class ServicoTriagem:
     def __init__(self, auth_service=None):
         self.repo = TriagemRepository()
+        self._operation_config = None
+        self._auth_service = auth_service
+        self._api = ClienteAPI(auth_service=auth_service)
+
+    def _get_operation_config(self):
+        if self._operation_config is None:
+            try:
+                from ser_pleno.config.operation_mode import get_operation_config
+
+                self._operation_config = get_operation_config()
+            except Exception:
+                pass
+        return self._operation_config
+
+    def _should_use_api(self) -> bool:
+        config = self._get_operation_config()
+        if config is None:
+            return True
+        return config.should_use_api()
 
     def listar_triagens(self, busca=None, status=None, prioridade=None, id_estudante=None, pagina=1):
         rows = self.repo.listar(busca=busca, status=status, prioridade=prioridade,
@@ -66,7 +90,23 @@ class ServicoTriagem:
         self.repo.deletar(id_triagem)
         return {"success": True, "message": "Triagem deletada com sucesso"}
 
+    @api_fallback("_local_listar_formularios")
     def listar_formularios(self):
+        if not self._should_use_api():
+            logger.info("Modo offline: usando repositório local para formulários")
+            return self._local_listar_formularios()
+
+        def _api_call():
+            resp = self._api.get("screenings/forms/")
+            if resp and resp.get("success") is not False and resp.get("data") is not None:
+                logger.info("Formulários carregados via API")
+                return resp
+            logger.debug("API não retornou dados válidos para formulários, usando repositório local")
+            return None
+
+        return _api_call()
+
+    def _local_listar_formularios(self):
         rows = self.repo.listar_formularios()
         formularios = []
         for r in rows:

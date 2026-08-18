@@ -106,20 +106,38 @@ class BemEstarRepository:
         )
         return last_id
 
-    def criar_checkin(self, student_id, check_in_date, overall_wellbeing, notes=""):
+    def criar_checkin(self, student_id, check_in_date, overall_wellbeing, check_in_type="weekly",
+                      attention_areas=None, recommendations="", professional_notes="",
+                      follow_up_needed=False, follow_up_date=None):
         query = """
-            INSERT INTO desktop_wellnesscheckin (student_id, check_in_date, overall_wellbeing, notes, created_at)
-            VALUES (%s, %s, %s, %s, NOW())
+            INSERT INTO desktop_wellnesscheckin
+                (student_id, check_in_date, check_in_type, overall_wellbeing,
+                 attention_areas, recommendations, professional_notes,
+                 follow_up_needed, follow_up_date, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """
+        import json as _json
+        attention_areas_json = _json.dumps(attention_areas or [])
+        follow_up_needed_val = 1 if follow_up_needed else 0
         checkin_data = {
             "student_id": student_id,
             "check_in_date": check_in_date,
+            "check_in_type": check_in_type,
             "overall_wellbeing": overall_wellbeing,
-            "notes": notes,
+            "attention_areas": attention_areas or [],
+            "recommendations": recommendations,
+            "professional_notes": professional_notes,
+            "follow_up_needed": follow_up_needed,
+            "follow_up_date": follow_up_date,
         }
 
         def _mysql():
-            return execute_non_query(query, (student_id, check_in_date, overall_wellbeing, notes))
+            return execute_non_query(
+                query,
+                (student_id, check_in_date, check_in_type, overall_wellbeing,
+                 attention_areas_json, recommendations, professional_notes,
+                 follow_up_needed_val, follow_up_date),
+            )
 
         def _local(mysql_result):
             last_id = generate_local_id(mysql_result)

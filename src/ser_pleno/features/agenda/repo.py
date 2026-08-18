@@ -107,8 +107,13 @@ class AgendamentoRepository:
         return horarios
 
     def _local_listar_horarios_base(self) -> List[str]:
-        # Horarios base nao sao sincronizados; retorna lista vazia
-        return []
+        rows = local_cache.list_availability()
+        horarios = []
+        for row in rows:
+            horario = row.get("horario", "")
+            horario_str = str(horario)
+            horarios.append(horario_str[:5] if len(horario_str) > 5 else horario_str)
+        return horarios
 
     @with_local_fallback("_local_taxa_presenca_ultimos_30_dias")
     def taxa_presenca_ultimos_30_dias(self) -> Dict[str, Any]:
@@ -359,7 +364,30 @@ class AgendamentoRepository:
             INSERT INTO disponibilidade (Horario, is_active, Dias)
             VALUES (%s, 1, 'segunda-terca-quarta-quinta-sexta')
         """
-        return execute_non_query(query, (time_obj,))
+
+        def _mysql():
+            return execute_non_query(query, (time_obj,))
+
+        def _local(mysql_result):
+            local_cache.upsert_availability({
+                "horario": horario,
+                "is_active": 1,
+                "dias": "segunda-terca-quarta-quinta-sexta",
+            })
+            return 1
+
+        def _queue_data(mysql_result, entity_id):
+            return {
+                "horario": horario,
+                "is_active": 1,
+                "dias": "segunda-terca-quarta-quinta-sexta",
+            }
+
+        return write_with_fallback(
+            _mysql, _local,
+            operation="add", entity="availability", entity_id=horario,
+            queue_data_fn=_queue_data,
+        )
 
     @with_local_fallback("_local_verificar_horario_existe")
     def verificar_horario_existe(self, horario: str) -> Optional[Dict[str, Any]]:
@@ -369,21 +397,45 @@ class AgendamentoRepository:
         return fetch_one(query, (time_obj,))
 
     def _local_verificar_horario_existe(self, horario: str) -> Optional[Dict[str, Any]]:
-        # Disponibilidade nao e sincronizada no cache local
+        rows = local_cache.list_availability()
+        for r in rows:
+            if r.get("horario") == horario:
+                return {"id_disponibilidade": r.get("horario")}
         return None
 
     def remover_horario_disponibilidade(self, horario: str) -> Any:
         """Remove um horario da tabela de disponibilidade."""
         time_obj = datetime.strptime(horario, "%H:%M").time()
-        # Verifica se ha agendamentos usando este horario
         query_uso = "SELECT id FROM agendamento WHERE TIME(data_hora) = %s"
-        uso = fetch_one(query_uso, (time_obj,))
-        if uso:
-            return {"success": False, "message": "Nao e possivel remover horario com agendamentos associados"}
-
-        # Remove o horario
         query_delete = "DELETE FROM disponibilidade WHERE Horario = %s"
-        return execute_non_query(query_delete, (time_obj,))
+
+        def _mysql():
+            uso = fetch_one(query_uso, (time_obj,))
+            if uso:
+                return {"success": False, "message": "Nao e possivel remover horario com agendamentos associados"}
+            return execute_non_query(query_delete, (time_obj,))
+
+        def _local(mysql_result):
+            if isinstance(mysql_result, dict) and not mysql_result.get("success"):
+                return mysql_result
+            rows = local_cache.list_all(
+                "appointments",
+                where_clause="SUBSTR(data_hora, 12, 5)=?",
+                params=(horario,),
+            )
+            if rows:
+                return {"success": False, "message": "Nao e possivel remover horario com agendamentos associados"}
+            local_cache.delete_availability(horario)
+            return 1
+
+        def _queue_data(mysql_result, entity_id):
+            return {"horario": horario}
+
+        return write_with_fallback(
+            _mysql, _local,
+            operation="remove", entity="availability", entity_id=horario,
+            queue_data_fn=_queue_data,
+        )
 
     def obter_ultimo_id_inserido(self) -> int:
         """Obtem o ultimo ID inserido no banco de dados."""

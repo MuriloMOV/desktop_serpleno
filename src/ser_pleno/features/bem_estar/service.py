@@ -1,15 +1,41 @@
 # -*- coding: utf-8 -*-
 """Service de Bem-Estar — orquestrador, sem SQL inline."""
 
+from __future__ import annotations
+
+import logging
+
 from ser_pleno.features.bem_estar.repo import BemEstarRepository
 from ser_pleno.features.estudantes.repo import EstudanteRepository
+from ser_pleno.infrastructure.api.api import ClienteAPI
+from ser_pleno.utils.api_fallback import api_fallback
 from ser_pleno.utils.mappers import safe_str
+
+logger = logging.getLogger(__name__)
 
 
 class ServicoBemEstar:
     def __init__(self, auth_service=None):
         self.repo = BemEstarRepository()
         self.repo_estudante = EstudanteRepository()
+        self._auth_service = auth_service
+        self._api = ClienteAPI(auth_service=auth_service)
+        self._operation_config = None
+
+    def _get_operation_config(self):
+        if self._operation_config is None:
+            try:
+                from ser_pleno.config.operation_mode import get_operation_config
+                self._operation_config = get_operation_config()
+            except Exception:
+                pass
+        return self._operation_config
+
+    def _should_use_api(self) -> bool:
+        config = self._get_operation_config()
+        if config is None:
+            return True
+        return config.should_use_api()
 
     def obter_dashboard(self):
         raw = self.repo.obter_dashboard()
@@ -36,15 +62,66 @@ class ServicoBemEstar:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    @api_fallback("_fallback_obter_medias_humor")
     def obter_medias_humor(self):
+        if not self._should_use_api():
+            return self._local_obter_medias_humor()
+
+        def _api_call():
+            resp = self._api.get("wellness/mood/averages/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return _api_call()
+
+    def _fallback_obter_medias_humor(self):
         result = self.repo.obter_medias_humor()
         return {"success": True, "data": result}
 
+    def _local_obter_medias_humor(self):
+        result = self.repo.obter_medias_humor()
+        return {"success": True, "data": result}
+
+    @api_fallback("_fallback_obter_humor_estudante")
     def obter_humor_estudante(self, id_estudante):
+        if not self._should_use_api():
+            return self._local_obter_humor_estudante(id_estudante)
+
+        def _api_call():
+            resp = self._api.get(f"wellness/mood/student/{id_estudante}/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return _api_call()
+
+    def _fallback_obter_humor_estudante(self, id_estudante):
         result = self.repo.obter_humor_estudante(id_estudante)
         return {"success": True, "data": result}
 
+    def _local_obter_humor_estudante(self, id_estudante):
+        result = self.repo.obter_humor_estudante(id_estudante)
+        return {"success": True, "data": result}
+
+    @api_fallback("_fallback_obter_historico_humor_estudante")
     def obter_historico_humor_estudante(self, id_estudante):
+        if not self._should_use_api():
+            return self._local_obter_historico_humor_estudante(id_estudante)
+
+        def _api_call():
+            resp = self._api.get(f"wellness/mood/student/{id_estudante}/history/")
+            if resp and resp.get("success") is not False:
+                return resp
+            return None
+
+        return _api_call()
+
+    def _fallback_obter_historico_humor_estudante(self, id_estudante):
+        result = self.repo.obter_humor_estudante(id_estudante)
+        return {"success": True, "data": result}
+
+    def _local_obter_historico_humor_estudante(self, id_estudante):
         result = self.repo.obter_humor_estudante(id_estudante)
         return {"success": True, "data": result}
 
@@ -57,8 +134,13 @@ class ServicoBemEstar:
             checkin_id = self.repo.criar_checkin(
                 student_id=dados.get("student_id"),
                 check_in_date=dados.get("check_in_date"),
+                check_in_type=dados.get("check_in_type", "weekly"),
                 overall_wellbeing=dados.get("overall_wellbeing"),
-                notes=dados.get("notes", ""),
+                attention_areas=dados.get("attention_areas", []),
+                recommendations=dados.get("recommendations", ""),
+                professional_notes=dados.get("professional_notes", ""),
+                follow_up_needed=dados.get("follow_up_needed", False),
+                follow_up_date=dados.get("follow_up_date"),
             )
             return {"success": True, "message": "Check-in criado", "data": {"id": checkin_id}}
         except Exception as e:

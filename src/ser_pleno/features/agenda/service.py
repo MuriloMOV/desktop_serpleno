@@ -544,5 +544,59 @@ class ServicoAgendamento:
                 })
             return {"success": True, "data": agendamentos}
         except Exception as e:
-            logging.error(f"Erro ao listar agendamentos do mês: {e}")
-            return {"success": True, "data": []}
+            logging.error(f"Erro ao listar agendamentos do mês via repo: {e}")
+
+        result = self._listar_agendamentos_mes_api(ano, mes)
+        if result is not None:
+            return result
+
+        logging.error("Erro ao listar agendamentos do mês: repo e API indisponíveis")
+        return {"success": True, "data": []}
+
+    def _listar_agendamentos_mes_api(self, ano, mes):
+        """Lista agendamentos do mês via API Desktop como fallback."""
+        try:
+            session = self._get_session()
+            params = {"year": str(ano), "month": str(mes)}
+
+            response = session.get(
+                f"{self.API_DESKTOP_URL}/schedule/month/",
+                params=params,
+                headers=self._get_headers(),
+                timeout=5,
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                if result.get("success"):
+                    days_map = result.get("data", {}).get("days", {})
+                    agendamentos = []
+                    for data_str, apts in days_map.items():
+                        for apt in apts:
+                            time_str = apt.get("time", "")
+                            try:
+                                data_hora = datetime.strptime(
+                                    f"{data_str} {time_str}", "%Y-%m-%d %H:%M"
+                                )
+                            except Exception:
+                                data_hora = None
+
+                            agendamentos.append({
+                                "id_agendamento": apt.get("id"),
+                                "nome": apt.get("student", {}).get("name", ""),
+                                "id_aluno": apt.get("student", {}).get("id"),
+                                "data_hora": data_hora,
+                                "motivo": "",
+                                "status": self._convert_status_backend_to_frontend(apt.get("status", "scheduled")),
+                                "local": None,
+                                "profissional": None,
+                                "laudo": None,
+                                "origem": "desktop_web",
+                            })
+
+                    logging.info(f"Agendamentos do mês obtidos via API Desktop: {len(agendamentos)}")
+                    return {"success": True, "data": agendamentos}
+        except Exception as e:
+            logging.warning(f"Erro ao buscar agendamentos do mês via API: {e}")
+
+        return None

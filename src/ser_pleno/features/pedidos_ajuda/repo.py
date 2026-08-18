@@ -3,7 +3,6 @@
 
 from ser_pleno.repositories.base import (
     fetch_all,
-    fetch_one,
     execute_non_query,
     with_local_fallback,
     local_cache,
@@ -64,7 +63,9 @@ class PedidosAjudaRepository:
         def _mysql():
             if notas:
                 execute_non_query(
-                    "UPDATE help_requests SET status = %s, dados_extras = JSON_SET(COALESCE(dados_extras, '{}'), '$.notas', %s), updated_at = NOW() WHERE id = %s",
+                    "UPDATE help_requests SET status = %s, dados_extras = "
+                    "JSON_SET(COALESCE(dados_extras, '{}'), '$.notas', %s), "
+                    "updated_at = NOW() WHERE id = %s",
                     (novo_status, notas, pedido_id),
                 )
             else:
@@ -75,7 +76,9 @@ class PedidosAjudaRepository:
             return 1
 
         def _local(mysql_result):
-            local_cache.update("help_requests", {"status": novo_status, "updated_at": "now"}, "id", pedido_id)
+            local_cache.update(
+                "help_requests", {"status": novo_status, "updated_at": "now"}, "id", pedido_id,
+            )
             return 1
 
         return write_with_fallback(
@@ -85,20 +88,26 @@ class PedidosAjudaRepository:
         )
 
     def _local_atualizar_status(self, pedido_id, novo_status, notas=None):
-        local_cache.update("help_requests", {"status": novo_status, "updated_at": "now"}, "id", pedido_id)
+        local_cache.update(
+            "help_requests", {"status": novo_status, "updated_at": "now"}, "id", pedido_id,
+        )
         return 1
 
     @with_local_fallback("_local_responder_pedido")
     def responder_pedido(self, pedido_id, resposta, status="resolved"):
         def _mysql():
             execute_non_query(
-                "UPDATE help_requests SET status = %s, dados_extras = JSON_SET(COALESCE(dados_extras, '{}'), '$.resposta', %s, '$.respondido_em', NOW()), updated_at = NOW() WHERE id = %s",
+                "UPDATE help_requests SET status = %s, dados_extras = "
+                "JSON_SET(COALESCE(dados_extras, '{}'), '$.resposta', %s, "
+                "'$.respondido_em', NOW()), updated_at = NOW() WHERE id = %s",
                 (status, resposta, pedido_id),
             )
             return 1
 
         def _local(mysql_result):
-            local_cache.update("help_requests", {"status": status, "updated_at": "now"}, "id", pedido_id)
+            local_cache.update(
+                "help_requests", {"status": status, "updated_at": "now"}, "id", pedido_id,
+            )
             return 1
 
         return write_with_fallback(
@@ -108,7 +117,9 @@ class PedidosAjudaRepository:
         )
 
     def _local_responder_pedido(self, pedido_id, resposta, status="resolved"):
-        local_cache.update("help_requests", {"status": status, "updated_at": "now"}, "id", pedido_id)
+        local_cache.update(
+            "help_requests", {"status": status, "updated_at": "now"}, "id", pedido_id,
+        )
         return 1
 
     def contar_por_status(self, status):
