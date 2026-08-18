@@ -651,6 +651,10 @@ class AvisosFrame(BaseViewFrame):
         self._modal: PublicacaoModal | None = None
         self._filtro_busca: str | None = None
         self._filtro_categoria: str | None = None
+        self._filtro_status: str | None = None
+        self._filtro_data_inicio: str | None = None
+        self._filtro_data_fim: str | None = None
+        self.f_resultados: ctk.CTkLabel | None = None
 
         self._build_filtros()
         self._build_lista()
@@ -686,7 +690,7 @@ class AvisosFrame(BaseViewFrame):
 
         body = ctk.CTkFrame(card, fg_color="transparent")
         body.pack(fill="x", padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"]))
-        body.grid_columnconfigure((0, 1, 2), weight=1)
+        body.grid_columnconfigure((0, 1, 2, 3, 4), weight=1)
 
         opt_style = dict(
             button_color=THEME["primary"],
@@ -710,7 +714,7 @@ class AvisosFrame(BaseViewFrame):
             text_color=THEME["text"],
             height=32,
         )
-        self.f_busca.grid(row=1, column=0, sticky="ew", padx=(0, 6))
+        self.f_busca.grid(row=1, column=0, sticky="ew", padx=(0, 4))
         self.f_busca.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
 
         ctk.CTkLabel(body, text="Categoria", font=font(size=11, weight="bold"), text_color=Q["text_muted"]).grid(row=0, column=1, sticky="w", pady=(0, 4))
@@ -721,10 +725,20 @@ class AvisosFrame(BaseViewFrame):
             command=lambda _: self._aplicar_filtros_auto(),
             **opt_style,
         )
-        self.f_categoria.grid(row=1, column=1, sticky="ew", padx=6)
+        self.f_categoria.grid(row=1, column=1, sticky="ew", padx=4)
 
-        ctk.CTkLabel(body, text="Publicado em", font=font(size=11, weight="bold"), text_color=Q["text_muted"]).grid(row=0, column=2, sticky="w", pady=(0, 4))
-        self.f_data = ctk.CTkEntry(
+        ctk.CTkLabel(body, text="Status", font=font(size=11, weight="bold"), text_color=Q["text_muted"]).grid(row=0, column=2, sticky="w", pady=(0, 4))
+        self.f_status = Dropdown(
+            body,
+            values=["Todos", "ativos", "inativos"],
+            initial="Todos",
+            command=lambda _: self._aplicar_filtros_auto(),
+            **opt_style,
+        )
+        self.f_status.grid(row=1, column=2, sticky="ew", padx=4)
+
+        ctk.CTkLabel(body, text="Data Início", font=font(size=11, weight="bold"), text_color=Q["text_muted"]).grid(row=0, column=3, sticky="w", pady=(0, 4))
+        self.f_data_inicio = ctk.CTkEntry(
             body,
             placeholder_text="YYYY-MM-DD",
             fg_color=THEME["bg_alt"],
@@ -734,19 +748,43 @@ class AvisosFrame(BaseViewFrame):
             text_color=THEME["text"],
             height=32,
         )
-        self.f_data.grid(row=1, column=2, sticky="ew", padx=(6, 0))
-        self.f_data.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
+        self.f_data_inicio.grid(row=1, column=3, sticky="ew", padx=(4, 2))
+        self.f_data_inicio.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
+
+        ctk.CTkLabel(body, text="Data Fim", font=font(size=11, weight="bold"), text_color=Q["text_muted"]).grid(row=0, column=4, sticky="w", pady=(0, 4))
+        self.f_data_fim = ctk.CTkEntry(
+            body,
+            placeholder_text="YYYY-MM-DD",
+            fg_color=THEME["bg_alt"],
+            border_width=1,
+            border_color=THEME["border"],
+            font=font(size=12),
+            text_color=THEME["text"],
+            height=32,
+        )
+        self.f_data_fim.grid(row=1, column=4, sticky="ew", padx=(2, 0))
+        self.f_data_fim.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
+
+        self.f_resultados = ctk.CTkLabel(body, text="", font=font(size=11), text_color=Q["text_light"])
+        self.f_resultados.grid(row=2, column=0, columnspan=5, sticky="w", pady=(8, 0))
 
     def _limpar_filtros(self):
         self.f_busca.delete(0, "end")
         self.f_categoria.set("Todas")
-        self.f_data.delete(0, "end")
+        self.f_status.set("Todos")
+        self.f_data_inicio.delete(0, "end")
+        self.f_data_fim.delete(0, "end")
+        if self.f_resultados:
+            self.f_resultados.configure(text="")
         self.carregar_avisos_async()
 
     def _aplicar_filtros_auto(self):
         self.carregar_avisos_async(
             busca=self.f_busca.get().strip() or None,
             categoria=self.f_categoria.get() if self.f_categoria.get() != "Todas" else None,
+            status=self.f_status.get() if self.f_status.get() != "Todos" else None,
+            data_inicio=self.f_data_inicio.get().strip() or None,
+            data_fim=self.f_data_fim.get().strip() or None,
         )
 
     def _build_lista(self):
@@ -756,10 +794,13 @@ class AvisosFrame(BaseViewFrame):
     def load_data(self):
         self.carregar_avisos_async()
 
-    def carregar_avisos_async(self, busca=None, categoria=None):
+    def carregar_avisos_async(self, busca=None, categoria=None, status=None, data_inicio=None, data_fim=None):
         self._limpar_lista()
         self._filtro_busca = busca
         self._filtro_categoria = categoria
+        self._filtro_status = status
+        self._filtro_data_inicio = data_inicio
+        self._filtro_data_fim = data_fim
 
         loading_lbl = ctk.CTkLabel(
             self.lista,
@@ -771,7 +812,8 @@ class AvisosFrame(BaseViewFrame):
 
         def _fetch():
             return self.servico_mural.listar_mensagens(
-                busca=busca, pagina=1, categoria=categoria
+                busca=busca, pagina=1, categoria=categoria,
+                status=status, data_inicio=data_inicio, data_fim=data_fim
             )
 
         self._load_async(_fetch, self._on_load_success, self._on_load_error)
@@ -788,6 +830,11 @@ class AvisosFrame(BaseViewFrame):
         self._limpar_lista()
         posts = self._parse_posts(res)
         self.posts = posts
+
+        if self.f_resultados:
+            total = len(posts)
+            plural = "s" if total != 1 else ""
+            self.f_resultados.configure(text=f"{total} resultado{plural} encontrado{plural}")
 
         if not posts:
             ctk.CTkLabel(
@@ -816,6 +863,8 @@ class AvisosFrame(BaseViewFrame):
 
     def _on_load_error(self, e):
         self._limpar_lista()
+        if self.f_resultados:
+            self.f_resultados.configure(text="")
         ctk.CTkLabel(
             self.lista,
             text=f"{ICONS['bolt']}   Erro ao carregar avisos: {e}",
