@@ -5,16 +5,17 @@ import shutil
 import time
 import tkinter.filedialog as fd
 import webbrowser
+
 import customtkinter as ctk
 from PIL import Image
 
-from ser_pleno.features.comunicacao.service import ServicoComunicacao
 from ser_pleno.config.paths import get_project_root
+from ser_pleno.features.comunicacao.service import ServicoComunicacao
 from ser_pleno.infrastructure.api.api import ClienteAPI
 from ser_pleno.infrastructure.api.websocket_client import WebSocketChatClient
-from ser_pleno.ui.components.ui_components import bind_clickable
 from ser_pleno.ui.components.icons import ICONS, IconButton, IconLabel
-from ser_pleno.ui.theme import RADIUS, SPACING, THEME, font, themed_font
+from ser_pleno.ui.components.ui_components import bind_clickable
+from ser_pleno.ui.theme import THEME, font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
@@ -46,6 +47,47 @@ _FILE_ICONS = {
     "Arquivos Zip": ICONS["zip"],
     "Code": ICONS["code"],
 }
+
+
+_MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024
+
+_ALLOWED_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+    ".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt",
+    ".xls", ".xlsx", ".csv", ".ppt", ".pptx",
+    ".mp4", ".avi", ".mov", ".wmv", ".flv",
+    ".mp3", ".wav", ".ogg", ".flac", ".aac",
+    ".zip", ".rar", ".7z", ".tar", ".gz",
+    ".py", ".js", ".html", ".css", ".json", ".xml",
+}
+
+_CATEGORY_EXTENSIONS = {
+    "Imagens": {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"},
+    "Vídeos": {".mp4", ".avi", ".mov", ".wmv", ".flv"},
+    "Áudio": {".mp3", ".wav", ".ogg", ".flac", ".aac"},
+    "Documentos": {".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt"},
+    "Planilhas": {".xls", ".xlsx", ".csv"},
+    "Apresentações": {".ppt", ".pptx"},
+    "Compactados": {".zip", ".rar", ".7z", ".tar", ".gz"},
+    "Código": {".py", ".js", ".html", ".css", ".json", ".xml"},
+}
+
+
+def _get_category_for_ext(ext: str) -> str:
+    for cat, exts in _CATEGORY_EXTENSIONS.items():
+        if ext.lower() in exts:
+            return cat
+    return "Outros"
+
+
+def _formatar_tamanho(b: int) -> str:
+    if b < 1024:
+        return f"{b} B"
+    if b < 1024**2:
+        return f"{b / 1024:.1f} KB"
+    if b < 1024**3:
+        return f"{b / 1024**2:.1f} MB"
+    return f"{b / 1024**3:.1f} GB"
 
 
 def _make_avatar(parent, initials: str, color: str, size: int = 40) -> ctk.CTkFrame:
@@ -90,6 +132,10 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.btn_clip = None
         self.btn_enviar = None
         self.modal_arquivos = None
+        self.preview_arquivo_frame = None
+        self.progress_bar = None
+        self.lbl_status_envio = None
+        self._arquivo_pendente = None
 
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -585,6 +631,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
         inner = ctk.CTkFrame(input_bar, fg_color="transparent")
         inner.pack(fill="both", expand=True, padx=spacing("lg"), pady=spacing("md"))
 
+        self._criar_area_preview_envio(input_bar)
+
         box = ctk.CTkFrame(
             inner,
             fg_color=THEME["input_bg"],
@@ -645,6 +693,78 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self.btn_enviar.pack(side="right", padx=(4, 8))
 
         self._criar_modal_arquivos(parent)
+
+    def _criar_area_preview_envio(self, parent):
+        self.preview_arquivo_frame = ctk.CTkFrame(
+            parent,
+            fg_color=THEME["bg_alt"],
+            corner_radius=10,
+            height=52,
+        )
+        self.preview_arquivo_frame.pack(
+            fill="x", padx=spacing("lg"), pady=(0, spacing("xs"))
+        )
+        self.preview_arquivo_frame.pack_propagate(False)
+        self.preview_arquivo_frame.grid_columnconfigure(1, weight=1)
+
+        self.preview_icon = ctk.CTkLabel(
+            self.preview_arquivo_frame,
+            text=ICONS["file"],
+            font=font(size=20),
+        )
+        self.preview_icon.grid(row=0, column=0, padx=(12, 8), pady=8, sticky="w")
+
+        self.preview_info = ctk.CTkFrame(self.preview_arquivo_frame, fg_color="transparent")
+        self.preview_info.grid(row=0, column=1, sticky="ew", padx=(0, 8), pady=4)
+
+        self.preview_nome = ctk.CTkLabel(
+            self.preview_info,
+            text="",
+            font=font(size=12, weight="bold"),
+            text_color=THEME["text"],
+            anchor="w",
+        )
+        self.preview_nome.pack(anchor="w")
+
+        self.preview_detalhes = ctk.CTkLabel(
+            self.preview_info,
+            text="",
+            font=font(size=11),
+            text_color=THEME["text_secondary"],
+            anchor="w",
+        )
+        self.preview_detalhes.pack(anchor="w")
+
+        self.preview_remover = ctk.CTkButton(
+            self.preview_arquivo_frame,
+            text=ICONS["clear"],
+            width=28,
+            height=28,
+            corner_radius=6,
+            fg_color=THEME["border"],
+            hover_color=THEME["border_strong"],
+            text_color=THEME["text"],
+            font=font(size=12),
+            command=self._limpar_preview,
+        )
+        self.preview_remover.grid(row=0, column=2, padx=(0, 8), pady=8, sticky="e")
+
+        self.preview_arquivo_frame.pack_forget()
+
+        self.progress_bar = ctk.CTkProgressBar(
+            parent,
+            height=4,
+            progress_color=THEME["primary"],
+            fg_color=THEME["bg_alt"],
+        )
+        self.progress_bar.set(0.0)
+
+        self.lbl_status_envio = ctk.CTkLabel(
+            parent,
+            text="",
+            font=font(size=11),
+            text_color=THEME["text_secondary"],
+        )
 
     def _criar_modal_arquivos(self, parent):
         self.modal_arquivos = ctk.CTkFrame(
@@ -708,6 +828,148 @@ class ComunicacaoFrame(ctk.CTkFrame):
                 self.modal_arquivos.grid_remove()
             else:
                 self.modal_arquivos.grid()
+
+    def _validar_arquivo(self, caminho: str) -> tuple[bool, str]:
+        if not os.path.exists(caminho):
+            return False, "Arquivo não encontrado."
+        ext = os.path.splitext(caminho)[1].lower()
+        if ext not in _ALLOWED_EXTENSIONS:
+            return False, f"Tipo de arquivo não permitido: {ext or 'sem extensão'}"
+        tamanho = os.path.getsize(caminho)
+        if tamanho > _MAX_FILE_SIZE_BYTES:
+            tamanho_str = _formatar_tamanho(_MAX_FILE_SIZE_BYTES)
+            return False, f"Arquivo excede o tamanho máximo de {tamanho_str}"
+        return True, ""
+
+    def _mostrar_preview_arquivo(self, caminho: str):
+        self._arquivo_pendente = caminho
+        nome = os.path.basename(caminho)
+        ext = os.path.splitext(caminho)[1].lower()
+        categoria = _get_category_for_ext(ext)
+        tamanho = os.path.getsize(caminho) if os.path.exists(caminho) else 0
+        tamanho_str = _formatar_tamanho(tamanho)
+        icon_map = {
+            "Imagens": ICONS.get("folder", ICONS["folder"]),
+            "Vídeos": ICONS.get("video", ICONS["video"]),
+            "Áudio": ICONS.get("audio", ICONS["audio"]),
+            "Documentos": ICONS.get("file", ICONS["file"]),
+            "Planilhas": ICONS.get("spreadsheet", ICONS["spreadsheet"]),
+            "Apresentações": ICONS.get("presentation", ICONS["presentation"]),
+            "Compactados": ICONS.get("zip", ICONS["zip"]),
+            "Código": ICONS.get("code", ICONS["code"]),
+        }
+        icon = icon_map.get(categoria, ICONS["file"])
+        self.preview_icon.configure(text=icon)
+        self.preview_nome.configure(text=nome)
+        self.preview_detalhes.configure(text=f"{categoria}  •  {tamanho_str}")
+        self.preview_arquivo_frame.pack(fill="x", padx=spacing("lg"), pady=(0, spacing("xs")))
+        self.preview_arquivo_frame.lift()
+
+    def _limpar_preview(self):
+        self._arquivo_pendente = None
+        self.preview_arquivo_frame.pack_forget()
+        self.preview_nome.configure(text="")
+        self.preview_detalhes.configure(text="")
+
+    def _ocultar_feedback_envio(self):
+        self.progress_bar.pack_forget()
+        self.lbl_status_envio.pack_forget()
+
+    def _mostrar_progresso_envio(self, mensagem: str = "Enviando..."):
+        self.progress_bar.set(0.0)
+        self.progress_bar.pack(fill="x", padx=spacing("lg"), pady=(0, spacing("xs")))
+        self.lbl_status_envio.configure(text=mensagem)
+        self.lbl_status_envio.pack(fill="x", padx=spacing("lg"), pady=(0, spacing("xs")))
+
+    def _atualizar_progresso(self, valor: float, mensagem: str = ""):
+        self.progress_bar.set(max(0.0, min(1.0, valor)))
+        if mensagem:
+            self.lbl_status_envio.configure(text=mensagem)
+
+    def _concluir_envio(self, sucesso: bool, mensagem: str = "", retry_callback=None):
+        self._ocultar_feedback_envio()
+        cor = THEME["success"] if sucesso else THEME["danger"]
+        self.lbl_status_envio.configure(text=mensagem, text_color=cor)
+        self.lbl_status_envio.pack(fill="x", padx=spacing("lg"), pady=(0, spacing("xs")))
+        if sucesso:
+            self._limpar_preview()
+            self.after(3000, lambda: self.lbl_status_envio.pack_forget())
+        else:
+            if retry_callback:
+                self.lbl_status_envio.after(0, lambda: self._criar_botao_retry(retry_callback))
+
+    def _criar_botao_retry(self, callback):
+        if self.lbl_status_envio.winfo_exists():
+            btn_retry = ctk.CTkButton(
+                self.lbl_status_envio,
+                text=f"{ICONS['send']} Tentar novamente",
+                font=font(size=11, weight="bold"),
+                height=28,
+                corner_radius=8,
+                fg_color=THEME["danger"],
+                hover_color="#DC2626",
+                text_color=THEME["text_on_primary"],
+                command=lambda: self._executar_retry(callback),
+            )
+            btn_retry.pack(pady=(4, 0))
+
+    def _executar_retry(self, callback):
+        self.lbl_status_envio.pack_forget()
+        for w in self.lbl_status_envio.master.winfo_children():
+            if isinstance(w, ctk.CTkButton) and w.cget("text").startswith(ICONS["send"]):
+                w.destroy()
+        callback()
+
+    def _enviar_com_progresso(self, caminho: str, categoria: str, tentativa: int = 1):
+        if not self.conversa_ativa:
+            self._concluir_envio(False, "Nenhuma conversa selecionada.")
+            return
+        valido, erro = self._validar_arquivo(caminho)
+        if not valido:
+            self._concluir_envio(False, erro)
+            return
+        self._mostrar_progresso_envio(f"Enviando arquivo... (tentativa {tentativa})")
+        nome = os.path.basename(caminho)
+
+        def _tarefa_envio():
+            if self.conversa_ativa["role"] == "group":
+                return self.servico_comunicacao.enviar_mensagem_grupo(
+                    self.usuario_logado_id, nome, caminho, categoria
+                )
+            return self.servico_comunicacao.enviar_mensagem(
+                self.usuario_logado_id, self.conversa_ativa["id"], nome
+            )
+
+        def _simular_progresso():
+            if not self.progress_bar.winfo_exists():
+                return
+            atual = self.progress_bar.get()
+            if atual < 0.9:
+                self._atualizar_progresso(atual + 0.1)
+                self.after(200, _simular_progresso)
+
+        self.after(0, _simular_progresso)
+
+        AsyncRunner.run(
+            task=_tarefa_envio,
+            on_success=lambda res: self.after(0, lambda: self._finalizar_envio(res, caminho)),
+            on_error=lambda exc: self.after(
+                0, lambda: self._concluir_envio(False, f"Erro ao enviar: {exc}", self._enviar_com_progresso)
+            ),
+            widget_ref=self,
+        )
+
+    def _finalizar_envio(self, res: dict, caminho: str):
+        if res.get("success"):
+            self._atualizar_progresso(1.0, "Enviado!")
+            self.after(300, lambda: self._concluir_envio(True, "Arquivo enviado com sucesso."))
+            self.carregar_mensagens()
+            self.carregar_contador_nao_lidas()
+            self.atualizar_lista_contatos()
+        else:
+            erro = res.get("error", "Falha no envio.")
+            categoria = _get_category_for_ext(os.path.splitext(caminho)[1].lower())
+            self._concluir_envio(False, erro, lambda: self._enviar_com_progresso(caminho, categoria))
 
     def carregar_mensagens(self):
         if not self.conversa_ativa or not hasattr(self, "winfo_exists") or not self.winfo_exists():
@@ -913,6 +1175,12 @@ class ComunicacaoFrame(ctk.CTkFrame):
 
     def enviar_mensagem(self):
         txt = self.entry_mensagem.get().strip() if self.entry_mensagem is not None else ""
+        if self._arquivo_pendente:
+            caminho = self._arquivo_pendente
+            ext = os.path.splitext(caminho)[1].lower()
+            categoria = _get_category_for_ext(ext)
+            self._enviar_com_progresso(caminho, categoria)
+            return
         if not txt or not self.conversa_ativa:
             return
         try:
@@ -956,7 +1224,13 @@ class ComunicacaoFrame(ctk.CTkFrame):
             tipos = [("Todos os arquivos", "*.*")]
         arq = fd.askopenfilename(title=f"Selecionar {categoria['nome'].lower()}", filetypes=tipos)
         if arq:
-            self.enviar_arquivo(arq, categoria["nome"])
+            valido, erro = self._validar_arquivo(arq)
+            if not valido:
+                self._concluir_envio(False, erro)
+                return
+            self._mostrar_preview_arquivo(arq)
+            if self.modal_arquivos is not None and self.modal_arquivos.winfo_exists():
+                self.modal_arquivos.grid_remove()
 
     def enviar_arquivo(self, caminho: str, categoria: str):
         if not self.conversa_ativa:
