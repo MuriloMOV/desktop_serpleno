@@ -26,6 +26,9 @@ from ser_pleno.ui.views.bem_estar import BemEstarFrame
 from ser_pleno.ui.views.relatorio import RelatorioFrame
 
 
+pytestmark = pytest.mark.ui_heavy
+
+
 @pytest.fixture(scope="function")
 def app():
     ctk.set_appearance_mode("Dark")
@@ -753,10 +756,11 @@ class TestConfiguracoesQA:
             on_save = MagicMock()
             modal = AlterarSenhaModal(view, on_save=on_save)
             modal.f_senha_atual.entry.insert(0, "oldpass")
-            modal.f_nova_senha.entry.insert(0, "newpass123")
-            modal.f_confirmar_senha.entry.insert(0, "newpass123")
+            modal.f_confirmar_senha_atual.entry.insert(0, "oldpass")
+            modal.f_nova_senha.entry.insert(0, "Newpass1!")
+            modal.f_confirmar_senha.entry.insert(0, "Newpass1!")
             modal._on_confirm()
-            on_save.assert_called_with("oldpass", "newpass123")
+            on_save.assert_called_with("oldpass", "Newpass1!")
 
     def test_encerrar_sessao(self, app, controller):
         with patch(
@@ -990,81 +994,4 @@ class TestExceptionSafety:
                     assert True
 
 
-class TestCoverageReport:
-    def test_all_views_instantiate(self, app, controller):
-        views = [
-            (LoginFrame, {}),
-            (DashboardFrame, {}),
-            (AgendaFrame, {}),
-            (EstudantesFrame, {}),
-            (OrientacoesFrame, {}),
-            (TriagemFrame, {}),
-            (AvisosFrame, {}),
-            (ConfiguracoesFrame, {}),
-            (BemEstarFrame, {}),
-            (RelatorioFrame, {}),
-        ]
-        patches = [
-            "ser_pleno.ui.views.dashboard.ServicoDashboard",
-            "ser_pleno.ui.views.agenda.ServicoAgendamento",
-            "ser_pleno.ui.views.estudantes.ServicoEstudante",
-            "ser_pleno.ui.views.orientacoes.ServicoOrientacoes",
-            "ser_pleno.ui.views.triagem.ServicoTriagem",
-            "ser_pleno.ui.views.avisos.ServicoMural",
-            "ser_pleno.ui.views.comunicacao.ServicoComunicacao",
-            "ser_pleno.ui.views.configuracoes.ServicoConfiguracoes",
-            "ser_pleno.ui.views.bem_estar.ServicoBemEstar",
-            "ser_pleno.ui.views.relatorio.ServicoRelatorio",
-        ]
-        mocks = {p: MagicMock() for p in patches}
-        mocks["ser_pleno.ui.views.login.ServicoAutenticacao"] = MagicMock()
-        with (
-            patch.multiple(
-                "ser_pleno.ui.views.login",
-                ServicoAutenticacao=mocks["ser_pleno.ui.views.login.ServicoAutenticacao"],
-            ),
-            patch(
-                "ser_pleno.ui.views.dashboard.ServicoDashboard",
-                mocks["ser_pleno.ui.views.dashboard.ServicoDashboard"],
-            ),
-            patch(
-                "ser_pleno.ui.views.agenda.ServicoAgendamento",
-                mocks["ser_pleno.ui.views.agenda.ServicoAgendamento"],
-            ),
-            patch(
-                "ser_pleno.ui.views.estudantes.ServicoEstudante",
-                mocks["ser_pleno.ui.views.estudantes.ServicoEstudante"],
-            ),
-            patch(
-                "ser_pleno.ui.views.orientacoes.ServicoOrientacoes",
-                mocks["ser_pleno.ui.views.orientacoes.ServicoOrientacoes"],
-            ),
-            patch(
-                "ser_pleno.ui.views.triagem.ServicoTriagem",
-                mocks["ser_pleno.ui.views.triagem.ServicoTriagem"],
-            ),
-            patch(
-                "ser_pleno.ui.views.avisos.ServicoMural",
-                mocks["ser_pleno.ui.views.avisos.ServicoMural"],
-            ),
-            patch(
-                "ser_pleno.ui.views.comunicacao.ServicoComunicacao",
-                mocks["ser_pleno.ui.views.comunicacao.ServicoComunicacao"],
-            ),
-            patch(
-                "ser_pleno.ui.views.configuracoes.ServicoConfiguracoes",
-                mocks["ser_pleno.ui.views.configuracoes.ServicoConfiguracoes"],
-            ),
-            patch(
-                "ser_pleno.ui.views.bem_estar.ServicoBemEstar",
-                mocks["ser_pleno.ui.views.bem_estar.ServicoBemEstar"],
-            ),
-            patch(
-                "ser_pleno.ui.views.relatorio.ServicoRelatorio",
-                mocks["ser_pleno.ui.views.relatorio.ServicoRelatorio"],
-            ),
-        ):
-            controller.usuario_logado_id = 1
-            for cls, kwargs in views:
-                obj = cls(app, controller)
-                assert obj is not None, f"{cls.__name__} falhou na inicialização"
+

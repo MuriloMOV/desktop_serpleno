@@ -1,24 +1,31 @@
 import gc
 import weakref
 import pytest
-from unittest.mock import MagicMock
-import customtkinter as ctk
-from tkinter import TclError
+import subprocess
 import sys
 import os
+from unittest.mock import MagicMock, patch
+import customtkinter as ctk
+from tkinter import TclError
 
-# Add project root and src to path for imports
 _root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _src = os.path.join(_root, "src")
-if _src not in sys.path:
-    sys.path.insert(0, _src)
-if _root not in sys.path:
-    sys.path.insert(0, _root)
+for _p in [_src, _root]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+def _run_ui_tests(path: str) -> None:
+    cmd = [sys.executable, "-m", "pytest", path, "-v"]
+    proc = subprocess.run(cmd, cwd=_root, capture_output=True, text=True)
+    out = proc.stdout + "\n" + proc.stderr
+    if proc.returncode != 0:
+        pytest.fail(f"Testes de UI falharam em subprocesso:\n{out}")
+    print(out)
 
 
 @pytest.fixture(scope="function")
 def app():
-    """Create a fresh CTk window per test to avoid Tcl/Tk interpreter memory leak."""
     ctk.set_appearance_mode("Dark")
     try:
         app = ctk.CTk()
@@ -27,15 +34,25 @@ def app():
     app.geometry("800x600")
     yield app
     try:
+        for widget in list(app.winfo_children()):
+            try:
+                widget.destroy()
+            except Exception:
+                pass
         app.destroy()
     except Exception:
         pass
-    _cleanup_tk()
+    for _ in range(5):
+        gc.collect()
+        gc.garbage.clear()
+    try:
+        ctk.CTk._instance().destroy()
+    except Exception:
+        pass
 
 
 @pytest.fixture(autouse=True)
 def cleanup_theme_listeners():
-    """Prevent theme listener accumulation across UI tests."""
     from ser_pleno.ui.theme import _LISTENERS
 
     before = list(_LISTENERS)
@@ -50,32 +67,19 @@ def cleanup_theme_listeners():
 
 @pytest.fixture(autouse=True)
 def cleanup_memory():
-    """Force cleanup after each test to prevent memory accumulation."""
     yield
-    _cleanup_tk()
-
-
-def _cleanup_tk() -> None:
-    """Destroy orphan Tkinter widgets and force garbage collection."""
-    try:
-        for widget in list(ctk.CTk._instance().winfo_children()):
-            try:
-                widget.destroy()
-            except Exception:
-                pass
-        ctk.CTk._instance().destroy()
-    except Exception:
-        pass
-    try:
+    for _ in range(5):
         gc.collect()
         gc.garbage.clear()
+    try:
+        from ser_pleno.infrastructure.local.local_cache import get_local_cache
+        get_local_cache().reset()
     except Exception:
         pass
 
 
 @pytest.fixture
 def controller(app):
-    """Mock controller"""
     controller = MagicMock()
     controller.content = app
     return controller
@@ -91,6 +95,5 @@ def mock_response():
 
 @pytest.fixture(autouse=True)
 def mock_network(monkeypatch):
-    """Disable actual network calls"""
     monkeypatch.setattr("requests.get", MagicMock())
     monkeypatch.setattr("requests.post", MagicMock())

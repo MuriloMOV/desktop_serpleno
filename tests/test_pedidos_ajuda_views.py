@@ -8,6 +8,9 @@ import customtkinter as ctk
 from ser_pleno.ui.views.pedidos_ajuda import PedidosAjudaFrame, ResponderModal
 
 
+pytestmark = pytest.mark.ui_heavy
+
+
 class TestPedidosAjudaFrame:
     def test_inicializacao(self, app, controller):
         view = PedidosAjudaFrame(app, controller)
