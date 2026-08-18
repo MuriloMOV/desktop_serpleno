@@ -1,6 +1,6 @@
 {
-  "read_fallback_total": 1065,
-  "write_fallback_total": 194,
+  "read_fallback_total": 1330,
+  "write_fallback_total": 291,
   "by_repository": {
     "AutenticacaoRepository": {
       "total": 10,
@@ -11,42 +11,42 @@
       }
     },
     "AgendamentoRepository": {
-      "total": 82,
-      "read": 82,
+      "total": 99,
+      "read": 99,
       "write": 0,
       "methods": {
-        "listar_horarios_base": 32,
+        "listar_horarios_base": 34,
         "listar_agendamentos": 20,
         "obter_nome_aluno": 2,
         "obter_time_id": 2,
-        "listar_proximos": 26
+        "listar_proximos": 41
       }
     },
     "EstudanteRepository": {
-      "total": 340,
-      "read": 340,
+      "total": 464,
+      "read": 464,
       "write": 0,
       "methods": {
-        "listar": 340
+        "listar": 464
       }
     },
     "appointments": {
-      "total": 42,
+      "total": 57,
       "read": 0,
-      "write": 42,
+      "write": 57,
       "methods": {
-        "create": 28,
+        "create": 43,
         "delete": 8,
         "update": 6
       }
     },
     "TriagemRepository": {
-      "total": 115,
-      "read": 115,
+      "total": 182,
+      "read": 182,
       "write": 0,
       "methods": {
-        "listar": 75,
-        "listar_formularios": 40
+        "listar": 115,
+        "listar_formularios": 67
       }
     },
     "ComunicacaoRepository": {
@@ -59,48 +59,48 @@
       }
     },
     "messages": {
-      "total": 34,
+      "total": 49,
       "read": 0,
-      "write": 34,
+      "write": 49,
       "methods": {
-        "create": 28,
+        "create": 43,
         "update": 6
       }
     },
     "DashboardRepository": {
-      "total": 131,
-      "read": 131,
+      "total": 145,
+      "read": 145,
       "write": 0,
       "methods": {
-        "obter_kpis": 127,
+        "obter_kpis": 141,
         "obter_notificacoes_alertas": 4
       }
     },
     "OrientacaoRepository": {
-      "total": 27,
-      "read": 27,
+      "total": 29,
+      "read": 29,
       "write": 0,
       "methods": {
-        "listar_orientacoes": 23,
+        "listar_orientacoes": 25,
         "listar_estudantes": 4
       }
     },
     "BemEstarRepository": {
-      "total": 40,
-      "read": 40,
+      "total": 44,
+      "read": 44,
       "write": 0,
       "methods": {
-        "obter_dashboard": 20,
-        "listar_checkins": 20
+        "obter_dashboard": 22,
+        "listar_checkins": 22
       }
     },
     "ReportTemplateRepository": {
-      "total": 286,
-      "read": 286,
+      "total": 322,
+      "read": 322,
       "write": 0,
       "methods": {
-        "listar_templates": 285,
-        "obter_template_por_id": 1
+        "listar_templates": 312,
+        "obter_template_por_id": 10
       }
     },
     "RelatorioRepository": {
@@ -114,27 +114,27 @@
       }
     },
     "students": {
-      "total": 26,
+      "total": 41,
       "read": 0,
-      "write": 26,
+      "write": 41,
       "methods": {
-        "create": 26
+        "create": 41
       }
     },
     "orientations": {
-      "total": 26,
+      "total": 41,
       "read": 0,
-      "write": 26,
+      "write": 41,
       "methods": {
-        "create": 26
+        "create": 41
       }
     },
     "screenings": {
-      "total": 26,
+      "total": 41,
       "read": 0,
-      "write": 26,
+      "write": 41,
       "methods": {
-        "create": 26
+        "create": 41
       }
     },
     "reports": {
@@ -146,11 +146,11 @@
       }
     },
     "user_preferences": {
-      "total": 26,
+      "total": 41,
       "read": 0,
-      "write": 26,
+      "write": 41,
       "methods": {
-        "update": 26
+        "update": 41
       }
     },
     "alerts": {
@@ -162,19 +162,19 @@
       }
     },
     "report_templates": {
-      "total": 1,
+      "total": 8,
       "read": 0,
-      "write": 1,
+      "write": 8,
       "methods": {
-        "create": 1
+        "create": 8
       }
     },
     "ConfiguracoesRepository": {
-      "total": 4,
-      "read": 4,
+      "total": 5,
+      "read": 5,
       "write": 0,
       "methods": {
-        "obter_configuracoes": 4
+        "obter_configuracoes": 5
       }
     },
     "AnalyticsRepository": {
@@ -186,7 +186,7 @@
       }
     }
   },
-  "last_read_fallback": "2026-08-18T08:52:16.431179",
-  "last_write_fallback": "2026-08-18T00:14:54.859552",
+  "last_read_fallback": "2026-08-18T13:14:28.990794",
+  "last_write_fallback": "2026-08-18T13:11:13.985368",
   "started_at": "2026-08-16T07:48:20.849824"
 }
