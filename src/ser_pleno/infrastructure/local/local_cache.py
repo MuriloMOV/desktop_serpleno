@@ -95,6 +95,11 @@ class LocalCache:
                 logger.debug("Falha ao fechar conexão local: %s", exc)
             self._local.connection = None
 
+    def reset(self) -> None:
+        self.close_connection()
+        self._local = threading.local()
+        self._ensure_tables()
+
     def _ensure_tables(self) -> None:
         conn = self._get_connection()
         try:
@@ -404,7 +409,7 @@ class LocalCache:
         columns = ", ".join(keys)
         update_clause = ", ".join([f"{k}=excluded.{k}" for k in keys if k != pk_field])
         _validate_identifier(pk_field, kind="campo PK")
-        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders}) ON CONFLICT(id) DO UPDATE SET {update_clause};"
+        query = f"INSERT INTO {table} ({columns}) VALUES ({placeholders}) ON CONFLICT({pk_field}) DO UPDATE SET {update_clause};"
         values = [json.dumps(v) if isinstance(v, (dict, list)) else v for v in data.values()]
         conn = self._get_connection()
         try:
