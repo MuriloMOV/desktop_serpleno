@@ -360,7 +360,7 @@ class FormModal(BaseModal):
 
 class AlterarSenhaModal(FormModal):
     def __init__(self, parent, on_save):
-        super().__init__(parent, "Alterar Senha", width=420, height=380, icon=ICONS["key"])
+        super().__init__(parent, "Alterar Senha", width=420, height=520, icon=ICONS["key"])
         self._on_save = on_save
 
         self.f_senha_atual = ConfigInputField(
@@ -370,50 +370,133 @@ class AlterarSenhaModal(FormModal):
             password=True,
             icon=ICONS["lock"],
         )
+        self.f_confirmar_senha_atual = ConfigInputField(
+            self._fields_frame,
+            "Confirmar Senha Atual",
+            placeholder="repita a senha atual",
+            password=True,
+            icon=ICONS["lock"],
+        )
         self.f_nova_senha = ConfigInputField(
             self._fields_frame,
             "Nova Senha",
-            placeholder="mín. 6 caracteres",
+            placeholder="mín. 8 caracteres",
             password=True,
             icon=ICONS["key"],
         )
         self.f_confirmar_senha = ConfigInputField(
             self._fields_frame,
-            "Confirmar Senha",
+            "Confirmar Nova Senha",
             placeholder="confirme a nova senha",
             password=True,
             icon=ICONS["key"],
         )
 
-        for f in (self.f_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
+        strength_frame = ctk.CTkFrame(self._fields_frame, fg_color="transparent")
+        strength_frame.pack(fill="x", pady=(0, 10))
+        self._strength_bar = ctk.CTkFrame(strength_frame, fg_color=THEME["border"], corner_radius=RADIUS["xs"], height=6)
+        self._strength_bar.pack(fill="x")
+        self._strength_bar.pack_propagate(False)
+        self._strength_segments = []
+        for i in range(5):
+            seg = ctk.CTkFrame(self._strength_bar, fg_color="transparent", corner_radius=0)
+            seg.place(relx=i / 5, rely=0, relwidth=0.2, relheight=1)
+            self._strength_segments.append(seg)
+        self._strength_label = ctk.CTkLabel(
+            strength_frame,
+            text="",
+            font=themed_font("overline"),
+            text_color=THEME["text_muted"],
+        )
+        self._strength_label.pack(anchor="w", pady=(4, 0))
+
+        for f in (self.f_senha_atual, self.f_confirmar_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
             f.pack(fill="x", pady=(0, 10))
+
+        self.f_nova_senha.entry.bind("<KeyRelease>", self._on_new_password_change)
+
+    def _on_new_password_change(self, event=None):
+        senha = self.f_nova_senha.get()
+        score = self._calcular_forca_senha(senha)
+        self._update_strength_ui(score)
+
+    def _calcular_forca_senha(self, senha):
+        if not senha:
+            return 0
+        score = 0
+        if len(senha) >= 8:
+            score += 1
+        if any(c.islower() for c in senha):
+            score += 1
+        if any(c.isupper() for c in senha):
+            score += 1
+        if any(c.isdigit() for c in senha):
+            score += 1
+        if any(not c.isalnum() for c in senha):
+            score += 1
+        return score
+
+    def _update_strength_ui(self, score):
+        colors = [THEME["danger"], THEME["danger"], THEME["warning"], THEME["warning"], THEME["success"]]
+        labels = ["", "Fraca", "Fraca", "Média", "Média", "Forte"]
+        label_colors = [THEME["text_muted"], THEME["danger"], THEME["danger"], THEME["warning"], THEME["warning"], THEME["success"]]
+        for i, seg in enumerate(self._strength_segments):
+            seg.configure(fg_color=colors[score] if i < score else "transparent")
+        self._strength_label.configure(text=labels[score], text_color=label_colors[score])
 
     def _on_confirm(self):
         atual = self.f_senha_atual.get().strip()
+        confirmar_atual = self.f_confirmar_senha_atual.get().strip()
         nova = self.f_nova_senha.get().strip()
         confirm = self.f_confirmar_senha.get().strip()
 
-        # Limpa estados anteriores
-        for f in (self.f_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
+        for f in (self.f_senha_atual, self.f_confirmar_senha_atual, self.f_nova_senha, self.f_confirmar_senha):
             f.clear_state()
 
-        if not atual or not nova or not confirm:
+        if not atual or not confirmar_atual or not nova or not confirm:
             self._show_error("Preencha todos os campos.", title="Atenção")
+            return
+        if atual != confirmar_atual:
+            self.f_confirmar_senha_atual.set_error("Senha atual não confere.")
+            self._show_error("Confirmação da senha atual não confere.", title="Atenção")
             return
         if nova != confirm:
             self.f_confirmar_senha.set_error("As senhas não coincidem.")
-            self._show_error("As senhas não coincidem.")
+            self._show_error("As senhas não coincidem.", title="Atenção")
             return
-        if len(nova) < 6:
-            self.f_nova_senha.set_error("Mínimo de 6 caracteres.")
-            self._show_error("A nova senha deve ter pelo menos 6 caracteres.", title="Atenção")
+        if len(nova) < 8:
+            self.f_nova_senha.set_error("Mínimo de 8 caracteres.")
+            self._show_error("A nova senha deve ter pelo menos 8 caracteres.", title="Atenção")
+            return
+        if not self._senha_atende_policy(nova):
+            self.f_nova_senha.set_error("Política de senha não atendida.")
+            self._show_error("Use maiúscula, minúscula, número e símbolo.", title="Atenção")
             return
 
         self._on_save(atual, nova)
         self.destroy()
 
+    def _senha_atende_policy(self, senha):
+        if len(senha) < 8:
+            return False
+        if not any(c.islower() for c in senha):
+            return False
+        if not any(c.isupper() for c in senha):
+            return False
+        if not any(c.isdigit() for c in senha):
+            return False
+        if not any(not c.isalnum() for c in senha):
+            return False
+        return True
 
-# •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
+    def _show_error(self, message: str, title: str = "Atenção") -> None:
+        try:
+            _ErrorModal(self.winfo_toplevel(), message=message, title=title)
+        except Exception:
+            pass
+
+
+# •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Frame principal de configurações
 # •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
@@ -927,6 +1010,14 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def _show_error(self, message: str, title: str = "Não foi possível concluir") -> None:
         try:
             _ErrorModal(self.winfo_toplevel(), message=message, title=title)
+        except Exception:
+            pass
+
+    def _show_success(self, message: str, duration: int = 3000) -> None:
+        try:
+            if hasattr(self, "_toast") and self._toast and self._toast.winfo_exists():
+                self._toast.destroy()
+            self._toast = Toast(self.winfo_toplevel(), message=message, status="success", duration=duration)
         except Exception:
             pass
 
