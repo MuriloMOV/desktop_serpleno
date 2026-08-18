@@ -1,21 +1,21 @@
 {
-  "read_fallback_total": 834,
+  "read_fallback_total": 899,
   "write_fallback_total": 126,
   "by_repository": {
     "AutenticacaoRepository": {
-      "total": 8,
-      "read": 8,
+      "total": 10,
+      "read": 10,
       "write": 0,
       "methods": {
-        "obter_usuario_por_username": 8
+        "obter_usuario_por_username": 10
       }
     },
     "AgendamentoRepository": {
-      "total": 68,
-      "read": 68,
+      "total": 70,
+      "read": 70,
       "write": 0,
       "methods": {
-        "listar_horarios_base": 29,
+        "listar_horarios_base": 31,
         "listar_agendamentos": 20,
         "obter_nome_aluno": 2,
         "obter_time_id": 2,
@@ -23,11 +23,11 @@
       }
     },
     "EstudanteRepository": {
-      "total": 277,
-      "read": 277,
+      "total": 301,
+      "read": 301,
       "write": 0,
       "methods": {
-        "listar": 277
+        "listar": 301
       }
     },
     "appointments": {
@@ -41,11 +41,11 @@
       }
     },
     "TriagemRepository": {
-      "total": 89,
-      "read": 89,
+      "total": 91,
+      "read": 91,
       "write": 0,
       "methods": {
-        "listar": 57,
+        "listar": 59,
         "listar_formularios": 32
       }
     },
@@ -68,38 +68,38 @@
       }
     },
     "DashboardRepository": {
-      "total": 91,
-      "read": 91,
+      "total": 104,
+      "read": 104,
       "write": 0,
       "methods": {
-        "obter_kpis": 87,
+        "obter_kpis": 100,
         "obter_notificacoes_alertas": 4
       }
     },
     "OrientacaoRepository": {
-      "total": 22,
-      "read": 22,
+      "total": 24,
+      "read": 24,
       "write": 0,
       "methods": {
-        "listar_orientacoes": 19,
+        "listar_orientacoes": 21,
         "listar_estudantes": 3
       }
     },
     "BemEstarRepository": {
-      "total": 34,
-      "read": 34,
+      "total": 38,
+      "read": 38,
       "write": 0,
       "methods": {
-        "obter_dashboard": 17,
-        "listar_checkins": 17
+        "obter_dashboard": 19,
+        "listar_checkins": 19
       }
     },
     "ReportTemplateRepository": {
-      "total": 220,
-      "read": 220,
+      "total": 236,
+      "read": 236,
       "write": 0,
       "methods": {
-        "listar_templates": 220
+        "listar_templates": 236
       }
     },
     "RelatorioRepository": {
@@ -161,7 +161,7 @@
       }
     }
   },
-  "last_read_fallback": "2026-08-17T01:44:10.361883",
+  "last_read_fallback": "2026-08-17T17:19:44.042559",
   "last_write_fallback": "2026-08-17T01:40:02.242691",
   "started_at": "2026-08-16T07:48:20.849824"
 }

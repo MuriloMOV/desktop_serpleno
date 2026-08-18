@@ -409,7 +409,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
         self.lbl_status_icon = ctk.CTkLabel(
             status_inner,
-            text="●",
+            text=ICONS["status_dot"],
             font=themed_font("body"),
             text_color=THEME["success"],
         )
@@ -434,8 +434,8 @@ class EstudantesFrame(ctk.CTkFrame):
         grid.grid_columnconfigure((0, 1), weight=1)
 
         cfg = [
-            ("Contato", "--", ICONS["chart"], 0, 0, "card_email"),
-            ("Telefone", "--", ICONS["location"], 0, 1, "card_phone"),
+            ("Contato", "--", ICONS["mail"], 0, 0, "card_email"),
+            ("Telefone", "--", ICONS["phone"], 0, 1, "card_phone"),
             ("Idade", "--", ICONS["cake"], 1, 0, "card_idade"),
             ("Curso / Turma", "--", ICONS["group"], 1, 1, "card_curso"),
             (
@@ -763,32 +763,33 @@ class EstudantesFrame(ctk.CTkFrame):
             anchor="w",
         ).grid(row=1, column=1, sticky="w")
 
-        ind = ctk.CTkFrame(inner, fg_color="transparent")
-        ind.grid(row=0, column=2, rowspan=2, padx=(6, 0))
+        if laudo or atenção:
+            ind = ctk.CTkFrame(inner, fg_color="transparent")
+            ind.grid(row=0, column=2, rowspan=2, padx=(6, 0))
 
-        if laudo:
-            laudo_badge = ctk.CTkFrame(
-                ind, fg_color=THEME["primary_soft"], corner_radius=RADIUS["sm"]
-            )
-            laudo_badge.pack(side="left", padx=(0, 3))
-            ctk.CTkLabel(
-                laudo_badge,
-                text=f"{ICONS['file']} ",
-                font=themed_font("caption"),
-                text_color=THEME["primary"],
-            ).pack(padx=spacing("xs"), pady=spacing("xs"))
+            if laudo:
+                laudo_badge = ctk.CTkFrame(
+                    ind, fg_color=THEME["primary_soft"], corner_radius=RADIUS["sm"]
+                )
+                laudo_badge.pack(side="left", padx=(0, 3))
+                ctk.CTkLabel(
+                    laudo_badge,
+                    text=f"{ICONS['file']} ",
+                    font=themed_font("caption"),
+                    text_color=THEME["primary"],
+                ).pack(padx=spacing("xs"), pady=spacing("xs"))
 
-        if atenção:
-            ate_badge = ctk.CTkFrame(
-                ind, fg_color=THEME["danger_soft"], corner_radius=RADIUS["sm"]
-            )
-            ate_badge.pack(side="left")
-            ctk.CTkLabel(
-                ate_badge,
-                text=f"{ICONS['bolt']} ",
-                font=themed_font("caption"),
-                text_color=THEME["danger"],
-            ).pack(padx=spacing("xs"), pady=spacing("xs"))
+            if atenção:
+                ate_badge = ctk.CTkFrame(
+                    ind, fg_color=THEME["danger_soft"], corner_radius=RADIUS["sm"]
+                )
+                ate_badge.pack(side="left")
+                ctk.CTkLabel(
+                    ate_badge,
+                    text=f"{ICONS['bolt']} ",
+                    font=themed_font("caption"),
+                    text_color=THEME["danger"],
+                ).pack(padx=spacing("xs"), pady=spacing("xs"))
 
         row.bind(
             "<Enter>",
@@ -1278,7 +1279,7 @@ class EstudantesFrame(ctk.CTkFrame):
             scroll,
             "Email de Contato",
             "email@exemplo.com",
-            icon=ICONS["chart"],
+            icon=ICONS["mail"],
             helper="Email institucional ou pessoal",
         )
         en_email.pack(fill="x", pady=(0, 12))
@@ -1299,7 +1300,7 @@ class EstudantesFrame(ctk.CTkFrame):
         en_idade.insert(0, str(st.get("age", "")))
 
         en_phone = FormField(
-            scroll, "Telefone", "(00) 00000-0000", icon=ICONS["location"]
+            scroll, "Telefone", "(00) 00000-0000", icon=ICONS["phone"]
         )
         en_phone.pack(fill="x", pady=(0, 12))
         en_phone.insert(0, st.get("phone", ""))
@@ -1317,7 +1318,7 @@ class EstudantesFrame(ctk.CTkFrame):
             scroll,
             "Telefone de Emergência",
             "(00) 00000-0000",
-            icon=ICONS["location"],
+            icon=ICONS["phone"],
         )
         en_emergency_phone.pack(fill="x", pady=(0, 12))
         en_emergency_phone.insert(0, st.get("emergency_phone", ""))

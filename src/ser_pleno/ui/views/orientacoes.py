@@ -240,7 +240,7 @@ class OrientationHistoryCard(ctk.CTkFrame):
                 O["accent"],
             ),
             (
-                f"{ICONS['cross']}  Editar",
+                f"{ICONS['edit']}  Editar",
                 lambda: self._on_edit(self._o),
                 O["accent"],
                 THEME["text_on_primary"],
@@ -451,7 +451,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         tabs = [
             ("historico", f"{ICONS['chart']}  Histórico"),
-            ("nova", f"{ICONS['cross']}  Nova Orientação"),
+            ("nova", f"{ICONS['add']}  Nova Orientação"),
             ("estatisticas", f"{ICONS['chart']}  Estatísticas"),
             ("filtros", f"{ICONS['search']}  Filtros"),
         ]
@@ -2180,7 +2180,7 @@ class OrientacoesFrame(ctk.CTkFrame):
 
         ctk.CTkButton(
             btn_row,
-            text=f"{ICONS['cross']}  Editar",
+            text=f"{ICONS['edit']}  Editar",
             command=lambda: (modal.destroy(), self._editar_orientacao(o)),
             height=38,
             corner_radius=10,

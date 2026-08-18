@@ -111,9 +111,20 @@ class PageHeader(ctk.CTkFrame):
         if actions:
             rf = ctk.CTkFrame(top, fg_color="transparent")
             rf.pack(side="right")
-            for btn in actions:
-                btn.configure(corner_radius=RADIUS["button"])
-                btn.pack(side="left", padx=6)
+            for action in actions:
+                if isinstance(action, dict):
+                    btn = PrimaryButton(
+                        rf,
+                        text=action.get("text", ""),
+                        command=action.get("command"),
+                        height=action.get("height", 36),
+                        width=action.get("width", 180),
+                    )
+                    btn.pack(side="left", padx=6)
+                else:
+                    btn = action
+                    btn.configure(corner_radius=RADIUS["button"])
+                    btn.pack(side="left", padx=6)
 
 
 class SectionHeader(ctk.CTkFrame):
