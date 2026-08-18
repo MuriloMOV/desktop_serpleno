@@ -1,35 +1,36 @@
 import customtkinter as ctk
+import json
 
-from ser_pleno.ui.theme import (
-    THEME,
-    SPACING,
-    RADIUS,
-    TYPO,
-    FONT_FAMILY,
-    font,
-    themed_font,
-    mono_font,
-)
-from ser_pleno.ui.theme_extensions import extend_theme
+from ser_pleno.features.estudantes.service import ServicoEstudante
+from ser_pleno.features.triagem.service import ServicoTriagem
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.ui.components.ui_components import (
-    Card,
-    PrimaryButton,
-    GhostButton,
-    Divider,
-    KPICard,
-    BaseModal,
-    EmptyState,
     Avatar,
+    BaseModal,
+    Card,
+    Divider,
+    EmptyState,
+    GhostButton,
+    KPICard,
+    PrimaryButton,
     Toast,
 )
+from ser_pleno.ui.theme import (
+    FONT_FAMILY,
+    THEME,
+    RADIUS,
+    SPACING,
+    TYPO,
+    font,
+    mono_font,
+    themed_font,
+)
+from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.ui.views.base import _ErrorModal
-from ser_pleno.ui.components.icons import ICONS, IconLabel
-from ser_pleno.utils.avatar_utils import get_avatar_color
-from ser_pleno.features.triagem.service import ServicoTriagem
-from ser_pleno.features.estudantes.service import ServicoEstudante
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.avatar_utils import get_avatar_color
+from ser_pleno.utils.dates import normalize_date
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
-import json
 
 # ••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 #  Design tokens — mapeamentos semânticos específicos da triagem
@@ -844,7 +845,15 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             if not form_id:
                 self._show_error("Selecione um formulário válido.", title="Atenção")
                 return
-            data = en_data.get().strip()
+            data_raw = en_data.get().strip()
+            if data_raw:
+                try:
+                    data = normalize_date(data_raw)
+                except ValueError:
+                    self._show_error("Data inválida. Use o formato dd/mm/aaaa.", title="Atenção")
+                    return
+            else:
+                data = ""
             responses = {}
             for qid, widget in self._perguntas_widgets.items():
                 if isinstance(widget, ctk.CTkTextbox):
@@ -1204,7 +1213,15 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             if not form_id:
                 self._show_error("Selecione um formulário válido.", title="Atenção")
                 return
-            data = en_data.get().strip()
+            data_raw = en_data.get().strip()
+            if data_raw:
+                try:
+                    data = normalize_date(data_raw)
+                except ValueError:
+                    self._show_error("Data inválida. Use o formato dd/mm/aaaa.", title="Atenção")
+                    return
+            else:
+                data = ""
             responses = {}
             for qid, widget in self._perguntas_widgets.items():
                 if isinstance(widget, ctk.CTkTextbox):

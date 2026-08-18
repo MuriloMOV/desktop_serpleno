@@ -10,6 +10,7 @@ from ser_pleno.ui.views.triagem import TriagemFrame
 from ser_pleno.ui.views.relatorio import RelatorioFrame
 from ser_pleno.ui.views.comunicacao import ComunicacaoFrame
 from ser_pleno.ui.views.orientacoes import OrientacoesFrame
+from ser_pleno.ui.views.interventions import IntervencoesFrame
 from ser_pleno.ui.views.configuracoes import ConfiguracoesFrame
 from ser_pleno.ui.views.metas import MetasFrame
 from ser_pleno.ui.views.alertas import AlertasFrame
@@ -21,6 +22,7 @@ from ser_pleno.ui.views.login import LoginFrame
 from ser_pleno.ui.views.avisos import AvisosFrame
 from ser_pleno.ui.views.notificacoes import NotificacoesFrame
 from ser_pleno.ui.views.report_template import ReportTemplateFrame
+from ser_pleno.ui.views.wellness_challenges import WellnessChallengesFrame
 
 
 class ViewFactory:
@@ -37,6 +39,7 @@ class ViewFactory:
             "relatorios": RelatorioFrame,
             "comunicacao": ComunicacaoFrame,
             "orientacoes": OrientacoesFrame,
+            "intervencoes": IntervencoesFrame,
             "avisos": AvisosFrame,
             "notificacoes": NotificacoesFrame,
             "configuracoes": ConfiguracoesFrame,
@@ -48,6 +51,7 @@ class ViewFactory:
             "pedidos_ajuda": PedidosAjudaFrame,
             "login": LoginFrame,
             "report_template": ReportTemplateFrame,
+            "wellness_challenges": WellnessChallengesFrame,
         }
 
     def create(self, key: str, parent, controller=None):

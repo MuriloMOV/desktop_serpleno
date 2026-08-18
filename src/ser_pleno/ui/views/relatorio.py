@@ -136,6 +136,10 @@ class RelatorioFrame(BaseViewFrame):
         self.filtro_busca = None
         self.filtro_data_inicio = None
         self.filtro_data_fim = None
+        self._export_data_inicio = None
+        self._export_data_fim = None
+        self._export_tipo = None
+        self._export_formato = None
         self.reports_container = None
         self._bulk_bar = None
         self._bulk_count_lbl = None
@@ -653,41 +657,88 @@ class RelatorioFrame(BaseViewFrame):
 
         Divider(card.body).pack(fill="x", pady=(SPACING["label_gap"], 0))
 
+        filtros_frame = ctk.CTkFrame(card.body, fg_color=THEME["bg_alt"], corner_radius=RADIUS["md"])
+        filtros_frame.pack(fill="x", pady=(0, SPACING["label_gap"]))
+
+        ctk.CTkLabel(
+            filtros_frame, text="De:", font=themed_font("body_sm"), text_color=THEME["text_secondary"]
+        ).pack(side="left", padx=(SPACING["card_pad"], SPACING["xs"]))
+        self._export_data_inicio = ctk.CTkEntry(
+            filtros_frame, width=100, height=32, placeholder_text="YYYY-MM-DD", font=themed_font("body_sm")
+        )
+        self._export_data_inicio.pack(side="left", padx=(0, SPACING["xs"]))
+
+        ctk.CTkLabel(
+            filtros_frame, text="Até:", font=themed_font("body_sm"), text_color=THEME["text_secondary"]
+        ).pack(side="left", padx=(SPACING["xs"], SPACING["xs"]))
+        self._export_data_fim = ctk.CTkEntry(
+            filtros_frame, width=100, height=32, placeholder_text="YYYY-MM-DD", font=themed_font("body_sm")
+        )
+        self._export_data_fim.pack(side="left", padx=(0, SPACING["icon_gap"]))
+
+        ctk.CTkLabel(
+            filtros_frame, text="Tipo:", font=themed_font("body_sm"), text_color=THEME["text_secondary"]
+        ).pack(side="left", padx=(0, SPACING["xs"]))
+        self._export_tipo = ctk.CTkOptionMenu(
+            filtros_frame,
+            values=["Todos", "Geral", "Estudante", "Agendamentos", "Intervenções", "Triagens", "Estatísticas"],
+            width=130,
+            height=32,
+            font=themed_font("body_sm"),
+            fg_color=THEME["input_bg"],
+            button_color=THEME["primary"],
+            button_hover_color=THEME["primary_hover"],
+            dropdown_fg_color=THEME["surface"],
+            dropdown_text_color=THEME["text"],
+        )
+        self._export_tipo.set("Todos")
+        self._export_tipo.pack(side="left", padx=(0, SPACING["icon_gap"]))
+
+        ctk.CTkLabel(
+            filtros_frame, text="Formato:", font=themed_font("body_sm"), text_color=THEME["text_secondary"]
+        ).pack(side="left", padx=(0, SPACING["xs"]))
+        self._export_formato = ctk.StringVar(value="csv")
+        for fmt, label in [("csv", "CSV"), ("excel", "Excel"), ("json", "JSON")]:
+            ctk.CTkRadioButton(
+                filtros_frame,
+                text=label,
+                variable=self._export_formato,
+                value=fmt,
+                font=themed_font("body_sm"),
+                fg_color=THEME["primary"],
+            ).pack(side="left", padx=(0, SPACING["icon_gap"]))
+
         btn_row = ctk.CTkFrame(card.body, fg_color="transparent")
         btn_row.pack(fill="x", pady=(0, SPACING["item_gap"]))
 
         exports = [
             (
                 f"{ICONS['chart']}  Estudantes",
-                "CSV",
                 self.servico_relatorio.exportar_estudantes,
                 THEME["kpi_blue"],
                 THEME["kpi_blue_soft"],
             ),
             (
                 f"{ICONS['calendar']}  Agenda",
-                "CSV",
                 self.servico_relatorio.exportar_agendamentos,
                 THEME["kpi_green"],
                 THEME["kpi_green_soft"],
             ),
             (
                 f"{ICONS['search']}  Triagens",
-                "CSV",
                 self.servico_relatorio.exportar_triagens,
                 THEME["kpi_amber"],
                 THEME["kpi_amber_soft"],
             ),
             (
-                f"{ICONS['chart']}  Relatório PDF",
-                "PDF",
-                lambda: self._abrir_modal_gerar_relatorio("geral"),
+                f"{ICONS['user']}  Intervenções",
+                self.servico_relatorio.exportar_intervencoes,
                 THEME["kpi_violet"],
                 THEME["kpi_violet_soft"],
             ),
         ]
 
-        for label, fmt, cmd, accent, soft in exports:
+        for label, cmd, accent, soft in exports:
             btn_wrap = ctk.CTkFrame(btn_row, fg_color=soft, corner_radius=RADIUS["button"])
             btn_wrap.pack(side="left", padx=(0, SPACING["icon_gap"]))
 
@@ -703,8 +754,8 @@ class RelatorioFrame(BaseViewFrame):
 
             ctk.CTkButton(
                 inner,
-                text=f"Exportar {fmt}",
-                command=cmd,
+                text="Exportar",
+                command=self._criar_handler_exportacao(cmd),
                 height=30,
                 corner_radius=RADIUS["xs"],
                 width=120,
@@ -713,6 +764,64 @@ class RelatorioFrame(BaseViewFrame):
                 hover_color=THEME["primary_hover"],
                 text_color=THEME["text_on_primary"],
             ).pack(anchor="w", pady=(SPACING["label_gap"], 0))
+
+    def _criar_handler_exportacao(self, metodo):
+        def handler():
+            self._executar_exportacao(metodo)
+        return handler
+
+    def _obter_filtros_exportacao(self):
+        filtros = {}
+        if self._export_data_inicio is not None:
+            val = self._export_data_inicio.get().strip()
+            if val:
+                filtros["date_from"] = val
+        if self._export_data_fim is not None:
+            val = self._export_data_fim.get().strip()
+            if val:
+                filtros["date_to"] = val
+        if self._export_tipo is not None:
+            tipo = self._export_tipo.get()
+            if tipo and tipo != "Todos":
+                filtros["tipo"] = tipo
+        return filtros
+
+    def _executar_exportacao(self, metodo):
+        def fetch():
+            filtros = self._obter_filtros_exportacao()
+            formato = self._export_formato.get() if self._export_formato else "csv"
+            return metodo(filtros=filtros, formato=formato)
+
+        def on_success(res):
+            if res.get("success"):
+                data = res.get("data", {})
+                content = data.get("content")
+                fmt = data.get("format", "csv")
+                nome = data.get("filename", "export_{}".format(__import__("datetime").datetime.now().strftime("%Y%m%d")))
+                ext = {"csv": ".csv", "excel": ".xlsx", "json": ".json"}.get(fmt, ".txt")
+                mime_types = {"csv": "CSV", "excel": "Excel", "json": "JSON"}
+                destino = filedialog.asksaveasfilename(
+                    initialfile=nome,
+                    defaultextension=ext,
+                    filetypes=[(mime_types.get(fmt, "Arquivo"), f"*{ext}"), ("Todos", "*.*")]
+                )
+                if destino:
+                    if fmt == "excel":
+                        with open(destino, "wb") as f:
+                            f.write(content)
+                    else:
+                        with open(destino, "w", encoding="utf-8") as f:
+                            f.write(content)
+                    self._show_success(f"Exportado para:\n{destino}")
+            else:
+                self._show_error(res.get("message", "Falha ao exportar."))
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=lambda exc: self._show_error(f"Falha ao exportar.\n{exc}"),
+            widget_ref=self,
+        )
 
     def _criar_lista_relatorios(self):
         card = Card(self, padding=(SPACING["card_pad"], SPACING["label_gap"]))

@@ -1,27 +1,26 @@
 from __future__ import annotations
 
-import customtkinter as ctk
-import tkinter as tk
-from tkinter import Menu
-import os
 import json
 import logging
+import os
+import tkinter as tk
 from typing import Any
 
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
-from ser_pleno.ui.theme_extensions import spacing
-from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+import customtkinter as ctk
+
 from ser_pleno.application.services.autenticacao import ServicoAutenticacao
+from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
-    PageHeader,
-    Card,
-    PrimaryButton,
-    GhostButton,
     Badge,
     BaseModal,
+    GhostButton,
+    PageHeader,
+    PrimaryButton,
     Toast,
 )
-from ser_pleno.ui.components.icons import IconLabel, ICONS
+from ser_pleno.ui.theme import RADIUS, SPACING, THEME, themed_font
+from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 
 logger = logging.getLogger("apps.desktop")
@@ -433,6 +432,8 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         from ser_pleno.config.paths import get_project_root
 
         self.base_path = get_project_root()
+        self._notificacoes_state: dict[str, bool] = {}
+        self._toggle_rows: dict[str, Any] = {}
         self._images: dict[str, Any] = {}
 
         self.grid_columnconfigure(0, weight=1)
@@ -441,6 +442,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._build_header()
         self._build_body()
         log_view_init_ms("configuracoes", self._t0, widget_ref=self)
+        self.after_idle(self._carregar_configuracoes)
 
     # —— helpers ---------------------------------------------------------------
     def _load_image(self, name: str, size: tuple[int, int]):
@@ -467,7 +469,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     def _profile_data(self) -> dict[str, str]:
         try:
-            with open(os.path.join(self.base_path, "user_profile.json"), "r") as f:
+            with open(os.path.join(self.base_path, "user_profile.json")) as f:
                 return json.load(f)
         except Exception:
             return {}
@@ -499,6 +501,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._build_central_avisos(col_right)
         self._build_aparencia(col_right)
         self._build_seguranca(col_right)
+        self._build_onboarding(col_right)
 
     # —— cartão pessoal -------------------------------------------------------
     def _build_cartao_pessoal(self, container):
@@ -648,15 +651,19 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             ("Efeitos Sonoros", "Feedback auditivo para alertas"),
         ]
         for titulo, subtitulo in itens:
-            ToggleRow(
+            row = ToggleRow(
                 card.body,
                 "",
                 titulo,
                 subtitulo,
                 on_toggle=lambda estado, t=titulo: self._on_toggle_notificacao(t, estado),
-            ).pack(fill="x", pady=4)
+            )
+            row.pack(fill="x", pady=4)
+            self._toggle_rows[titulo] = row
+            self._notificacoes_state[titulo] = row.switch.get()
 
     def _on_toggle_notificacao(self, tipo: str, estado: bool):
+        self._notificacoes_state[tipo] = estado
         logger.info("Notificação '%s' %s", tipo, "ativada" if estado else "desativada")
 
     # —— aparência ------------------------------------------------------------
@@ -711,6 +718,12 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             justify="left",
         ).pack(anchor="w", padx=spacing("md"), pady=spacing("md"))
 
+        PrimaryButton(
+            tip.body,
+            text="Salvar Preferências",
+            command=self._salvar_configuracoes,
+        ).pack(pady=(spacing("md"), 0))
+
     def _toggle_menu(self, kind: str) -> None:
         if self._select_menu is not None:
             try:
@@ -763,6 +776,73 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         except Exception as exc:
             logger.exception("Erro ao alterar tema: %s", exc)
 
+    def _carregar_configuracoes(self):
+        try:
+            res = self.servico_configuracoes.obter_configuracoes()
+            if res.get("success") and res.get("data"):
+                user_id = None
+                auth = getattr(self.servico_configuracoes, "_auth_service", None)
+                if auth and getattr(auth, "user", None):
+                    user_id = auth.user.get("id")
+                
+                for item in res["data"]:
+                    if item.get("user_id") == user_id and user_id is not None:
+                        theme = item.get("theme")
+                        notifications = item.get("notifications")
+                        if theme:
+                            self._theme_btn.configure(text=theme)
+                            self._alterar_tema(theme)
+                        if notifications:
+                            try:
+                                notif = json.loads(notifications)
+                                for titulo, estado in notif.items():
+                                    self._notificacoes_state[titulo] = estado
+                                    if titulo in self._toggle_rows:
+                                        switch = self._toggle_rows[titulo].switch
+                                        if estado:
+                                            switch.select()
+                                        else:
+                                            switch.deselect()
+                            except Exception:
+                                pass
+                        break
+        except Exception as exc:
+            logger.exception("Erro ao carregar configurações: %s", exc)
+        self._apply_notification_settings()
+
+    def _salvar_configuracoes(self):
+        user_id = None
+        auth = getattr(self.servico_configuracoes, "_auth_service", None)
+        if auth and getattr(auth, "user", None):
+            user_id = auth.user.get("id")
+        
+        dados = {
+            "user_id": user_id,
+            "theme": self._theme_btn.cget("text"),
+            "notifications": json.dumps(self._notificacoes_state),
+        }
+        
+        try:
+            res = self.servico_configuracoes.atualizar_configuracoes(dados)
+            if res.get("success"):
+                Toast(self.winfo_toplevel(), "Preferências salvas com sucesso!", status="success")
+                self._apply_notification_settings()
+            else:
+                self._show_error(res.get("message", "Falha ao salvar preferências."))
+        except Exception as exc:
+            logger.exception("Erro ao salvar configurações: %s", exc)
+            self._show_error("Falha ao salvar preferências.")
+
+    def _apply_notification_settings(self) -> None:
+        try:
+            notifier = getattr(self.controller, "_desktop_notifier", None)
+            if notifier is None:
+                return
+            sound_enabled = self._notificacoes_state.get("Efeitos Sonoros", True)
+            notifier.set_sound_enabled(bool(sound_enabled))
+        except Exception as exc:
+            logger.debug("Falha ao aplicar configurações de notificação: %s", exc)
+
     # —— segurança ------------------------------------------------------------
     def _build_seguranca(self, container):
         card = SectionCard(container, ICONS["settings"], "Sessão & Segurança")
@@ -795,6 +875,31 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             danger=True,
             on_action=lambda t: self._on_seguranca_action(t),
         ).pack(fill="x", pady=2)
+
+    def _build_onboarding(self, container):
+        card = SectionCard(container, ICONS["help"], "Tour Guiado")
+        card.pack(fill="x", pady=(16, 0))
+
+        ctk.CTkLabel(
+            card.body,
+            text="Reinicie o onboarding para revisar as principais funcionalidades do sistema.",
+            font=themed_font("body"),
+            text_color=THEME["text_secondary"],
+            wraplength=420,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 10))
+
+        PrimaryButton(
+            card.body,
+            text="Reiniciar tour guiado",
+            command=self._reiniciar_onboarding,
+        ).pack(pady=(0, spacing("md")))
+
+    def _reiniciar_onboarding(self):
+        app = self.winfo_toplevel()
+        tour = getattr(app, "onboarding_tour", None)
+        if tour is not None:
+            tour.restart()
 
     def _on_seguranca_action(self, btn_text: str):
         if btn_text == "Alterar Senha":

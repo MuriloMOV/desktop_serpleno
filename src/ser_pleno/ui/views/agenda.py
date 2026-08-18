@@ -1,31 +1,32 @@
 import logging
-import customtkinter as ctk
 from datetime import datetime, timedelta
+
+import customtkinter as ctk
+
 from ser_pleno.features.agenda.service import ServicoAgendamento
-from ser_pleno.features.agenda.repo import AgendamentoRepository
-from ser_pleno.ui.theme import (
-    THEME,
-    SPACING,
-    RADIUS,
-    themed_font,
-    blend_color,
-)
-from ser_pleno.ui.theme_extensions import spacing
-from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
-from ser_pleno.utils.widget_batch import WidgetBatchBuilder
+from ser_pleno.ui.components.icons import ICONS, IconButton
 from ser_pleno.ui.components.ui_components import (
+    BaseModal,
     Card,
-    PrimaryButton,
-    GhostButton,
     Divider,
     EmptyState,
-    Toast,
-    BaseModal,
-    bind_clickable,
+    GhostButton,
+    PrimaryButton,
     SkeletonLoader,
+    Toast,
+    bind_clickable,
 )
-from ser_pleno.ui.components.icons import IconButton, ICONS
+from ser_pleno.ui.theme import (
+    RADIUS,
+    SPACING,
+    THEME,
+    blend_color,
+    themed_font,
+)
+from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.ui.views.base import _ErrorModal
+from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -482,12 +483,21 @@ class GradeManagementModal(BaseModal):
         self.horarios_base = horarios_base
         self.servico_agenda = servico_agenda
         self.on_refresh = on_refresh
+        self._loading = False
         super().__init__(parent, title="Gestão de Grade", width=420, height=580)
         self._build()
 
     def _build(self):
         container = ctk.CTkFrame(self, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=24, pady=24)
+
+        self._sync_label = ctk.CTkLabel(
+            container,
+            text="",
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"],
+        )
+        self._sync_label.pack(anchor="w", pady=(0, 8))
 
         ctk.CTkLabel(
             container,
@@ -501,7 +511,8 @@ class GradeManagementModal(BaseModal):
         )
         self.lista_frame.pack(fill="x", pady=(0, 16))
 
-        self._render_lista()
+        self._render_lista_skeletons()
+        self.after_idle(self._load_horarios_async)
 
         ctk.CTkLabel(
             container,
@@ -530,39 +541,97 @@ class GradeManagementModal(BaseModal):
             width=160,
         ).pack(anchor="w")
 
+    def _render_lista_skeletons(self):
+        for child in self.lista_frame.winfo_children():
+            child.destroy()
+        batch = WidgetBatchBuilder(parent=self.lista_frame, batch_size=20)
+        for idx in range(4):
+            batch.add(
+                lambda i=idx: SkeletonLoader(
+                    self.lista_frame, width=280, height=40, variant="card"
+                ).pack(fill="x", pady=4, padx=4)
+            )
+        batch.execute()
+
+    def _set_sync_status(self, text):
+        if self._sync_label is not None:
+            self._sync_label.configure(text=text)
+
+    def _load_horarios_async(self):
+        if getattr(self, "_loading", False):
+            return
+        self._loading = True
+
+        def fetch():
+            return self.servico_agenda.listar_horarios_base()
+
+        def on_success(horarios):
+            self._loading = False
+            if not self.winfo_exists():
+                return
+            self.horarios_base = horarios
+            self._render_lista()
+            self._set_sync_status("")
+
+        def on_error(exc):
+            self._loading = False
+            logger.error("GradeManagementModal._load_horarios_async: ERRO = %s", exc)
+            self._set_sync_status("")
+
+        self._set_sync_status("Sincronizando...")
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
+
     def _render_lista(self):
         for child in self.lista_frame.winfo_children():
             child.destroy()
 
-        self.horarios_base = self.servico_agenda.listar_horarios_base()
-        for h in self.horarios_base:
-            row = ctk.CTkFrame(
+        if not self.horarios_base:
+            EmptyState(
                 self.lista_frame,
-                fg_color=THEME["surface"],
-                corner_radius=RADIUS["sm"],
-                border_width=1,
-                border_color=THEME["border"],
-            )
-            row.pack(fill="x", pady=4, padx=4)
+                icon=ICONS["calendar"],
+                title="Nenhum horário configurado",
+                subtitle="Adicione horários para compor a grade",
+            ).pack(pady=20)
+            return
 
-            ctk.CTkLabel(
-                row, text=h, font=themed_font("body", "bold"), text_color=THEME["text"]
-            ).pack(side="left", padx=14, pady=10)
+        batch = WidgetBatchBuilder(parent=self.lista_frame, batch_size=20)
+        for h in self.horarios_base:
+            batch.add(lambda h=h: self._criar_item_horario(h))
+        batch.execute()
 
-            GhostButton(row, text="Remover", command=lambda x=h: self._remover(x), width=110).pack(
-                side="right", padx=10, pady=8
-            )
+    def _criar_item_horario(self, h):
+        row = ctk.CTkFrame(
+            self.lista_frame,
+            fg_color=THEME["surface"],
+            corner_radius=RADIUS["sm"],
+            border_width=1,
+            border_color=THEME["border"],
+        )
+        row.pack(fill="x", pady=4, padx=4)
+
+        ctk.CTkLabel(
+            row, text=h, font=themed_font("body", "bold"), text_color=THEME["text"]
+        ).pack(side="left", padx=14, pady=10)
+
+        GhostButton(row, text="Remover", command=lambda x=h: self._remover(x), width=110).pack(
+            side="right", padx=10, pady=8
+        )
 
     def _adicionar(self):
         horario = self.entry_novo.get().strip()
         if len(horario) < 5 or horario[2] != ":":
             self._show_error("Formato de horário inválido. Use HH:MM.")
             return
-        try:
-            res = self.servico_agenda.adicionar_horario_disponibilidade(horario)
+
+        def fetch():
+            return self.servico_agenda.adicionar_horario_disponibilidade(horario)
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
             if res.get("success"):
                 self.entry_novo.delete(0, "end")
-                self._render_lista()
+                self._load_horarios_async()
                 if callable(getattr(self, "on_refresh", None)):
                     try:
                         self.on_refresh()
@@ -570,24 +639,40 @@ class GradeManagementModal(BaseModal):
                         pass
             else:
                 self._show_error(str(res.get("message", "Erro ao adicionar horário")))
-        except Exception as e:
-            self._show_error(f"Erro inesperado: {e}")
+
+        def on_error(exc):
+            logger.error("GradeManagementModal._adicionar: ERRO = %s", exc)
+            self._show_error(f"Erro inesperado: {exc}")
+
+        self._set_sync_status("Adicionando...")
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
     def _remover(self, horario):
-        if self._confirmar(f"Deseja realmente remover o horário {horario}?"):
-            try:
-                res = self.servico_agenda.remover_horario_disponibilidade(horario)
-                if res.get("success"):
-                    self._render_lista()
-                    if callable(getattr(self, "on_refresh", None)):
-                        try:
-                            self.on_refresh()
-                        except Exception:
-                            pass
-                else:
-                    self._show_error(str(res.get("message", "Erro ao remover horário")))
-            except Exception as e:
-                self._show_error(f"Erro inesperado: {e}")
+        if not self._confirmar(f"Deseja realmente remover o horário {horario}?"):
+            return
+
+        def fetch():
+            return self.servico_agenda.remover_horario_disponibilidade(horario)
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
+            if res.get("success"):
+                self._load_horarios_async()
+                if callable(getattr(self, "on_refresh", None)):
+                    try:
+                        self.on_refresh()
+                    except Exception:
+                        pass
+            else:
+                self._show_error(str(res.get("message", "Erro ao remover horário")))
+
+        def on_error(exc):
+            logger.error("GradeManagementModal._remover: ERRO = %s", exc)
+            self._show_error(f"Erro inesperado: {exc}")
+
+        self._set_sync_status("Removendo...")
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
 
 class AgendaFrame(ctk.CTkScrollableFrame):
@@ -600,7 +685,6 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         self.servico_agenda = ServicoAgendamento(
             auth_service=getattr(controller, "auth_service", None)
         )
-        self.repo_agendamento = AgendamentoRepository()
 
         self.data_selecionada = datetime.now()
         self.ano_calendario = self.data_selecionada.year

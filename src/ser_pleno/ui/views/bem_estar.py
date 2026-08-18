@@ -719,6 +719,13 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._checkins_detail_body: ctk.CTkScrollableFrame | None = None
         self._challenges_detail_body: ctk.CTkScrollableFrame | None = None
         self._checkins_body: ctk.CTkFrame | None = None
+        self._history_timeline_canvas: ctk.CTkCanvas | None = None
+        self._lbl_general_avg: ctk.CTkLabel | None = None
+        self._lbl_student_avg: ctk.CTkLabel | None = None
+        self._lbl_total_entries: ctk.CTkLabel | None = None
+        self._averages_row: ctk.CTkFrame | None = None
+        self._student_timeline_data: list = []
+        self._student_timeline_after_id = None
 
         self._content = ctk.CTkFrame(self, fg_color="transparent")
         self._content.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=SPACING["page_y"])
@@ -779,7 +786,17 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         ).pack(side="left", padx=(0, 8))
         PrimaryButton(
             right,
-            text=f"{ICONS['add']}  Registrar Humor",
+            text=f"{ICONS['chart']}  Novo Check-in",
+            command=self._abrir_checkin_modal,
+            height=36,
+            width=180,
+            fg_color=THEME["info"],
+            hover_color=THEME["info_strong"],
+            text_color=THEME["text_on_primary"],
+        ).pack(side="left", padx=(0, 8))
+        PrimaryButton(
+            right,
+            text=f"{ICONS['mood_good']}  Registrar Humor",
             command=self._abrir_mood_modal,
             height=36,
             width=180,
@@ -1114,6 +1131,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         self._carregar_checkins_estudante(sid)
         self._carregar_desafios_estudante(sid)
         self._carregar_dashboard_desafios()
+        self._carregar_medias_gerais()
 
     def _carregar_perfil_estudante(self, student_id):
         def fetch():
@@ -1145,6 +1163,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                 ).pack(expand=True)
             if hasattr(self, "_mini_chart_canvas") and self._mini_chart_canvas is not None and entries:
                 self._draw_mini_chart(entries)
+            self._atualizar_medias_ui(student_entries=entries)
 
         def on_error(exc):
             logging.error(f"Falha ao carregar perfil: {exc}")
@@ -1216,6 +1235,9 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                     entries = data.get("entries") or []
                 elif isinstance(data, list):
                     entries = data
+            self._student_timeline_data = entries
+            self._draw_student_timeline(entries)
+            self._atualizar_medias_ui(student_entries=entries)
             if not entries:
                 EmptyState(
                     self._history_body,
@@ -1509,11 +1531,17 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             dash = self.servico_bem_estar.obter_dashboard()
             checkins = self.servico_bem_estar.listar_checkins()
             risks = self.servico_bem_estar.listar_estudantes_risco()
-            return dash, checkins, risks
+            medias = self.servico_bem_estar.obter_medias_humor()
+            return dash, checkins, risks, medias
 
         def on_success(result):
-            dash, checkins, risks = result
+            dash, checkins, risks, medias = result
             self.update_ui(dash, checkins, risks)
+            if isinstance(medias, dict):
+                data = medias.get("data") or {}
+                if isinstance(data, dict):
+                    avg = data.get("average_mood")
+                    self._atualizar_medias_ui(general_avg=avg)
 
         def on_error(exc):
             self._show_error(
@@ -1830,7 +1858,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         detail_card = Card(body, auto_body=False)
         detail_card.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(spacing("md"), 0))
         detail_card._inner.grid_columnconfigure(0, weight=1)
-        detail_card._inner.grid_rowconfigure(1, weight=1)
+        detail_card._inner.grid_rowconfigure(3, weight=1)
         profile_hdr = ctk.CTkFrame(detail_card._inner, fg_color="transparent")
         profile_hdr.grid(
             row=0, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(SPACING["card_pad"], 0)
@@ -1890,6 +1918,29 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             mini_chart_card._inner, bg=THEME["surface"], height=80, highlightthickness=0
         )
         self._mini_chart_canvas.grid(row=0, column=0, sticky="nsew")
+        self._averages_row = ctk.CTkFrame(detail_card._inner, fg_color="transparent")
+        self._averages_row.grid(row=2, column=0, sticky="ew", padx=SPACING["card_pad"], pady=(0, spacing("xs")))
+        self._lbl_general_avg = ctk.CTkLabel(
+            self._averages_row,
+            text="Média Geral: —",
+            font=themed_font("caption", "bold"),
+            text_color=THEME["text_secondary"],
+        )
+        self._lbl_general_avg.pack(side="left", padx=(0, spacing("md")))
+        self._lbl_student_avg = ctk.CTkLabel(
+            self._averages_row,
+            text="Média: —",
+            font=themed_font("caption", "bold"),
+            text_color=THEME["primary"],
+        )
+        self._lbl_student_avg.pack(side="left", padx=(0, spacing("md")))
+        self._lbl_total_entries = ctk.CTkLabel(
+            self._averages_row,
+            text="Registros: —",
+            font=themed_font("caption"),
+            text_color=THEME["text_muted"],
+        )
+        self._lbl_total_entries.pack(side="right")
         self._detail_tabs = ctk.CTkTabview(
             detail_card._inner,
             fg_color="transparent",
@@ -1901,11 +1952,16 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             corner_radius=RADIUS["lg"],
         )
         self._detail_tabs.grid(
-            row=2, column=0, sticky="nsew", padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"])
+            row=3, column=0, sticky="nsew", padx=SPACING["card_pad"], pady=(0, SPACING["card_pad"])
         )
         self._tab_history = self._detail_tabs.add("Histórico")
         self._tab_checkins = self._detail_tabs.add("Check-ins")
         self._tab_challenges = self._detail_tabs.add("Desafios")
+        self._history_timeline_canvas = ctk.CTkCanvas(
+            self._tab_history, bg=THEME["surface"], height=120, highlightthickness=0
+        )
+        self._history_timeline_canvas.pack(fill="x", pady=(0, spacing("sm")))
+        self._history_timeline_canvas.bind("<Configure>", self._schedule_draw_student_timeline)
         self._history_body = ctk.CTkScrollableFrame(
             self._tab_history,
             fg_color="transparent",
@@ -1928,6 +1984,88 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         )
         self._challenges_detail_body.pack(fill="both", expand=True)
         self._detail_tabs.set("Histórico")
+
+    def _atualizar_medias_ui(self, general_avg=None, student_entries=None):
+        if hasattr(self, "_lbl_general_avg") and self._lbl_general_avg and self._lbl_general_avg.winfo_exists():
+            if general_avg is not None:
+                self._lbl_general_avg.configure(text=f"Média Geral: {general_avg:.1f}")
+            else:
+                self._lbl_general_avg.configure(text="Média Geral: —")
+        if hasattr(self, "_lbl_student_avg") and self._lbl_student_avg and self._lbl_student_avg.winfo_exists():
+            if student_entries:
+                avg = sum(e.get("mood_level", 3) for e in student_entries) / len(student_entries)
+                self._lbl_student_avg.configure(text=f"Média: {avg:.1f}")
+            else:
+                self._lbl_student_avg.configure(text="Média: —")
+        if hasattr(self, "_lbl_total_entries") and self._lbl_total_entries and self._lbl_total_entries.winfo_exists():
+            if student_entries is not None:
+                self._lbl_total_entries.configure(text=f"Registros: {len(student_entries)}")
+            else:
+                self._lbl_total_entries.configure(text="Registros: —")
+
+    def _carregar_medias_gerais(self):
+        def fetch():
+            return self.servico_bem_estar.obter_medias_humor()
+
+        def on_success(res):
+            if not self.winfo_exists():
+                return
+            avg = None
+            if isinstance(res, dict):
+                data = res.get("data") or {}
+                if isinstance(data, dict):
+                    avg = data.get("average_mood")
+            self._atualizar_medias_ui(general_avg=avg)
+
+        def on_error(exc):
+            logging.error(f"Falha ao carregar médias gerais: {exc}")
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
+
+    def _schedule_draw_student_timeline(self, event=None):
+        if hasattr(self, "_student_timeline_after_id") and self._student_timeline_after_id:
+            self.after_cancel(self._student_timeline_after_id)
+        self._student_timeline_after_id = self.after(80, lambda: self._draw_student_timeline(getattr(self, "_student_timeline_data", [])))
+
+    def _draw_student_timeline(self, entries):
+        canvas = getattr(self, "_history_timeline_canvas", None)
+        if not canvas or not canvas.winfo_exists():
+            return
+        canvas.delete("all")
+        if not entries:
+            return
+        sorted_entries = sorted(entries, key=lambda e: e.get("entry_date", "") or "")
+        pts = [e.get("mood_level", 3) for e in sorted_entries]
+        w = canvas.winfo_width() or 400
+        h = canvas.winfo_height() or 120
+        pad = 20
+        cw = w - 2 * pad
+        ch = h - 2 * pad
+        coords = [
+            (pad + i * cw / max(len(pts) - 1, 1), (h - pad) - ((v - 1) * ch / 4))
+            for i, v in enumerate(pts)
+        ]
+        poly = []
+        for x, y in coords:
+            poly += [x, y]
+        poly += [coords[-1][0], h - pad, coords[0][0], h - pad]
+        canvas.create_polygon(poly, fill=THEME["chart_fill"], outline="")
+        for i in range(len(coords) - 1):
+            canvas.create_line(
+                coords[i][0], coords[i][1],
+                coords[i + 1][0], coords[i + 1][1],
+                fill=THEME["chart_line"], width=2, capstyle="round"
+            )
+        for x, y in coords:
+            canvas.create_oval(x - 3, y - 3, x + 3, y + 3, fill=THEME["dot_good"], outline=THEME["surface"], width=1)
+        step = max(1, len(pts) // 6)
+        for i, (x, _) in enumerate(coords):
+            if i % step == 0 and sorted_entries:
+                lbl = sorted_entries[i].get("entry_date", "")
+                lbl = str(lbl)
+                if len(lbl) > 5:
+                    lbl = lbl[5:]
+                canvas.create_text(x, h - 6, text=lbl, font=(FONT_FAMILY, 8), fill=THEME["text_secondary"])
 
     def _filtrar_lista_estudantes(self, _=None):
         termo = self._student_search.get().lower().strip()

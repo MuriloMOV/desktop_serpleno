@@ -339,7 +339,7 @@ class CompartilhamentoDadosFrame(ctk.CTkFrame):
 
     def _carregar_relatorio(self):
         def fetch():
-            return self.servico_compartilhamento.obter_relatorio_compartilhamento()
+            return self.servico_compartilhamento.obter_relatorio()
 
         def on_success(result):
             self.render_relatorio(result)
@@ -870,7 +870,7 @@ class CompartilhamentoDadosFrame(ctk.CTkFrame):
                 "shared_with_role": funcao,
             }
 
-            res = self.servico_compartilhamento.bulk_share(dados)
+            res = self.servico_compartilhamento.compartilhamento_massa(dados)
             if res.get("success"):
                 self._show_toast(res.get("message", "Bulk share realizado com sucesso."), "success")
                 modal.destroy()
@@ -1011,7 +1011,7 @@ class CompartilhamentoDadosFrame(ctk.CTkFrame):
                 "shared_with_user_id": shared_with_user_id,
             }
 
-            res = self.servico_compartilhamento.bulk_unshare(dados)
+            res = self.servico_compartilhamento.descompartilhamento_massa(dados)
             if res.get("success"):
                 self._show_toast(
                     res.get("message", "Bulk unshare realizado com sucesso."), "success"
@@ -1172,7 +1172,7 @@ class CompartilhamentoDadosFrame(ctk.CTkFrame):
             w.destroy()
 
         def fetch():
-            return self.servico_compartilhamento.obter_historico_compartilhamento(student_id)
+            return self.servico_compartilhamento.obter_historico(student_id)
 
         def on_success(result):
             if not self.winfo_exists():

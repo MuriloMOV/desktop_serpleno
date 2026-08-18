@@ -1,8 +1,13 @@
+import json
 import logging
+import os
+
 import customtkinter as ctk
 
-from ser_pleno.features.dashboard.service import ServicoDashboard
+from ser_pleno.config.paths import get_project_root
 from ser_pleno.features.analytics.service import ServicoAnalytics
+from ser_pleno.features.dashboard.service import ServicoDashboard
+from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.ui.components.ui_components import (
     AlertRow,
     BaseModal,
@@ -15,7 +20,6 @@ from ser_pleno.ui.components.ui_components import (
     ProgressBar,
     bind_clickable,
 )
-from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.ui.theme import FONT_FAMILY, RADIUS, SPACING, THEME, themed_font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
@@ -316,6 +320,7 @@ class DashboardFrame(ctk.CTkFrame):
 
     def _carregar_dados(self):
         self._mostrar_skeletons()
+        self._carregar_quick_actions()
 
         def fetch():
             return self.servico_dashboard.obter_kpis()
@@ -439,28 +444,192 @@ class DashboardFrame(ctk.CTkFrame):
         ).place(relx=0.5, rely=0.5, anchor="center")
 
     def _criar_quick_actions(self):
-        bar = ctk.CTkFrame(self.scroll, fg_color="transparent")
-        bar.pack(fill="x", padx=SPACING["page_x"], pady=(0, spacing("sm")))
-        self._quick_actions_bar = bar
+        self._quick_actions_card = Card(self.scroll, title="Ações Rápidas")
+        self._quick_actions_card.pack(fill="x", padx=SPACING["page_x"], pady=(0, spacing("sm")))
+        self._quick_actions_container = self._quick_actions_card.body
+        self._quick_action_items = []
+        self._quick_actions_data = []
+        self._renderizar_quick_actions()
 
-        actions = [
-            ("Novo Agendamento", ICONS["calendar"], self._quick_novo_agendamento),
-            ("Nova Triagem", ICONS["add"], self._quick_nova_triagem),
-            ("Enviar Mensagem", ICONS["send"], self._quick_enviar_mensagem),
-            ("Ver Alertas", ICONS["bell"], self._abrir_notificacoes_alertas),
+    def _carregar_quick_actions(self):
+        def fetch():
+            return self.servico_analytics.obter_quick_actions()
+
+        def on_success(acoes):
+            self._quick_actions_data = acoes if isinstance(acoes, list) else []
+            self._renderizar_quick_actions()
+
+        def on_error(exc):
+            logger.debug("Quick actions não disponíveis: %s", exc)
+            self._quick_actions_data = self._fallback_quick_actions()
+            self._renderizar_quick_actions()
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
+    def _fallback_quick_actions(self):
+        return [
+            {
+                "id": "nova_triagem",
+                "label": "Nova Triagem",
+                "icon": ICONS["add"],
+                "description": "Iniciar triagem de estudante",
+                "action_type": "navigate",
+                "target": "analise",
+            },
+            {
+                "id": "check_in",
+                "label": "Registrar Check-in",
+                "icon": ICONS["heart"],
+                "description": "Registrar check-in de bem-estar",
+                "action_type": "navigate",
+                "target": "bem_estar",
+            },
+            {
+                "id": "add_student",
+                "label": "Adicionar Estudante",
+                "icon": ICONS["add"],
+                "description": "Cadastrar novo estudante",
+                "action_type": "navigate",
+                "target": "estudantes",
+            },
+            {
+                "id": "criar_orientacao",
+                "label": "Criar Orientação",
+                "icon": ICONS["compass"],
+                "description": "Nova orientação para encaminhamento",
+                "action_type": "navigate",
+                "target": "orientacoes",
+            },
         ]
 
-        self._quick_action_buttons = []
-        for text, icon, command in actions:
-            btn = PrimaryButton(
-                bar,
-                text=f"{icon}  {text}" if icon else text,
-                command=command,
-                height=36,
-                width=160,
-                text_color="white",
-            )
-            self._quick_action_buttons.append(btn)
+    def _renderizar_quick_actions(self):
+        if not hasattr(self, "_quick_actions_container"):
+            return
+        for item in self._quick_action_items:
+            if item.winfo_exists():
+                item.destroy()
+        self._quick_action_items = []
+
+        acoes = self._quick_actions_data or self._fallback_quick_actions()
+        favoritos = self._carregar_favoritos()
+
+        if favoritos:
+            acoes_filtradas = [a for a in acoes if a.get("id") in favoritos]
+            if not acoes_filtradas:
+                acoes_filtradas = acoes[:4]
+        else:
+            acoes_filtradas = acoes[:4]
+
+        for acao in acoes_filtradas:
+            self._criar_item_quick_action(acao)
+
+    def _criar_item_quick_action(self, acao):
+        item = ctk.CTkFrame(
+            self._quick_actions_container,
+            fg_color=THEME["bg_alt"],
+            corner_radius=RADIUS["lg"],
+        )
+        item.pack(fill="x", pady=spacing("xs"))
+
+        inner = ctk.CTkFrame(item, fg_color="transparent")
+        inner.pack(fill="both", padx=spacing("md"), pady=spacing("sm"))
+        inner.grid_columnconfigure(1, weight=1)
+
+        icon_lbl = ctk.CTkLabel(
+            inner,
+            text=acao.get("icon", "•"),
+            font=themed_font("h4"),
+            text_color=THEME["primary"],
+        )
+        icon_lbl.grid(row=0, column=0, padx=(0, spacing("md")), sticky="w")
+
+        text_frame = ctk.CTkFrame(inner, fg_color="transparent")
+        text_frame.grid(row=0, column=1, sticky="ew")
+
+        ctk.CTkLabel(
+            text_frame,
+            text=acao.get("label", ""),
+            font=themed_font("body", "bold"),
+            text_color=THEME["text"],
+            anchor="w",
+        ).pack(anchor="w")
+
+        descricao = acao.get("description", "")
+        if descricao:
+            ctk.CTkLabel(
+                text_frame,
+                text=descricao,
+                font=themed_font("caption"),
+                text_color=THEME["text_secondary"],
+                anchor="w",
+            ).pack(anchor="w")
+
+        fav_id = acao.get("id", "")
+        is_fav = fav_id in self._carregar_favoritos()
+        star_text = "★" if is_fav else "☆"
+        star_color = THEME["warning"] if is_fav else THEME["text_muted"]
+
+        star_btn = ctk.CTkButton(
+            inner,
+            text=star_text,
+            width=32,
+            height=32,
+            corner_radius=RADIUS["button"],
+            fg_color="transparent",
+            hover_color=THEME["bg_alt"],
+            text_color=star_color,
+            command=lambda aid=fav_id: self._toggle_favorito(aid),
+        )
+        star_btn.grid(row=0, column=2, padx=(spacing("sm"), 0), sticky="e")
+
+        bind_clickable(item, lambda a=acao: self._executar_quick_action(a))
+        self._quick_action_items.append(item)
+
+    def _executar_quick_action(self, acao):
+        target = acao.get("target")
+        if target:
+            try:
+                self.controller.app.mostrar_tela(target)
+            except Exception as e:
+                self._show_error(f"Não foi possível abrir {acao.get('label', '')}.\n{e}")
+
+    def _toggle_favorito(self, acao_id):
+        favoritos = self._carregar_favoritos()
+        if acao_id in favoritos:
+            favoritos.discard(acao_id)
+        else:
+            favoritos.add(acao_id)
+        self._salvar_favoritos(favoritos)
+        self._renderizar_quick_actions()
+
+    def _carregar_favoritos(self):
+        try:
+            path = os.path.join(get_project_root(), "user_profile.json")
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+                    return set(data.get("quick_action_favorites", []))
+        except Exception:
+            pass
+        return set()
+
+    def _salvar_favoritos(self, favoritos_set):
+        try:
+            path = os.path.join(get_project_root(), "user_profile.json")
+            data = {}
+            if os.path.exists(path):
+                with open(path, encoding="utf-8") as f:
+                    data = json.load(f)
+            data["quick_action_favorites"] = list(favoritos_set)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.error("Erro ao salvar favoritos: %s", e)
 
     def _reflow_quick_actions(self, width):
         if not hasattr(self, "_quick_action_buttons"):
@@ -475,24 +644,6 @@ class DashboardFrame(ctk.CTkFrame):
             for btn in self._quick_action_buttons:
                 btn.configure(width=0)
                 btn.pack(fill="x", pady=spacing("xs"))
-
-    def _quick_novo_agendamento(self):
-        try:
-            self.controller.app.mostrar_tela("agenda")
-        except Exception as e:
-            self._show_error(f"Não foi possível abrir a agenda.\n{e}")
-
-    def _quick_nova_triagem(self):
-        try:
-            self.controller.app.mostrar_tela("triagem")
-        except Exception as e:
-            self._show_error(f"Não foi possível abrir a triagem.\n{e}")
-
-    def _quick_enviar_mensagem(self):
-        try:
-            self.controller.app.mostrar_tela("comunicacao")
-        except Exception as e:
-            self._show_error(f"Não foi possível abrir a comunicação.\n{e}")
 
     def _criar_badge(self, parent) -> ctk.CTkFrame:
         badge = ctk.CTkFrame(

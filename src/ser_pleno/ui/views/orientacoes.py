@@ -3,6 +3,7 @@ import os
 import shutil
 import time
 import tkinter.filedialog as fd
+import mimetypes
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 from PIL import Image as PILImage
@@ -314,6 +315,8 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._form_nova_built = False
         self._estatisticas_built = False
         self._filtros_built = False
+        self._templates_cache = []
+        self._themes_cache = []
 
         self.grid_columnconfigure(0, weight=1)
         self.grid_rowconfigure(0, weight=1)
@@ -655,17 +658,11 @@ class OrientacoesFrame(ctk.CTkFrame):
         self.f_tema = FormField(
             row,
             f"{ICONS['pin']}  Tema",
-            values=[
-                "Acadêmico",
-                "Emocional",
-                "Social",
-                "Familiar",
-                "Vocacional",
-                "Geral",
-            ],
+            values=["Geral"],
             initial="Geral",
         )
         self.f_tema.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self._carregar_themes()
 
         self.f_data = FormField(
             row,
@@ -711,7 +708,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         ).pack(side="left")
         ctk.CTkButton(
             anexos_header,
-            text="Adicionar Anexo",
+            text="Anexar arquivo",
             command=self._adicionar_anexo,
             height=30,
             width=140,
@@ -1672,7 +1669,7 @@ class OrientacoesFrame(ctk.CTkFrame):
                 novos = [
                     a
                     for a in self._anexos_selecionados
-                    if "caminho" in a and os.path.exists(a.get("caminho", ""))
+                    if "caminho" in a and not a.get("_existente") and os.path.exists(a.get("caminho", ""))
                 ]
                 if novos:
                     self._upload_anexos(oid, novos)
@@ -1707,11 +1704,13 @@ class OrientacoesFrame(ctk.CTkFrame):
                     f"Arquivo muito grande (>10MB): {os.path.basename(caminho)}"
                 )
                 continue
+            mime_type, _ = mimetypes.guess_type(caminho)
             self._anexos_selecionados.append(
                 {
                     "caminho": caminho,
                     "nome": os.path.basename(caminho),
                     "tamanho": tamanho,
+                    "mime_type": mime_type or "application/octet-stream",
                 }
             )
         self._renderizar_anexos_selecionados()
@@ -1775,7 +1774,7 @@ class OrientacoesFrame(ctk.CTkFrame):
             ).pack(anchor="w")
             ctk.CTkLabel(
                 info,
-                text=self._formatar_tamanho(anexo["tamanho"]),
+                text=f"{self._formatar_tamanho(anexo['tamanho'])}  •  {anexo.get('mime_type', 'application/octet-stream')}",
                 font=font(size=10),
                 text_color=O["text_light"],
                 anchor="w",
@@ -1838,9 +1837,7 @@ class OrientacoesFrame(ctk.CTkFrame):
     def _abrir_dialogo_templates(self) -> None:
         if not self._form_nova_built:
             self._build_form_nova_lazy()
-        templates = self.servico_orientacoes.get_presets()
-        if not templates:
-            self._show_error("Nenhum modelo disponível", title="Modelos")
+        if self.f_titulo is None or not self.f_titulo.winfo_exists():
             return
 
         modal = BaseModal(self, "Selecionar Modelo", 420, 320)
@@ -1856,34 +1853,89 @@ class OrientacoesFrame(ctk.CTkFrame):
             fill="both", expand=True, padx=spacing("xl"), pady=spacing("sm")
         )
 
+        loading_lbl = ctk.CTkLabel(
+            scroll,
+            text="Carregando modelos...",
+            font=font(size=12),
+            text_color=O["text_muted"],
+        )
+        loading_lbl.pack(pady=20)
+
         student_id = (
             self._selected_student.get("id") if self._selected_student else None
         )
 
-        def usar_template(chave: str):
-            res = self.servico_orientacoes.usar_template(chave, student_id)
-            if res:
+        def aplicar_template(template_id: str):
+            res = self.servico_orientacoes.usar_template(template_id, student_id)
+            if res and res.get("success"):
+                data = res.get("data", {})
                 if self.f_titulo is not None and self.f_titulo.winfo_exists():
-                    self.f_titulo.insert(0, res.get("title", ""))
+                    self.f_titulo.delete(0, "end")
+                    self.f_titulo.insert(0, data.get("title", ""))
                 if self.f_conteudo is not None and self.f_conteudo.winfo_exists():
-                    self.f_conteudo.insert("1.0", res.get("content", ""))
+                    self.f_conteudo.delete("1.0", "end")
+                    self.f_conteudo.insert("1.0", data.get("content", ""))
                 if self.f_tema is not None and self.f_tema.winfo_exists():
-                    self.f_tema.widget.set(res.get("theme", "Geral"))
+                    self.f_tema.widget.set(data.get("theme", "Geral"))
+                if self.f_data is not None and self.f_data.winfo_exists():
+                    self.f_data.delete(0, "end")
+                    hoje = datetime.datetime.now().strftime("%Y-%m-%d")
+                    self.f_data.insert(0, hoje)
             modal.destroy()
 
-        for chave, info in templates.items():
-            ctk.CTkButton(
-                scroll,
-                text=f"{ICONS['file_text']}  {info.get('label', chave)}",
-                command=lambda c=chave: usar_template(c),
-                height=40,
-                corner_radius=10,
-                anchor="w",
-                fg_color=O["accent_soft"],
-                hover_color=O["accent"],
-                text_color=O["accent"],
-                font=font(size=12, weight="bold"),
-            ).pack(fill="x", pady=3)
+        def renderizar_templates(templates):
+            clear_children(scroll)
+            if not templates:
+                ctk.CTkLabel(
+                    scroll,
+                    text="Nenhum modelo disponível",
+                    font=font(size=12),
+                    text_color=O["text_muted"],
+                ).pack(pady=20)
+                return
+            for t in templates:
+                tid = t.get("id") if isinstance(t, dict) else t
+                label = t.get("label", tid) if isinstance(t, dict) else str(t)
+                ctk.CTkButton(
+                    scroll,
+                    text=f"{ICONS['file_text']}  {label}",
+                    command=lambda x=tid: aplicar_template(x),
+                    height=40,
+                    corner_radius=10,
+                    anchor="w",
+                    fg_color=O["accent_soft"],
+                    hover_color=O["accent"],
+                    text_color=O["accent"],
+                    font=font(size=12, weight="bold"),
+                ).pack(fill="x", pady=3)
+
+        def fetch():
+            return self.servico_orientacoes.listar_templates()
+
+        def on_success(resultado):
+            if not modal.winfo_exists():
+                return
+            data = resultado.get("data", []) if isinstance(resultado, dict) else []
+            self._templates_cache = data
+            renderizar_templates(data)
+
+        def on_error(exc):
+            logger.error("Erro ao carregar templates: %s", exc)
+            if modal.winfo_exists():
+                clear_children(scroll)
+                ctk.CTkLabel(
+                    scroll,
+                    text="Erro ao carregar modelos",
+                    font=font(size=12),
+                    text_color=O["danger"],
+                ).pack(pady=20)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=modal,
+        )
 
         ctk.CTkButton(
             modal,
@@ -1900,6 +1952,39 @@ class OrientacoesFrame(ctk.CTkFrame):
             font=font(size=12),
         ).pack(pady=spacing("md"))
 
+    def _carregar_themes(self) -> None:
+        def fetch():
+            return self.servico_orientacoes.listar_themes()
+
+        def on_success(resultado):
+            if not self.winfo_exists():
+                return
+            data = resultado.get("data", []) if isinstance(resultado, dict) else []
+            self._themes_cache = data
+            if not data or self.f_tema is None or not self.f_tema.winfo_exists():
+                return
+            values = []
+            for t in data:
+                v = t.get("value") if isinstance(t, dict) else str(t)
+                l = t.get("label", v) if isinstance(t, dict) else str(t)
+                values.append(v)
+            if not values:
+                values = ["Geral"]
+            self.f_tema.widget.configure(values=values)
+            current = self.f_tema.get()
+            if current not in values:
+                self.f_tema.widget.set(values[0])
+
+        def on_error(exc):
+            logger.error("Erro ao carregar themes: %s", exc)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
+
     def _carregar_anexos_edicao(self, orientation_id: int) -> None:
         def fetch():
             return self.servico_orientacoes.listar_anexos(orientation_id)
@@ -1909,12 +1994,19 @@ class OrientacoesFrame(ctk.CTkFrame):
                 return
             anexos = resultado.get("data", []) if isinstance(resultado, dict) else []
             for anexo in anexos:
+                caminho_arquivo = anexo.get("file", "")
+                tamanho = 0
+                if caminho_arquivo and os.path.exists(caminho_arquivo):
+                    tamanho = os.path.getsize(caminho_arquivo)
+                mime_type = anexo.get("mime_type") or "application/octet-stream"
                 self._anexos_selecionados.append(
                     {
                         "file_id": anexo.get("id"),
                         "nome": anexo.get("file_name", "arquivo"),
-                        "tamanho": 0,
+                        "tamanho": tamanho,
+                        "mime_type": mime_type,
                         "_existente": True,
+                        "caminho": caminho_arquivo,
                     }
                 )
                 self._anexos_existentes_ids.append(anexo.get("id"))
@@ -1976,6 +2068,9 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._mudar_tab("nova")
 
     def _duplicar_orientacao(self, oid: int) -> None:
+        if not self._confirmar("Duplicar esta orientação?"):
+            return
+
         def fetch():
             return self.servico_orientacoes.duplicar_orientacao(oid)
 
@@ -2329,6 +2424,40 @@ class OrientacoesFrame(ctk.CTkFrame):
     def _baixar_anexo(self, anexo: Dict[str, Any]) -> None:
         caminho = anexo.get("file")
         nome = anexo.get("file_name", "arquivo")
+
+        if caminho and isinstance(caminho, str) and caminho.startswith(("http://", "https://")):
+            destino = fd.asksaveasfilename(
+                title="Salvar anexo",
+                initialfile=nome,
+                filetypes=[("Todos os arquivos", "*.*")],
+            )
+            if not destino:
+                return
+
+            def download_task():
+                session = self.servico_orientacoes._get_session()
+                headers = self.servico_orientacoes._get_headers()
+                response = session.get(caminho, headers=headers, timeout=15)
+                if response.ok:
+                    with open(destino, "wb") as f:
+                        f.write(response.content)
+                    return True
+                raise RuntimeError(f"Erro HTTP {response.status_code}")
+
+            def on_ok(_):
+                if self.winfo_exists():
+                    self._show_success(
+                        f"Arquivo salvo em:\n{destino}", duration=4000
+                    )
+
+            AsyncRunner.run(
+                task=download_task,
+                on_success=on_ok,
+                on_error=lambda e: self._show_error(f"Falha ao baixar: {e}"),
+                widget_ref=self,
+            )
+            return
+
         if not caminho or not os.path.exists(caminho):
             self._show_error(
                 "Arquivo não encontrado localmente.", title="Informação"

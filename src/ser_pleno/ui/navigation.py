@@ -12,6 +12,8 @@ from ser_pleno.ui.theme import THEME, SPACING, font
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import GhostButton, Avatar, Divider
 from ser_pleno.ui.view_factory import ViewFactory
+from ser_pleno.infrastructure.desktop.native_notifier import get_desktop_notifier
+from ser_pleno.utils.async_runner import AsyncRunner
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,8 @@ class NavigationManager:
         self.view_factory = ViewFactory(app)
         self._view_cache: OrderedDict[str, ctk.CTkFrame] = OrderedDict()
         self._current_view: ctk.CTkFrame | None = None
+        self._desktop_notifier = get_desktop_notifier()
+        self._notification_poll_after_id = None
 
     # ================= SIDEBAR =================
     def create_sidebar(self):
@@ -247,8 +251,101 @@ class NavigationManager:
         )
         self.app.header_subtitle.grid(row=1, column=0, sticky="w", pady=(4, 0))
 
+        self._build_global_search(header)
+
         self.app.content_body = ctk.CTkFrame(self.app.content, fg_color="transparent")
         self.app.content_body.grid(row=1, column=0, sticky="nsew", padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
+
+        self._start_notification_polling()
+
+    def _build_global_search(self, header):
+        search_frame = ctk.CTkFrame(header, fg_color="transparent")
+        search_frame.grid(row=0, column=1, rowspan=2, sticky="e", padx=(12, 0))
+
+        self.app.global_search = ctk.CTkEntry(
+            search_frame,
+            placeholder_text="Buscar... (Ctrl+K)",
+            width=260,
+            height=36,
+            corner_radius=10,
+            border_width=1,
+            border_color=THEME["border"],
+            fg_color=THEME["surface"],
+            text_color=THEME["text"],
+            font=font(12),
+        )
+        self.app.global_search.pack(side="left", padx=(0, 8))
+        self.app.global_search.bind("<KeyRelease>", self._on_global_search)
+
+        self.search_dropdown = ctk.CTkFrame(self.app, fg_color=THEME["surface"], corner_radius=10, border_width=1, border_color=THEME["border"])
+        self.search_dropdown.place_forget()
+        self.search_dropdown._search_callback = None
+
+    def _on_global_search(self, event):
+        query = getattr(self.app, "global_search", None)
+        if not query:
+            return
+        term = query.get().strip()
+        if len(term) < 2:
+            self._hide_search_dropdown()
+            return
+        try:
+            from ser_pleno.features.analytics.service import ServicoAnalytics
+            service = ServicoAnalytics(auth_service=getattr(self.app, "auth_service", None))
+            result = service.buscar_global(term)
+            items = result.get("results", []) if isinstance(result, dict) else []
+        except Exception:
+            items = []
+        self._show_search_dropdown(items)
+
+    def _show_search_dropdown(self, items):
+        for child in getattr(self, "search_dropdown", []).winfo_children() if hasattr(self, "search_dropdown") else []:
+            try:
+                child.destroy()
+            except Exception:
+                pass
+        if not items:
+            self._hide_search_dropdown()
+            return
+        dropdown = self.search_dropdown
+        dropdown.configure(width=320)
+        dropdown.place(x=60, y=86)
+        dropdown.lift()
+        for item in items[:8]:
+            tipo = item.get("type", "item")
+            label = item.get("label", "Sem título")
+            subtitle = item.get("subtitle", "")
+            target = item.get("target")
+            row = ctk.CTkFrame(dropdown, fg_color="transparent")
+            row.pack(fill="x", padx=8, pady=4)
+            btn = ctk.CTkButton(
+                row,
+                text=f"{label}\n{subtitle}" if subtitle else label,
+                anchor="w",
+                height=44,
+                corner_radius=8,
+                fg_color="transparent",
+                hover_color=THEME["nav_hover"],
+                text_color=THEME["text"],
+                font=font(12),
+            )
+            btn.pack(fill="x")
+            if target:
+                btn.configure(command=lambda k=target: self._navigate_search_result(k))
+        close = ctk.CTkButton(dropdown, text="Fechar", width=280, height=28, command=self._hide_search_dropdown)
+        close.pack(pady=(4, 8))
+
+    def _hide_search_dropdown(self):
+        try:
+            self.search_dropdown.place_forget()
+        except Exception:
+            pass
+
+    def _navigate_search_result(self, key):
+        self._hide_search_dropdown()
+        if hasattr(self.app, "global_search"):
+            self.app.global_search.delete(0, "end")
+        self.show(key)
 
     # ================= NAVEGACAO =================
     def update_menu(self, active_key: str) -> None:
@@ -345,6 +442,58 @@ class NavigationManager:
             widget.destroy()
         self._view_cache.clear()
         self._current_view = None
+
+    def _get_recipient_id(self) -> int | None:
+        user_id = getattr(self.app, "usuario_logado_id", None)
+        if user_id:
+            return user_id
+        auth = getattr(self.app, "auth_service", None)
+        if auth and hasattr(auth, "user") and isinstance(auth.user, dict):
+            return auth.user.get("id")
+        return None
+
+    def _refresh_notification_count(self) -> None:
+        recipient_id = self._get_recipient_id()
+        if not recipient_id:
+            return
+
+        def _fetch():
+            from ser_pleno.features.notificacoes.service import ServicoNotificacoes
+            service = ServicoNotificacoes(auth_service=getattr(self.app, "auth_service", None))
+            return service.contar_nao_lidas(recipient_id=recipient_id)
+
+        def _on_success(res):
+            if not isinstance(res, dict):
+                return
+            count = res.get("data", 0) if res.get("success") else 0
+            try:
+                notifier = getattr(self, "_desktop_notifier", None)
+                if notifier is not None:
+                    notifier.update_unread_badge(count)
+                    if count > getattr(notifier, "_last_count", 0):
+                        notifier.notify("SerPleno", f"Você tem {count} notificação(ões) não lida(s).")
+            except Exception as exc:
+                logger.debug("Falha ao atualizar notificador desktop: %s", exc)
+
+        def _on_error(exc):
+            pass
+
+        AsyncRunner.run(task=_fetch, on_success=_on_success, on_error=_on_error, widget_ref=self.app)
+
+    def _start_notification_polling(self) -> None:
+        if self._notification_poll_after_id is not None:
+            try:
+                self.after_cancel(self._notification_poll_after_id)
+            except Exception:
+                pass
+        try:
+            self._notification_poll_after_id = self.after(30000, self._poll_notifications)
+        except Exception:
+            pass
+
+    def _poll_notifications(self) -> None:
+        self._refresh_notification_count()
+        self._start_notification_polling()
 
 
 def get_mode():

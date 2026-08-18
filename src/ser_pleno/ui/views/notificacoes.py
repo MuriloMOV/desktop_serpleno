@@ -103,13 +103,24 @@ class NotificacoesFrame(ctk.CTkFrame):
                 fill="x", pady=(0, 12)
             )
 
+    def _get_recipient_id(self) -> int | None:
+        user_id = getattr(self.app, "usuario_logado_id", None)
+        if user_id:
+            return user_id
+        auth = getattr(self, "auth_service", None) or getattr(self.controller, "auth_service", None)
+        if auth and hasattr(auth, "user") and isinstance(auth.user, dict):
+            return auth.user.get("id")
+        return None
+
     def carregar_notificacoes_async(self):
         self._limpar_lista()
         self._mostrar_skeletons()
         self.status_lbl.configure(text="Carregando...")
 
+        recipient_id = self._get_recipient_id()
+
         def _fetch():
-            return self.servico_notificacoes.listar(unread_only=self._mostrar_nao_lidas)
+            return self.servico_notificacoes.listar(recipient_id=recipient_id, unread_only=self._mostrar_nao_lidas)
 
         def _on_success(res):
             if not self.winfo_exists():
@@ -126,6 +137,7 @@ class NotificacoesFrame(ctk.CTkFrame):
                     subtitle="Tente ajustar os filtros",
                 ).pack(pady=30)
                 self._atualizar_status(0)
+                self._atualizar_desktop_notifier(0)
                 return
 
             batch = WidgetBatchBuilder(parent=self, batch_size=20)
@@ -135,6 +147,7 @@ class NotificacoesFrame(ctk.CTkFrame):
                 batch.add(lambda n=n: self._criar_card(n))
             batch.execute()
             self._atualizar_status(len(self.notificacoes))
+            self._atualizar_desktop_notifier(len(self.notificacoes))
 
         def _on_error(exc):
             if not self.winfo_exists():
@@ -172,6 +185,17 @@ class NotificacoesFrame(ctk.CTkFrame):
         self.status_lbl.configure(
             text=f"Mostrando {total} notificacoes"
         )
+
+    def _atualizar_desktop_notifier(self, total: int) -> None:
+        try:
+            notifier = getattr(self.app, "_desktop_notifier", None)
+            if notifier is None:
+                return
+            notifier.update_unread_badge(total)
+            if total <= 0:
+                notifier.clear_badge()
+        except Exception as exc:
+            logger.debug("Falha ao atualizar notificador desktop: %s", exc)
 
     def _criar_card(self, notificacao: dict):
         card = Card(self.lista)
@@ -231,9 +255,10 @@ class NotificacoesFrame(ctk.CTkFrame):
         nid = notificacao.get("id") or notificacao.get("notification_id")
         if not nid:
             return
+        recipient_id = self._get_recipient_id()
 
         def _fetch():
-            return self.servico_notificacoes.marcar_lida(nid)
+            return self.servico_notificacoes.marcar_lida(nid, recipient_id=recipient_id)
 
         def _on_success(res):
             if isinstance(res, dict) and res.get("success") is False:
@@ -247,8 +272,10 @@ class NotificacoesFrame(ctk.CTkFrame):
         AsyncRunner.run(task=_fetch, on_success=_on_success, on_error=_on_error, widget_ref=self)
 
     def _marcar_todas_lidas(self):
+        recipient_id = self._get_recipient_id()
+
         def _fetch():
-            return self.servico_notificacoes.marcar_todas_lidas()
+            return self.servico_notificacoes.marcar_todas_lidas(recipient_id=recipient_id)
 
         def _on_success(res):
             if isinstance(res, dict) and res.get("success") is False:

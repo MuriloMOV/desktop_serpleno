@@ -83,6 +83,8 @@ class AlertasFrame(ctk.CTkFrame):
             "data_fim": None,
         }
         self._total_alertas = 0
+        self._modo_critico = False
+        self._unread_count = 0
 
         self._build_filtros()
         self._build_status_bar()
@@ -144,6 +146,15 @@ class AlertasFrame(ctk.CTkFrame):
             width=120, height=36,
         ).pack(side="left", padx=(spacing("md"), 0))
 
+        self.btn_criticos = SecondaryButton(
+            frame, text=f"{ICONS['alert']}  Alertas Críticos",
+            command=self._toggle_criticos,
+            height=36, width=170,
+            fg_color=THEME["danger_soft"], hover_color=THEME["danger"],
+            text_color=THEME["danger"],
+        )
+        self.btn_criticos.pack(side="left", padx=(spacing("sm"), 0))
+
         for w in (self.f_data_inicio, self.f_data_fim):
             w.bind("<KeyRelease>", lambda _: self._aplicar_filtros_auto())
 
@@ -173,6 +184,8 @@ class AlertasFrame(ctk.CTkFrame):
         self.f_resolucao.set("Todos")
         self.f_data_inicio.delete(0, "end")
         self.f_data_fim.delete(0, "end")
+        self._modo_critico = False
+        self._atualizar_botao_criticos()
         self._filtros = {
             "alert_type": None, "severity": None,
             "is_read": None, "is_resolved": None,
@@ -180,7 +193,40 @@ class AlertasFrame(ctk.CTkFrame):
         }
         self.carregar_alertas_async()
 
+    def _toggle_criticos(self):
+        self._modo_critico = not self._modo_critico
+        self._atualizar_botao_criticos()
+        if self._modo_critico:
+            self._filtros["severity"] = "critical"
+            self._filtros["is_read"] = False
+            self.f_severidade.set("Critico")
+            self.f_leitura.set("Nao lidos")
+        else:
+            self._filtros["severity"] = None
+            self._filtros["is_read"] = None
+            self.f_severidade.set("Todas")
+            self.f_leitura.set("Todos")
+        self.carregar_alertas_async()
+
+    def _atualizar_botao_criticos(self):
+        if self._modo_critico:
+            self.btn_criticos.configure(
+                fg_color=THEME["danger"], hover_color=THEME["danger"],
+                text_color=THEME["text_on_primary"],
+            )
+        else:
+            self.btn_criticos.configure(
+                fg_color=THEME["danger_soft"], hover_color=THEME["danger"],
+                text_color=THEME["danger"],
+            )
+
     def _aplicar_filtros_auto(self):
+        if self._modo_critico:
+            self._filtros["severity"] = "critical"
+            self._filtros["is_read"] = False
+            self.carregar_alertas_async()
+            return
+
         tipo_raw = self.f_tipo.get()
         sev_raw = self.f_severidade.get()
         leitura_raw = self.f_leitura.get()
@@ -256,9 +302,8 @@ class AlertasFrame(ctk.CTkFrame):
                 batch.add(lambda a=alerta: self._criar_card(a))
             batch.execute()
             self._atualizar_status(len(self.alertas), len(self.alertas))
-            self._atualizar_badge_navegacao(
-                sum(1 for a in self.alertas if not a.get("is_read"))
-            )
+            self._unread_count = sum(1 for a in self.alertas if not a.get("is_read"))
+            self._atualizar_badge_navegacao(self._unread_count)
 
         def _on_error(exc):
             if not self.winfo_exists():
@@ -404,6 +449,7 @@ class AlertasFrame(ctk.CTkFrame):
                 self._show_error(res.get("message", "Erro ao marcar como lido"))
                 return
             self.carregar_alertas_async()
+            self._atualizar_unread_count()
 
         def _on_error(exc):
             self._show_error(f"Erro ao marcar como lido: {exc}")
@@ -419,6 +465,7 @@ class AlertasFrame(ctk.CTkFrame):
                 self._show_error(res.get("message", "Erro ao dispensar alerta"))
                 return
             self.carregar_alertas_async()
+            self._atualizar_unread_count()
 
         def _on_error(exc):
             self._show_error(f"Erro ao dispensar alerta: {exc}")
@@ -434,6 +481,7 @@ class AlertasFrame(ctk.CTkFrame):
                 self._show_error(res.get("message", "Erro ao marcar todos como lidos"))
                 return
             self.carregar_alertas_async()
+            self._atualizar_unread_count()
 
         def _on_error(exc):
             self._show_error(f"Erro ao marcar todos como lidos: {exc}")
@@ -462,6 +510,21 @@ class AlertasFrame(ctk.CTkFrame):
                 app.navigation.update_alert_badge(count)
             except Exception:
                 pass
+
+    def _atualizar_unread_count(self):
+        def fetch():
+            return self.servico_alertas.contar_nao_lidos()
+
+        def on_success(count):
+            if not self.winfo_exists():
+                return
+            self._unread_count = count
+            self._atualizar_badge_navegacao(count)
+
+        def on_error(exc):
+            logger.error("Erro ao atualizar contagem de alertas nao lidos: %s", exc)
+
+        AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
     def _show_error(self, message: str, title: str = "Nao foi possivel concluir") -> None:
         try:

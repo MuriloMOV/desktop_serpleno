@@ -8,9 +8,8 @@ import time
 from typing import Optional
 
 import customtkinter as ctk
-import tkinter as tk
 
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font, STATUS_COLORS
+from ser_pleno.ui.theme import THEME, SPACING, RADIUS, themed_font
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.views.base import BaseViewFrame
 from ser_pleno.ui.components.ui_components import (
@@ -23,7 +22,6 @@ from ser_pleno.ui.components.ui_components import (
     GhostButton,
     SegmentedButton,
     Toast,
-    Divider,
 )
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
@@ -192,7 +190,9 @@ class PedidosAjudaFrame(BaseViewFrame):
             auto_header=True,
         )
         self.controller = controller
-        self.servico_pedidos = ServicoPedidosAjuda(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_pedidos = ServicoPedidosAjuda(
+            auth_service=getattr(controller, "auth_service", None),
+        )
         self.app = getattr(controller, "app", None)
 
         self.pedidos: list[dict] = []
@@ -204,7 +204,12 @@ class PedidosAjudaFrame(BaseViewFrame):
         self._build_status_bar()
 
         self._cards_container = ctk.CTkFrame(self, fg_color="transparent")
-        self._cards_container.pack(fill="both", expand=True, padx=SPACING["page_x"], pady=(0, SPACING["page_y"]))
+        self._cards_container.pack(
+            fill="both",
+            expand=True,
+            padx=SPACING["page_x"],
+            pady=(0, SPACING["page_y"]),
+        )
 
         self._modal_responder: Optional[ResponderModal] = None
 
@@ -214,7 +219,11 @@ class PedidosAjudaFrame(BaseViewFrame):
 
     def _build_filtros(self):
         frame = ctk.CTkFrame(self, fg_color="transparent")
-        frame.pack(fill="x", padx=SPACING["page_x"], pady=(SPACING["item_gap"], SPACING["label_gap"]))
+        frame.pack(
+            fill="x",
+            padx=SPACING["page_x"],
+            pady=(SPACING["item_gap"], SPACING["label_gap"]),
+        )
 
         self.seg_status = SegmentedButton(
             frame,
@@ -511,7 +520,9 @@ class PedidosAjudaFrame(BaseViewFrame):
                 anchor="w",
             ).pack(anchor="w", pady=(0, SPACING["xs"]))
 
-        ctk.CTkFrame(content, height=1, fg_color=THEME["divider"]).pack(fill="x", pady=(SPACING["xs"], 8))
+        ctk.CTkFrame(content, height=1, fg_color=THEME["divider"]).pack(
+            fill="x", pady=(SPACING["xs"], 8),
+        )
 
         acts = ctk.CTkFrame(content, fg_color="transparent")
         acts.pack(fill="x")
