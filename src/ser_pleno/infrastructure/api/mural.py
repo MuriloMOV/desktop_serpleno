@@ -62,7 +62,7 @@ class ServicoMural:
                 headers['X-CSRFToken'] = auth.csrf_token
         return headers
 
-    def listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None) -> Dict[str, Any]:
+    def listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None, status: Optional[str] = None, data_inicio: Optional[str] = None, data_fim: Optional[str] = None) -> Dict[str, Any]:
         """
         Lista mensagens do mural com filtros opcionais
         
@@ -70,13 +70,16 @@ class ServicoMural:
             busca: Termo para buscar nos campos título, conteúdo e autor
             pagina: Número da página
             categoria: Filtro por categoria (informativo, aviso, aula, urgente, evento)
+            status: Filtro por status (ativos, inativos, None=todos)
+            data_inicio: Data inicial (YYYY-MM-DD)
+            data_fim: Data final (YYYY-MM-DD)
             
         Returns:
             Dict com success, data (mensagens)
         """
         if not self._should_use_api():
             logger.info("Modo independente: usando banco local diretamente para mural")
-            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
         
         try:
             url = f"{self.base_url}/"
@@ -87,6 +90,12 @@ class ServicoMural:
                 params['search'] = busca
             if categoria and categoria != "Todas":
                 params['categoria'] = categoria
+            if status and status != "Todos":
+                params['ativo'] = 1 if status == "ativos" else 0
+            if data_inicio:
+                params['data_inicio'] = data_inicio
+            if data_fim:
+                params['data_fim'] = data_fim
             
             if session and requests:
                 try:
@@ -96,19 +105,19 @@ class ServicoMural:
                             return response.json()
                         except Exception as json_err:
                             logger.debug(f"Resposta não é JSON válido: {json_err}")
-                            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+                            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
                     else:
                         logger.debug(f"API retornou status {response.status_code}, usando banco local")
-                        return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+                        return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
                 except Exception as conn_err:
                     logger.warning(f"Erro de conexão com API: {conn_err}, usando banco local")
-                    return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+                    return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
             
-            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
             
         except Exception as e:
             logger.exception(f"Erro ao listar mensagens: {e}")
-            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria)
+            return self._local_listar_mensagens(busca=busca, pagina=pagina, categoria=categoria, status=status, data_inicio=data_inicio, data_fim=data_fim)
     
     def obter_mensagem(self, mensagem_id: int) -> Dict[str, Any]:
         """
@@ -282,14 +291,27 @@ class ServicoMural:
     
     # ----------------------- Métodos locais (banco de dados) -----------------------
     
-    def _local_listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None) -> Dict[str, Any]:
+    def _local_listar_mensagens(self, busca: Optional[str] = None, pagina: int = 1, categoria: Optional[str] = None, status: Optional[str] = None, data_inicio: Optional[str] = None, data_fim: Optional[str] = None) -> Dict[str, Any]:
         """Retorna mensagens do banco local"""
         try:
             connection = get_db_connection()
             cursor = connection.cursor(dictionary=True)
             
-            query = "SELECT * FROM mural_posts WHERE ativo = 1"
+            query = "SELECT * FROM mural_posts WHERE 1=1"
             params = []
+            
+            if status == "ativos":
+                query += " AND ativo = 1"
+            elif status == "inativos":
+                query += " AND ativo = 0"
+            
+            if data_inicio:
+                query += " AND DATE(publicado_em) >= %s"
+                params.append(data_inicio)
+            
+            if data_fim:
+                query += " AND DATE(publicado_em) <= %s"
+                params.append(data_fim)
             
             if busca:
                 query += " AND (titulo LIKE %s OR conteudo LIKE %s OR autor LIKE %s)"
