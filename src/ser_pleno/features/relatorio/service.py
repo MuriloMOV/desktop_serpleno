@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import zipfile
 from typing import Any, Dict, List, Optional
 
 from ser_pleno.features.relatorio.repo import RelatorioRepository

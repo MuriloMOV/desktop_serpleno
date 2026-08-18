@@ -117,7 +117,11 @@ class ServicoReportTemplate:
         last_id = self.repo.criar_template(
             nome, report_type, template_config, default_parameters, is_active, created_by_id
         )
+        if not last_id:
+            return {"success": False, "message": "Falha ao criar template localmente."}
         row = self.repo.obter_template_por_id(last_id)
+        if not row:
+            return {"success": False, "message": "Template criado, mas não encontrado após criação."}
         return {"success": True, "data": row}
 
     @api_fallback("_fallback_atualizar_template")
