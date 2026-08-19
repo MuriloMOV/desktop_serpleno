@@ -100,6 +100,58 @@ def require_permission(permission_code: str) -> Callable:
     return decorator
 
 
+ENDPOINT_PERMISSIONS: dict[str, str] = {
+    "students.create": "criar_estudante",
+    "students.update": "editar_estudante",
+    "students.delete": "excluir_estudante",
+    "schedule.create": "criar_agendamento",
+    "schedule.update": "editar_agendamento",
+    "schedule.delete": "excluir_agendamento",
+    "screenings.create": "criar_screening",
+    "screenings.update": "editar_screening",
+    "screenings.delete": "excluir_screening",
+    "reports.create": "gerenciar_relatorios",
+    "reports.export": "exportar_dados",
+    "analytics.view": "ver_analytics",
+    "users.manage": "gerenciar_usuarios",
+    "permissions.manage": "gerenciar_permissoes",
+    "audit.view": "ver_audit_log",
+    "orientations.manage": "gerenciar_orientacoes",
+    "goals.manage": "gerenciar_metas",
+    "wellness.manage": "gerenciar_bem_estar",
+    "sharing.manage": "gerenciar_compartilhamento",
+    "notifications.manage": "gerenciar_notificacoes",
+}
+
+
+def check_screen_access(controller: Any, screen_name: str) -> bool:
+    return can_access_screen(controller, screen_name)
+
+
+def require_role(role_name: str) -> Callable:
+    def decorator(fn: Callable) -> Callable:
+        def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            profile = get_user_profile(getattr(self, "controller", None))
+            if profile is None or profile.role != role_name:
+                try:
+                    from ser_pleno.ui.views.base import _ErrorModal
+                    _ErrorModal(
+                        self.winfo_toplevel(),
+                        message=f"Permissão necessária: role {role_name}",
+                        title="Acesso negado",
+                    )
+                except Exception:
+                    pass
+                return None
+            return fn(self, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_admin() -> Callable:
+    return require_role("admin")
+
+
 def apply_rbac_to_button(button: ctk.CTkButton, controller: Any, permission_code: str) -> None:
     visible = has_permission(controller, permission_code)
     if visible:

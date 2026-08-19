@@ -6,11 +6,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def gerar_pdf_relatorio(
-    report_type: str,
-    report_data: dict[str, Any],
-    report_name: str,
-) -> bytes:
+def _build_fpdf_report(report_type: str, report_data: dict[str, Any], report_name: str) -> bytes:
     try:
         from fpdf import FPDF  # type: ignore
 
@@ -41,9 +37,11 @@ def gerar_pdf_relatorio(
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(0, 8, f"Tipo: {report_type}", ln=True)
         pdf.ln(4)
-        pdf.set_font("Helvetica", "", 10)
         summary = report_data.get("summary") if isinstance(report_data, dict) else None
         if isinstance(summary, dict):
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.cell(0, 8, "Resumo", ln=True)
+            pdf.set_font("Helvetica", "", 10)
             for key, value in summary.items():
                 pdf.cell(0, 7, f"{key}: {value}", ln=True)
             pdf.ln(4)
@@ -64,24 +62,34 @@ def gerar_pdf_relatorio(
             pdf.ln(2)
         return pdf.output(dest="S").encode("latin-1", errors="replace")
     except ImportError:
-        pass
+        return b""
+
+
+def _render_markdown_html(text: str) -> str:
+    sanitized = text.replace("&", "&").replace("<", "<").replace(">", ">")
+    return f"<para>{sanitized}</para>"
+
+
+def _build_reportlab_report(report_type: str, report_data: dict[str, Any], report_name: str) -> bytes:
     try:
         from reportlab.lib import colors  # type: ignore
         from reportlab.lib.pagesizes import letter  # type: ignore
-        from reportlab.lib.styles import getSampleStyleSheet  # type: ignore
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
         from reportlab.platypus import (  # type: ignore
             Paragraph,
             SimpleDocTemplate,
             Table,
             TableStyle,
+            Spacer,
         )
 
         buffer = __import__("io").BytesIO()
         doc = SimpleDocTemplate(buffer, pagesize=letter)
         styles = getSampleStyleSheet()
-        story: list = []
+        story: list[Any] = []
         story.append(Paragraph(f"<b>{report_name}</b>", styles["Title"]))
         story.append(Paragraph(f"Tipo: {report_type}", styles["Normal"]))
+        story.append(Spacer(1, 12))
         summary = report_data.get("summary") if isinstance(report_data, dict) else None
         if isinstance(summary, dict):
             table_data = [[str(k), str(v)] for k, v in summary.items()]
@@ -95,9 +103,45 @@ def gerar_pdf_relatorio(
                 ("BACKGROUND", (0, 1), (-1, -1), colors.beige),
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
             ])))
+            story.append(Spacer(1, 12))
+        for key, value in (report_data or {}).items():
+            if key == "summary":
+                continue
+            story.append(Paragraph(f"<b>{str(key).replace('_', ' ').title()}</b>", styles["Heading2"]))
+            if isinstance(value, list):
+                for item in value[:50]:
+                    story.append(Paragraph(_render_markdown_html(str(item)), styles["Normal"]))
+            elif isinstance(value, dict):
+                for sub_key, sub_value in value.items():
+                    story.append(Paragraph(f"{sub_key}: {sub_value}", styles["Normal"]))
+            else:
+                story.append(Paragraph(_render_markdown_html(str(value)), styles["Normal"]))
+            story.append(Spacer(1, 6))
+        try:
+            from reportlab.graphics.barcode import qr  # type: ignore
+            from reportlab.graphics.shapes import Drawing  # type: ignore
+            qr_code = qr.QrCodeWidget(report_name)
+            bounds = qr_code.getBounds()
+            d = Drawing(54, 54)
+            d.add(qr_code)
+            story.append(Spacer(1, 12))
+            story.append(d)
+        except Exception:
+            pass
         doc.build(story)
         return buffer.getvalue()
     except ImportError as exc:
         raise ImportError(
             "Nenhuma biblioteca de PDF disponível. Instale 'fpdf2' ou 'reportlab'."
         ) from exc
+
+
+def gerar_pdf_relatorio(
+    report_type: str,
+    report_data: dict[str, Any],
+    report_name: str,
+) -> bytes:
+    pdf_bytes = _build_fpdf_report(report_type, report_data, report_name)
+    if pdf_bytes:
+        return pdf_bytes
+    return _build_reportlab_report(report_type, report_data, report_name)
