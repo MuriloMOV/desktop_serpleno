@@ -1,18 +1,17 @@
 from dataclasses import dataclass
 from datetime import date
-from typing import Optional
 
 
 @dataclass
 class Autoavaliacao:
     id_autoavaliacao: int
     aluno_id: int
-    data_avaliacao: Optional[date] = None
-    bem_estar_academico: Optional[str] = None
-    bem_estar_emocional: Optional[str] = None
-    bem_estar_social: Optional[str] = None
-    reflexoes_pessoais: Optional[str] = None
-    pontos_xp: Optional[int] = None
+    data_avaliacao: date | None = None
+    bem_estar_academico: str | None = None
+    bem_estar_emocional: str | None = None
+    bem_estar_social: str | None = None
+    reflexoes_pessoais: str | None = None
+    pontos_xp: int | None = None
 
 
 @dataclass
@@ -24,7 +23,7 @@ class Gamificacao:
     check_in: bool
     metas_pessoais: str
     aluno_id: int
-    last_check_in_date: Optional[date] = None
+    last_check_in_date: date | None = None
 
 
 @dataclass
@@ -42,4 +41,4 @@ class RegistrosDiarios:
     aluno_id: int
     data: date
     humor: str
-    observacoes: Optional[str] = None
+    observacoes: str | None = None
