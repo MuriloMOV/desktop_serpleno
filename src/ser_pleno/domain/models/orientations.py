@@ -8,7 +8,8 @@ class Orientation:
     id: int
     title: str
     content: str
-    content_type: str
+    content_type: str = "text"
+    is_markdown: bool = False
     publish_at: date | None = None
     is_published: bool = False
     psychologist_id: int | None = None

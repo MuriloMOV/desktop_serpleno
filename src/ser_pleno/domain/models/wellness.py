@@ -14,7 +14,17 @@ class MoodEntry:
 
     @staticmethod
     def get_average(student_id: int) -> float:
-        return 0.0
+        try:
+            from ser_pleno.infrastructure.db.query_helpers import fetch_all
+            rows = fetch_all(
+                "SELECT mood_value FROM mood_entry WHERE student_id = %s",
+                (student_id,),
+            )
+            if not rows:
+                return 0.0
+            return sum(float(r.get("mood_value", 0)) for r in rows) / len(rows)
+        except Exception:
+            return 0.0
 
 
 @dataclass

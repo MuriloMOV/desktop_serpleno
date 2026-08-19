@@ -30,7 +30,7 @@ class Agendamento(TimestampMixin):
 
     @property
     def time(self) -> str | None:
-        return None
+        return self.horario or None
 
     @property
     def notes(self) -> str:

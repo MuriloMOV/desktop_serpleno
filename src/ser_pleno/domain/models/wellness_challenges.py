@@ -24,22 +24,29 @@ class WellnessChallenge:
 @dataclass
 class StudentWellnessChallenge:
     id: int
-    student_id: int
-    challenge_id: int
+    student: int
+    challenge: int
     status: str
     completed_count: int = 0
     assigned_by_id: int | None = None
     assigned_at: datetime = field(default_factory=datetime.now)
     completed_at: datetime | None = None
 
+    @property
+    def student_id(self) -> int:
+        return self.student
+
+    @property
+    def challenge_id(self) -> int:
+        return self.challenge
+
     def complete(self) -> None:
         self.status = "completed"
         self.completed_at = datetime.now()
         self.completed_count += 1
 
-    def calculate_progress(self) -> float:
-        from .wellness_challenges import WellnessChallenge
-        challenge = WellnessChallenge(id=0, title="", description="", category="", difficulty="", points=0, start_date=datetime.now().date(), end_date=datetime.now().date(), target_count=1)
-        if challenge.target_count == 0:
+    def calculate_progress(self, challenge: WellnessChallenge | None = None) -> float:
+        target = challenge.target_count if challenge else 1
+        if target == 0:
             return 0.0
-        return min(100.0, max(0.0, (self.completed_count / challenge.target_count) * 100))
+        return min(100.0, max(0.0, (self.completed_count / target) * 100))

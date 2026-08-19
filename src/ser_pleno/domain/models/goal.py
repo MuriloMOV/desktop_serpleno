@@ -1,15 +1,24 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
 class GoalProgress:
     id: int
     goal_id: int
-    percentage: float
+    date: datetime | None = None
+    value: float | None = None
     notes: str | None = None
+    percentage: float | None = None
     recorded_by_id: int | None = None
     recorded_at: datetime = field(default_factory=datetime.now)
+
+    def __post_init__(self) -> None:
+        if self.date is None:
+            self.date = self.recorded_at
+        if self.value is None and self.percentage is not None:
+            self.value = self.percentage
 
 
 @dataclass
