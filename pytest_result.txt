@@ -1,0 +1,14 @@
+﻿============================= test session starts =============================
+collected 204 items
+
+tests\test_config.py ..                                                  [  0%]
+tests\test_dates.py .........                                            [  5%]
+tests\test_local_fallback.py ..................                          [ 14%]
+tests\test_local_integration.py ....................                     [ 24%]
+tests\test_pedidos_ajuda_repositories.py ......                          [ 26%]
+tests\test_pedidos_ajuda_services.py ..........                          [ 31%]
+tests\test_pedidos_ajuda_views.py ..........                             [ 36%]
+tests\test_perf.py ...                                                   [ 38%]
+tests\test_qa_interacoes.py s........................................... [ 59%]
+.........s..........................                                     [ 77%]
+tests\test_repositories.py ...............................               [ 92%]

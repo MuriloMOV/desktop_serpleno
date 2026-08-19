@@ -14,7 +14,7 @@ UI_TEST_FILES = [
 
 def collect_test_nodeids(path: str) -> list[str]:
     """Collect all test nodeids from a test file."""
-    cmd = [PYTHON, "-m", "pytest", path, "--collect-only", "-q"]
+    cmd = [PYTHON, "-m", "pytest", path, "--collect-only", "-m", "ui_heavy", "-o", "addopts="]
     proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True)
     if proc.returncode != 0:
         print(f"Failed to collect tests from {path}:")
@@ -50,7 +50,7 @@ def collect_test_nodeids(path: str) -> list[str]:
 
 def run_test_isolated(nodeid: str) -> tuple[bool, str]:
     """Run a single test in isolated subprocess."""
-    cmd = [PYTHON, "-m", "pytest", nodeid, "-v", "--tb=short"]
+    cmd = [PYTHON, "-m", "pytest", nodeid, "-v", "--tb=short", "-m", "ui_heavy", "-o", "addopts="]
     try:
         proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, timeout=180)
         out = proc.stdout + "\n" + proc.stderr

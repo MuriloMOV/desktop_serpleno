@@ -45,7 +45,7 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 test = "pytest tests/ -v --tb=short -m 'not ui_heavy'"
 test-ui = "python runners/run_ui_tests.py"
-test-all = "pytest tests/ -v --tb=short"
+test-all = "pytest tests/ && python runners/run_ui_tests.py"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -86,7 +86,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not ui_heavy'"
 markers = ["ui_heavy: testes que exigem CustomTkinter e devem ser executados em subprocesso isolado"]
 
 [tool.coverage.run]
