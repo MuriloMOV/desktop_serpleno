@@ -23,6 +23,7 @@ from ser_pleno.ui.views.avisos import AvisosFrame
 from ser_pleno.ui.views.notificacoes import NotificacoesFrame
 from ser_pleno.ui.views.report_template import ReportTemplateFrame
 from ser_pleno.ui.views.wellness_challenges import WellnessChallengesFrame
+from ser_pleno.ui.views.documents import DocumentsFrame
 
 
 class ViewFactory:
@@ -52,6 +53,7 @@ class ViewFactory:
             "login": LoginFrame,
             "report_template": ReportTemplateFrame,
             "wellness_challenges": WellnessChallengesFrame,
+            "documents": DocumentsFrame,
         }
 
     def create(self, key: str, parent, controller=None):
@@ -72,6 +74,7 @@ class ViewFactory:
             "bem_estar": ["servico_bem_estar"],
             "analise": ["servico_triagem", "servico_estudantes"],
             "relatorios": ["servico_relatorio", "servico_report_template"],
+            "documents": ["servico_documents"],
             "comunicacao": ["servico_comunicacao"],
             "orientacoes": ["servico_orientacoes"],
             "intervencoes": ["servico_intervencoes"],

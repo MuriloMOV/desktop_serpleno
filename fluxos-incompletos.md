@@ -1,9 +1,19 @@
 # Fluxos Incompletos — Desktop SerPleno CustomTkinter
 
-**Data:** 2026-08-17  
+**Data:** 2026-08-19  
 **Escopo:** `src/ser_pleno` (apresentação, controllers, services, repositories, infrastructure)  
 **Objetivo:** Mapear funcionalidades que não têm entrada de dados, fluxos órfãos backend↔frontend e gaps de navegação.  
 **Status:** Documento de acompanhamento — atualizado após análise comparativa com web desktop.
+
+---
+
+## Completed (2026-08-19)
+
+| Item | Descrição | Data de resolução |
+|------|-----------|-------------------|
+| 2.1 Configurações sem persistência | `ConfiguracoesFrame` agora consome `obter_configuracoes()` e `atualizar_configuracoes()` via `servico_configuracoes` injetado pelo `ViewFactory`. | 2026-08-19 |
+| 2.3 Bem-Estar sem formulário de check-in | Modal `_CheckinModal` e ação `_abrir_checkin_modal` implementados em `bem_estar.py`. | 2026-08-19 |
+| 3.3 Duplicar orientação | `_duplicar_orientacao` agora chama `servico_orientacoes.duplicar_orientacao(oid)` com feedback de sucesso. | 2026-08-19 |
 
 ---
 
@@ -40,13 +50,8 @@
 - `ConfiguracoesController` expõe:
   - `obter_configuracoes()`
   - `atualizar_configuracoes(dados)`
-- `src/ser_pleno/ui/views/configuracoes.py` **não consome esses métodos**.
-- A tela funciona em modo local/estático:
-  - avatar salvo apenas em `user_profile.json`
-  - toggles de tema/fonte alteram `customtkinter` em memória
-  - toggles de notificação só registram `logger.info`
-- **Efeito:** não há como persistir preferências do sistema nem sincronizá-las com API/backend.
-- **Status:** ❌ NÃO RESOLVIDO — Prioridade CRÍTICA
+- `src/ser_pleno/ui/views/configuracoes.py` consome esses métodos via `servico_configuracoes` injetado pelo `ViewFactory`.
+- **Status:** ✅ CONCLUÍDO — Prioridade CRÍTICA
 
 ### 2.2 Agenda — modal de grade ainda dependente de sync manual
 - `AgendaController` expõe:
@@ -58,9 +63,8 @@
 
 ### 2.3 Bem-Estar — sem formulário de check-in
 - `BemEstarController` expõe `listar_checkins()` e `listar_estudantes_risco()`.
-- `bem_estar.py` renderiza lista de check-ins e visão de risco, mas não há botão, modal ou fluxo para “Registrar check-in”.
-- Não há ação de follow-up/encaminhamento por estudante em risco diretamente na tela.
-- **Status:** ❌ NÃO RESOLVIDO — Prioridade CRÍTICA
+- `bem_estar.py` renderiza lista de check-ins e visão de risco, e inclui modal `_CheckinModal` com fluxo completo de "Registrar check-in".
+- **Status:** ✅ CONCLUÍDO — Prioridade CRÍTICA
 
 ### 2.4 Triagem — `listar_formularios()` não consumida pela UI
 - `TriagemController.listar_formularios()` existe, mas `triagem.py` não o chama em lugar algum.
@@ -104,12 +108,10 @@
 - Também há ausência de feedback de envio além do reload imediato de mensagens.
 - **Status:** ❌ NÃO RESOLVIDO — Prioridade MÉDIA
 
-### 3.3 Duplicar orientação — botão com handler sem implementação
+### 3.3 Duplicar orientação — botão com handler implementado
 - `orientacoes.py`: `OrientationHistoryCard` cria botão `Duplicar` com callback `self._on_duplicate(self._o.get("id"))`.
-- `OrientacoesFrame._duplicar_orientacao` só executa:
-  - `logger.info("Duplicar orientação %s", oid)`
-- **Efeito:** usuário vê e clica em ação que não executa nada.
-- **Status:** ❌ NÃO RESOLVIDO — Prioridade ALTA
+- `OrientacoesFrame._duplicar_orientacao` agora executa a duplicação via `servico_orientacoes.duplicar_orientacao(oid)` com feedback.
+- **Status:** ✅ CONCLUÍDO — Prioridade ALTA
 
 ### 3.4 Alterar senha sem reautenticação forte
 - `dashboard.py`: modal `_editar_perfil` usa `AutenticacaoController.alterar_senha(senha_atual, nova_senha)`.

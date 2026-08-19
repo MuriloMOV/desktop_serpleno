@@ -47,6 +47,16 @@ class ServicoBemEstar:
         }
         return {"success": True, "data": data}
 
+    def obter_wellness_dashboard(self):
+        try:
+            response = self._api.get("wellness/dashboard/")
+            if response.get("success"):
+                return response
+            return {"success": True, "data": response.get("data", {})}
+        except Exception as exc:
+            logger.error("Erro ao obter wellness dashboard: %s", exc)
+            return {"success": False, "message": str(exc)}
+
     def listar_entradas_humor(self):
         result = self.repo.listar_entradas_humor()
         return {"success": True, "data": result}

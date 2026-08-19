@@ -1,6 +1,6 @@
 {
-  "read_fallback_total": 1617,
-  "write_fallback_total": 484,
+  "read_fallback_total": 1645,
+  "write_fallback_total": 506,
   "by_repository": {
     "AutenticacaoRepository": {
       "total": 10,
@@ -11,41 +11,41 @@
       }
     },
     "AgendamentoRepository": {
-      "total": 133,
-      "read": 133,
+      "total": 135,
+      "read": 135,
       "write": 0,
       "methods": {
         "listar_horarios_base": 45,
         "listar_agendamentos": 20,
         "obter_nome_aluno": 2,
         "obter_time_id": 2,
-        "listar_proximos": 64
+        "listar_proximos": 66
       }
     },
     "EstudanteRepository": {
-      "total": 593,
-      "read": 593,
+      "total": 597,
+      "read": 597,
       "write": 0,
       "methods": {
-        "listar": 593
+        "listar": 597
       }
     },
     "appointments": {
-      "total": 102,
+      "total": 104,
       "read": 0,
-      "write": 102,
+      "write": 104,
       "methods": {
-        "create": 66,
+        "create": 68,
         "delete": 19,
         "update": 17
       }
     },
     "TriagemRepository": {
-      "total": 228,
-      "read": 228,
+      "total": 230,
+      "read": 230,
       "write": 0,
       "methods": {
-        "listar": 155,
+        "listar": 157,
         "listar_formularios": 73
       }
     },
@@ -59,20 +59,20 @@
       }
     },
     "messages": {
-      "total": 83,
+      "total": 85,
       "read": 0,
-      "write": 83,
+      "write": 85,
       "methods": {
-        "create": 66,
+        "create": 68,
         "update": 17
       }
     },
     "DashboardRepository": {
-      "total": 166,
-      "read": 166,
+      "total": 171,
+      "read": 171,
       "write": 0,
       "methods": {
-        "obter_kpis": 162,
+        "obter_kpis": 167,
         "obter_notificacoes_alertas": 4
       }
     },
@@ -95,11 +95,11 @@
       }
     },
     "ReportTemplateRepository": {
-      "total": 343,
-      "read": 343,
+      "total": 345,
+      "read": 345,
       "write": 0,
       "methods": {
-        "listar_templates": 333,
+        "listar_templates": 335,
         "obter_template_por_id": 10
       }
     },
@@ -114,27 +114,27 @@
       }
     },
     "students": {
-      "total": 64,
+      "total": 66,
       "read": 0,
-      "write": 64,
+      "write": 66,
       "methods": {
-        "create": 64
+        "create": 66
       }
     },
     "orientations": {
-      "total": 64,
+      "total": 66,
       "read": 0,
-      "write": 64,
+      "write": 66,
       "methods": {
-        "create": 64
+        "create": 66
       }
     },
     "screenings": {
-      "total": 64,
+      "total": 66,
       "read": 0,
-      "write": 64,
+      "write": 66,
       "methods": {
-        "create": 64
+        "create": 66
       }
     },
     "reports": {
@@ -146,11 +146,11 @@
       }
     },
     "user_preferences": {
-      "total": 64,
+      "total": 66,
       "read": 0,
-      "write": 64,
+      "write": 66,
       "methods": {
-        "update": 64
+        "update": 66
       }
     },
     "alerts": {
@@ -170,11 +170,11 @@
       }
     },
     "ConfiguracoesRepository": {
-      "total": 7,
-      "read": 7,
+      "total": 11,
+      "read": 11,
       "write": 0,
       "methods": {
-        "obter_configuracoes": 7
+        "obter_configuracoes": 11
       }
     },
     "AnalyticsRepository": {
@@ -184,9 +184,29 @@
       "methods": {
         "obter_quick_actions": 2
       }
+    },
+    "DocumentRepository": {
+      "total": 9,
+      "read": 9,
+      "write": 0,
+      "methods": {
+        "listar_documentos": 4,
+        "obter_documento": 3,
+        "listar_documentos_expirados": 2
+      }
+    },
+    "documents": {
+      "total": 10,
+      "read": 0,
+      "write": 10,
+      "methods": {
+        "create": 7,
+        "delete": 1,
+        "update": 2
+      }
     }
   },
-  "last_read_fallback": "2026-08-19T13:01:48.264364",
-  "last_write_fallback": "2026-08-19T13:01:43.717030",
+  "last_read_fallback": "2026-08-19T17:30:01.444038",
+  "last_write_fallback": "2026-08-19T17:29:58.402921",
   "started_at": "2026-08-16T07:48:20.849824"
 }

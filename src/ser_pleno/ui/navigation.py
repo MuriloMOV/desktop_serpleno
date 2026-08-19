@@ -30,6 +30,8 @@ MENU_ITEMS = [
      "header": ("Analise", "Triagem e classificacao")},
     {"key": "relatorios",    "label": "Relatorios",        "icon": ICONS["document"],
      "header": ("Relatorios", "Indicadores e exportacoes")},
+    {"key": "documents",     "label": "Documentos",        "icon": ICONS["file"],
+     "header": ("Documentos", "Gestao de documentos")},
     {"key": "comunicacao",   "label": "Comunicacao",       "icon": ICONS["chat"],
      "header": ("Comunicacao", "Mensagens internas e suporte")},
     {"key": "orientacoes",   "label": "Orientacoes",       "icon": ICONS["compass"],

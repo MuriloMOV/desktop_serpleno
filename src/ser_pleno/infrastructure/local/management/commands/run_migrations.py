@@ -18,6 +18,7 @@ from ser_pleno.infrastructure.local.migrations import (
     m_008_add_interventions,
     m_009_add_minigame_block_log,
     m_010_add_notifications,
+    m_011_add_documents,
 )
 from ser_pleno.infrastructure.local.migrations.manager import (
     apply_migration,
@@ -37,6 +38,7 @@ MIGRATIONS = [
     (m_008_add_interventions.MIGRATION_ID, m_008_add_interventions.UP_SQL, m_008_add_interventions.DOWN_SQL),
     (m_009_add_minigame_block_log.MIGRATION_ID, m_009_add_minigame_block_log.UP_SQL, m_009_add_minigame_block_log.DOWN_SQL),
     (m_010_add_notifications.MIGRATION_ID, m_010_add_notifications.UP_SQL, m_010_add_notifications.DOWN_SQL),
+    (m_011_add_documents.MIGRATION_ID, m_011_add_documents.UP_SQL, m_011_add_documents.DOWN_SQL),
 ]
 
 

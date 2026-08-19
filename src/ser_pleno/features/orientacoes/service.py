@@ -358,6 +358,92 @@ class ServicoOrientacoes:
             logger.warning(f"Erro ao listar anexos via API: {e}")
             return {"success": False, "message": str(e)}
 
+    def listar_templates(self):
+        """Lista templates de orientações."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/templates/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    if data.get("success"):
+                        return {"success": True, "data": data.get("data", [])}
+            return self._listar_templates_local()
+        except Exception as e:
+            logger.warning(f"Erro ao listar templates via API: {e}")
+            return self._listar_templates_local()
+
+    def _listar_templates_local(self):
+        return {
+            "success": True,
+            "data": list(self.PRESETS.values()) if hasattr(self, "PRESETS") else [],
+        }
+
+    def listar_themes(self):
+        """Lista temas de orientações."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/themes/"
+                response = session.get(endpoint, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    if data.get("success"):
+                        return {"success": True, "data": data.get("data", [])}
+            return self._listar_themes_local()
+        except Exception as e:
+            logger.warning(f"Erro ao listar themes via API: {e}")
+            return self._listar_themes_local()
+
+    def _listar_themes_local(self):
+        themes = [
+            {"id": "study_support", "label": "Apoio Pedagógico"},
+            {"id": "emotional_support", "label": "Apoio Emocional"},
+            {"id": "career_guidance", "label": "Orientação Profissional"},
+        ]
+        return {"success": True, "data": themes}
+
+    def usar_template(self, template_id: str, student_id: int):
+        """Cria uma orientação a partir de um template."""
+        try:
+            if self._should_use_api():
+                session = self._get_session()
+                endpoint = f"{self.base_url.rstrip('/')}/orientations/templates/use/"
+                payload = {"template_id": template_id, "student_id": student_id}
+                response = session.post(endpoint, json=payload, headers=self._get_headers(), timeout=10)
+                if response.ok:
+                    data = response.json()
+                    return {"success": True, "data": data.get("data", data)}
+            return self._usar_template_local(template_id, student_id)
+        except Exception as e:
+            logger.warning(f"Erro ao usar template via API: {e}")
+            return self._usar_template_local(template_id, student_id)
+
+    def _usar_template_local(self, template_id: str, student_id: int):
+        preset = self.PRESETS.get(template_id) if hasattr(self, "PRESETS") else None
+        if not preset:
+            return {"success": False, "message": "Template não encontrado"}
+        componentes = preset.get("components", [])
+        content_parts = []
+        action_plan = []
+        for comp in componentes:
+            label = comp.get("label", "")
+            content_parts.append(f"**{label}**\n\n")
+            if comp.get("type") == "checkbox":
+                action_plan.append({"text": label, "done": False})
+        content = "\n".join(content_parts)
+        dados = {
+            "student_id": student_id,
+            "title": preset.get("label", "Orientação"),
+            "theme": preset.get("label", "Geral"),
+            "content": content,
+            "is_markdown": True,
+            "action_plan": action_plan,
+            "psychologist": "Equipe SerPleno",
+        }
+        return self.criar_orientacao(dados)
+
     def adicionar_anexo(self, orientation_id: int, arquivo_path: str, uploaded_by_id: int):
         """Adiciona um anexo a uma orientação."""
         try:

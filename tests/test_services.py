@@ -211,7 +211,7 @@ class TestServicoAutenticacao:
         service.user = {"id": 1, "username": "user"}
 
         mock_repo = MagicMock()
-        mock_repo.obter_senha_usuario.return_value = {
+        mock_repo.obter_hash_senha_para_verificacao.return_value = {
             "password": "pbkdf2_sha256$29000$4Xbq4peWIk4u$F0vpVOIL9jogA4tdMQ/V2z44/vlbVBhCxO0GRg8qfuc="
         }
         service.repo = mock_repo

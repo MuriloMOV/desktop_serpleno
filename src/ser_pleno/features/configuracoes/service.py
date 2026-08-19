@@ -1,5 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Service de Configurações — orquestrador, sem SQL inline."""
+"""Service de Configurações — orquestrador, sem SQL inline.
+
+Wiring: ViewFactory mapeia ``configuracoes`` para ``servico_configuracoes``
+no app (ver ``ui/view_factory.py``). A view ``ConfiguracoesFrame`` acessa
+a instância via ``getattr(controller, "servico_configuracoes", None)``, onde
+``controller`` é o próprio ``App``. Os métodos ``obter_configuracoes`` e
+``atualizar_configuracoes`` são consumidos pela view para carregar e persistir
+preferências de tema, notificações e avatar.
+"""
 
 from ser_pleno.features.configuracoes.repo import ConfiguracoesRepository
 from ser_pleno.repositories.autenticacao import AutenticacaoRepository

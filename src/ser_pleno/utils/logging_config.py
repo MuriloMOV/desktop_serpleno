@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 """Configuração centralizada de logging para o desktop."""
 
+import json
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from typing import Any, Dict
 
 from ser_pleno.config.paths import get_project_root
 
@@ -14,6 +16,42 @@ os.makedirs(LOG_DIR, exist_ok=True)
 
 LOG_FORMAT = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+_STRUCTURED_LOG = logging.getLogger("apps.desktop.structured")
+
+
+def log_event(event: str, **kwargs: Any) -> None:
+    """Registra um evento estruturado no log."""
+    payload: Dict[str, Any] = {"event": event}
+    payload.update(kwargs)
+    try:
+        _STRUCTURED_LOG.info(json.dumps(payload, ensure_ascii=False, default=str))
+    except Exception:
+        _STRUCTURED_LOG.info("%s %s", event, kwargs)
+
+
+def log_login(user_id: int, username: str = "") -> None:
+    log_event("login", user_id=user_id, username=username)
+
+
+def log_logout(user_id: int, username: str = "") -> None:
+    log_event("logout", user_id=user_id, username=username)
+
+
+def log_sync_start(entity: str, count: int = 0) -> None:
+    log_event("sync_start", entity=entity, count=count)
+
+
+def log_sync_complete(entity: str, success: bool = True, **kwargs: Any) -> None:
+    log_event("sync_complete", entity=entity, success=success, **kwargs)
+
+
+def log_sync_error(entity: str, error: str, **kwargs: Any) -> None:
+    log_event("sync_error", entity=entity, error=error, **kwargs)
+
+
+def log_external_call(method: str, endpoint: str, status_code: int = 0, **kwargs: Any) -> None:
+    log_event("external_call", method=method, endpoint=endpoint, status_code=status_code, **kwargs)
 
 
 def setup_logging(level: int = logging.INFO) -> None:
