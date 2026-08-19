@@ -4,9 +4,8 @@ import csv
 import io
 import json
 import logging
-import os
 import zipfile
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ser_pleno.features.relatorio.repo import RelatorioRepository
 from ser_pleno.infrastructure.api.api import ClienteAPI
@@ -56,11 +55,11 @@ class ServicoRelatorio:
                 headers["X-CSRFToken"] = auth.csrf_token
         return headers
 
-    def _obter_dados_api(self, endpoint: str, filtros: Optional[dict] = None):
+    def _obter_dados_api(self, endpoint: str, filtros: dict | None = None):
         if not self._should_use_api():
             return None
         try:
-            params: Dict[str, Any] = {}
+            params: dict[str, Any] = {}
             if filtros:
                 for k, v in filtros.items():
                     if v is not None and v != "":
@@ -79,7 +78,7 @@ class ServicoRelatorio:
             pass
         return None
 
-    def _aplicar_filtros(self, rows: list, filtros: Optional[dict], campo_data: str, campo_tipo: str) -> list:
+    def _aplicar_filtros(self, rows: list, filtros: dict | None, campo_data: str, campo_tipo: str) -> list:
         filtros = filtros or {}
         resultado = []
         for r in rows:
@@ -131,9 +130,9 @@ class ServicoRelatorio:
             return string_index[s]
 
         ss_parts = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>']
-        ss_parts.append('<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="{}" uniqueCount="{}">'.format(len(strings), len(strings)))
+        ss_parts.append(f'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="{len(strings)}" uniqueCount="{len(strings)}">')
         for s in strings:
-            ss_parts.append('<si><t>{}</t></si>'.format(xml_escape(s)))
+            ss_parts.append(f'<si><t>{xml_escape(s)}</t></si>')
         ss_parts.append('</sst>')
         ss_xml = "\n".join(ss_parts)
 
@@ -148,13 +147,13 @@ class ServicoRelatorio:
         sheet_parts.append('</row>')
 
         for row_idx, linha in enumerate(dados, 2):
-            sheet_parts.append('<row r="{}">'.format(row_idx))
+            sheet_parts.append(f'<row r="{row_idx}">')
             for i, campo in enumerate(campos, 1):
                 valor = linha.get(campo, "")
                 if isinstance(valor, (dict, list)):
                     valor = json.dumps(valor, ensure_ascii=False)
                 idx = get_string_index(valor)
-                sheet_parts.append('<c r="{}" t="s"><v>{}</v></c>'.format(self._coluna(i) + str(row_idx), idx))
+                sheet_parts.append(f'<c r="{self._coluna(i) + str(row_idx)}" t="s"><v>{idx}</v></c>')
             sheet_parts.append('</row>')
 
         sheet_parts.append('</sheetData>')
@@ -164,7 +163,7 @@ class ServicoRelatorio:
         workbook_parts = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>']
         workbook_parts.append('<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">')
         workbook_parts.append('<sheets>')
-        workbook_parts.append('<sheet name="{}" sheetId="1" r:id="rId1"/>'.format(xml_escape(nome_planilha)))
+        workbook_parts.append(f'<sheet name="{xml_escape(nome_planilha)}" sheetId="1" r:id="rId1"/>')
         workbook_parts.append('</sheets>')
         workbook_parts.append('</workbook>')
         workbook_xml = "\n".join(workbook_parts)
@@ -192,7 +191,6 @@ class ServicoRelatorio:
         return output.getvalue()
 
     def _processar_exportacao(self, dados: list, formato: str, entidade: str, campos: list, nome_arquivo: str) -> dict:
-        ext_map = {"csv": ".csv", "excel": ".xlsx", "json": ".json"}
         if not dados:
             vazio = "" if formato != "excel" else b""
             return {"success": True, "data": {"content": vazio, "format": formato, "filename": nome_arquivo, "mime_type": self._mime_type(formato)}}
@@ -416,7 +414,7 @@ class ServicoRelatorio:
                 file_paths.append(row['file_path'])
         return {"success": True, "data": {"file_paths": file_paths}}
 
-    def gerar_relatorio_por_template(self, id_template: int, parametros: Optional[dict] = None) -> dict:
+    def gerar_relatorio_por_template(self, id_template: int, parametros: dict | None = None) -> dict:
         from ser_pleno.features.report_template.service import ServicoReportTemplate
         template_service = ServicoReportTemplate()
         template_res = template_service.aplicar_template_em_dados(id_template, parametros)
@@ -440,7 +438,8 @@ class ServicoRelatorio:
                 from ser_pleno.application.services.pdf import gerar_pdf_relatorio
                 pdf_bytes = gerar_pdf_relatorio(report_type=report_type, report_data=report_data, report_name=nome)
                 if pdf_bytes:
-                    import os, tempfile
+                    import os
+                    import tempfile
                     file_path = os.path.join(tempfile.gettempdir(), f"{nome.replace(' ', '_')}.pdf")
                     with open(file_path, "wb") as f:
                         f.write(pdf_bytes)
@@ -470,6 +469,87 @@ class ServicoRelatorio:
                 "generated_at": __import__("datetime").datetime.now().isoformat(),
                 "file_path": file_path,
             }
+        }
+
+    def exportar_lote(self, tipos: list[str], filtros: dict | None = None, formato: str = "csv") -> dict:
+        MAX_REGISTROS = 10000
+        allowed = {"students", "appointments", "screenings", "interventions"}
+        tipos_normalizados = [t.lower().strip() for t in tipos if t]
+        invalidos = [t for t in tipos_normalizados if t not in allowed]
+        if invalidos:
+            return {"success": False, "message": f"Tipos inválidos: {', '.join(invalidos)}"}
+        if not tipos_normalizados:
+            return {"success": False, "message": "Informe pelo menos um tipo para exportação"}
+        filtros = filtros or {}
+        if formato not in {"csv", "json", "excel"}:
+            formato = "csv"
+        entidade_configs = {
+            "students": {
+                "campo_data": "updated_at",
+                "campos": ["id", "nome", "email", "curso", "age", "phone", "professor_responsavel", "status", "priority_level", "updated_at"],
+                "nome": "estudantes",
+            },
+            "appointments": {
+                "campo_data": "data_hora",
+                "campos": ["id", "nome", "id_aluno", "data_hora", "motivo", "status", "local", "profissional", "origem", "updated_at"],
+                "nome": "agendamentos",
+            },
+            "screenings": {
+                "campo_data": "created_at",
+                "campos": ["id", "student_id", "form_id", "status", "priority", "scheduled_date", "observations", "recommendations", "requires_followup", "followup_date", "updated_at"],
+                "nome": "triagens",
+            },
+            "interventions": {
+                "campo_data": "date",
+                "campos": ["id", "student_id", "date", "intervention_type", "duration_minutes", "intervention_notes", "outcome", "follow_up_required", "follow_up_date", "updated_at"],
+                "nome": "intervencoes",
+            },
+        }
+        arquivos: dict[str, bytes | str] = {}
+        total_registros = 0
+        for tipo in tipos_normalizados:
+            cfg = entidade_configs[tipo]
+            if tipo == "students":
+                api_data = self._obter_dados_api("export/students/", filtros)
+                rows = api_data if api_data is not None else self.repo.exportar_estudantes()
+            elif tipo == "appointments":
+                api_data = self._obter_dados_api("export/appointments/", filtros)
+                rows = api_data if api_data is not None else self.repo.exportar_agendamentos()
+            elif tipo == "screenings":
+                api_data = self._obter_dados_api("export/screenings/", filtros)
+                rows = api_data if api_data is not None else self.repo.exportar_triagens()
+            else:
+                rows = self.repo.exportar_intervencoes() if hasattr(self.repo, 'exportar_intervencoes') else []
+            dados_filtrados = self._aplicar_filtros(rows, filtros, cfg["campo_data"], "")
+            total_registros += len(dados_filtrados)
+            if total_registros > MAX_REGISTROS:
+                return {"success": False, "message": f"Exportação excede o limite de {MAX_REGISTROS} registros"}
+            if formato == "csv":
+                arquivos[f"{cfg['nome']}.csv"] = self._formatar_csv(dados_filtrados, cfg["campos"])
+            elif formato == "json":
+                arquivos[f"{cfg['nome']}.json"] = self._formatar_json(dados_filtrados)
+            else:
+                arquivos[f"{cfg['nome']}.xlsx"] = self._formatar_excel(dados_filtrados, cfg["campos"], cfg["nome"].capitalize())
+        if not arquivos:
+            return {"success": False, "message": "Nenhum dado encontrado para os filtros informados"}
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for nome_arquivo, conteudo in arquivos.items():
+                if isinstance(conteudo, str):
+                    zf.writestr(nome_arquivo, conteudo.encode("utf-8"))
+                else:
+                    zf.writestr(nome_arquivo, conteudo)
+        nome_zip = f"exportacao_lote_{__import__('datetime').datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        return {
+            "success": True,
+            "data": {
+                "content": zip_buffer.getvalue(),
+                "format": "zip",
+                "filename": nome_zip,
+                "mime_type": "application/zip",
+                "records": total_registros,
+                "files": list(arquivos.keys()),
+            },
         }
 
     def _gerar_dados_relatorio(self, report_type: str, parameters: dict) -> dict:

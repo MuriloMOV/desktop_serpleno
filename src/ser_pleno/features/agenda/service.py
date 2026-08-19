@@ -1,9 +1,12 @@
-from ser_pleno.config.config import API_ROOT_URL, DESKTOP_API_URL, DESKTOP_API_TOKEN
+import logging
+from datetime import datetime
+
+import requests
+
+from ser_pleno.config.config import API_ROOT_URL, DESKTOP_API_TOKEN, DESKTOP_API_URL
 from ser_pleno.features.agenda.repo import AgendamentoRepository
 from ser_pleno.features.estudantes.repo import EstudanteRepository
-import logging
-from datetime import datetime, timedelta
-import requests
+from ser_pleno.utils.dates import normalize_datetime
 
 
 def _invalidate_dashboard_cache() -> None:
@@ -100,7 +103,8 @@ class ServicoAgendamento:
     def criar_agendamento(self, dados):
         """Cria um agendamento usando banco de dados local primeiro, API como fallback"""
         try:
-            data_hora = datetime.strptime(dados["data_hora"], "%Y-%m-%d %H:%M")
+            data_hora_str = normalize_datetime(dados["data_hora"])
+            data_hora = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M")
             data_str = data_hora.strftime("%Y-%m-%d")
             hora_str = data_hora.strftime("%H:%M")
             id_aluno = int(dados["id_aluno"])
@@ -177,7 +181,7 @@ class ServicoAgendamento:
                 logging.info(f"Agendamento criado via API Desktop: {appointment_id}")
                 return {"success": True, "id": appointment_id}
             elif response.status_code == 403:
-                logging.error(f"Erro 403 ao criar agendamento: autenticação necessária")
+                logging.error("Erro 403 ao criar agendamento: autenticação necessária")
             elif response.status_code == 409:
                 data = response.json() if response.text else {}
                 message = data.get("message", "Conflito de horário")
@@ -315,7 +319,8 @@ class ServicoAgendamento:
     def atualizar_agendamento(self, id_agendamento, dados):
         """Atualiza um agendamento usando o repositório local"""
         try:
-            data_hora = datetime.strptime(dados["data_hora"], "%Y-%m-%d %H:%M")
+            data_hora_str = normalize_datetime(dados["data_hora"])
+            data_hora = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M")
             status = self._convert_status_frontend_to_backend(dados.get("status", "Agendado"))
 
             self.repo.atualizar_agendamento(
@@ -396,7 +401,7 @@ class ServicoAgendamento:
                     logging.warning(f"Horário {horario} já existe na API")
                     return {"success": False, "message": "Este horário já existe"}
                 elif response.status_code == 403:
-                    logging.error(f"Erro 403 ao adicionar horário: autenticação necessária")
+                    logging.error("Erro 403 ao adicionar horário: autenticação necessária")
                     return {
                         "success": False,
                         "message": "Erro de autenticação. Faça login novamente.",
@@ -437,7 +442,7 @@ class ServicoAgendamento:
                     logging.info(f"Horário {horario} removido via API Desktop")
                     return {"success": True}
                 elif response.status_code == 403:
-                    logging.error(f"Erro 403 ao remover horário: autenticação necessária")
+                    logging.error("Erro 403 ao remover horário: autenticação necessária")
                     return {
                         "success": False,
                         "message": "Erro de autenticação. Faça login novamente.",

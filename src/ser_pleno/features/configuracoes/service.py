@@ -33,3 +33,13 @@ class ServicoConfiguracoes:
             return {"success": True, "message": "Perfil atualizado com sucesso"}
         except Exception as e:
             return {"success": False, "message": str(e)}
+
+    def atualizar_avatar(self, nome_arquivo: str, user_id: int | None = None) -> dict:
+        try:
+            dados = {"avatar": nome_arquivo}
+            if user_id is not None:
+                dados["user_id"] = user_id
+            self.repo.atualizar_configuracoes(dados)
+            return {"success": True, "message": "Avatar atualizado"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}

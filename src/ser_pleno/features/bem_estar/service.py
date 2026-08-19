@@ -10,6 +10,7 @@ from ser_pleno.features.estudantes.repo import EstudanteRepository
 from ser_pleno.infrastructure.api.api import ClienteAPI
 from ser_pleno.utils.api_fallback import api_fallback
 from ser_pleno.utils.mappers import safe_str
+from ser_pleno.utils.dates import normalize_date
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +53,13 @@ class ServicoBemEstar:
 
     def criar_entrada_humor(self, dados):
         try:
+            entry_date = dados.get("entry_date")
+            if entry_date:
+                entry_date = normalize_date(entry_date)
             mood_id = self.repo.criar_entrada_humor(
                 student_id=dados.get("student_id"),
                 mood_level=dados.get("mood_level"),
-                entry_date=dados.get("entry_date"),
+                entry_date=entry_date,
                 notes=dados.get("notes", ""),
             )
             return {"success": True, "message": "Entrada de humor registrada", "data": {"id": mood_id}}
@@ -131,16 +135,22 @@ class ServicoBemEstar:
 
     def criar_checkin(self, dados):
         try:
+            check_in_date = dados.get("check_in_date")
+            if check_in_date:
+                check_in_date = normalize_date(check_in_date)
+            follow_up_date = dados.get("follow_up_date")
+            if follow_up_date:
+                follow_up_date = normalize_date(follow_up_date)
             checkin_id = self.repo.criar_checkin(
                 student_id=dados.get("student_id"),
-                check_in_date=dados.get("check_in_date"),
+                check_in_date=check_in_date,
                 check_in_type=dados.get("check_in_type", "weekly"),
                 overall_wellbeing=dados.get("overall_wellbeing"),
                 attention_areas=dados.get("attention_areas", []),
                 recommendations=dados.get("recommendations", ""),
                 professional_notes=dados.get("professional_notes", ""),
                 follow_up_needed=dados.get("follow_up_needed", False),
-                follow_up_date=dados.get("follow_up_date"),
+                follow_up_date=follow_up_date,
             )
             return {"success": True, "message": "Check-in criado", "data": {"id": checkin_id}}
         except Exception as e:

@@ -3,11 +3,10 @@ Serviço de Orientações para o Desktop CustomTkinter
 Funciona de forma independente com sincronização opcional com a API do SerPleno Web
 """
 
-import logging
-import json
 import datetime
+import json
+import logging
 import os
-from typing import Optional, List, Dict, Any
 
 try:
     import requests
@@ -16,6 +15,7 @@ except Exception:
 
 from ser_pleno.config.config import DESKTOP_API_URL
 from ser_pleno.features.orientacoes.repo import OrientacaoRepository
+from ser_pleno.utils.dates import normalize_date
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +185,10 @@ class ServicoOrientacoes:
     def criar_orientacao(self, dados, arquivos=None):
         """Cria uma nova orientação."""
         try:
+            dados = dict(dados)
+            session_date = dados.get("session_date")
+            if session_date:
+                dados["session_date"] = normalize_date(session_date)
             orientacao_id = self.repo.criar_orientacao(
                 student_id=dados.get("student_id"),
                 title=dados.get("title"),
@@ -205,6 +209,10 @@ class ServicoOrientacoes:
     def atualizar_orientacao(self, id_orientacao: int, dados, arquivos=None):
         """Atualiza uma orientação existente."""
         try:
+            dados = dict(dados)
+            session_date = dados.get("session_date")
+            if session_date:
+                dados["session_date"] = normalize_date(session_date)
             self.repo.atualizar_orientacao(
                 id_orientacao=id_orientacao,
                 student_id=dados.get("student_id"),
@@ -239,7 +247,7 @@ class ServicoOrientacoes:
         """Retorna todos os presets disponíveis"""
         return self.PRESETS
 
-    def duplicar_orientacao(self, id_orientacao: int, id_estudante: Optional[int] = None):
+    def duplicar_orientacao(self, id_orientacao: int, id_estudante: int | None = None):
         """Duplica uma orientação existente."""
         try:
             if self._should_use_api():
@@ -269,7 +277,7 @@ class ServicoOrientacoes:
             logger.error(f"Erro ao duplicar orientação: {e}")
             return {"success": False, "message": str(e)}
 
-    def _duplicar_orientacao_api(self, id_orientacao: int, id_estudante: Optional[int] = None):
+    def _duplicar_orientacao_api(self, id_orientacao: int, id_estudante: int | None = None):
         try:
             session = self._get_session()
             endpoint = f"{self.base_url.rstrip('/')}/orientations/{id_orientacao}/duplicate/"
@@ -285,7 +293,7 @@ class ServicoOrientacoes:
             logger.warning(f"Erro ao duplicar via API: {e}")
             return {"success": False, "message": str(e)}
 
-    def obter_estatisticas(self, id_estudante: Optional[int] = None):
+    def obter_estatisticas(self, id_estudante: int | None = None):
         """Obtém estatísticas das orientações."""
         try:
             stats = self.repo.obter_estatisticas()
@@ -466,31 +474,6 @@ class ServicoOrientacoes:
                 {"id": "emotional_support", "label": "Apoio Emocional"},
                 {"id": "career_guidance", "label": "Orientação Profissional"},
             ]}
-
-    def usar_template(self, template_id, student_id):
-        """Cria uma orientação a partir de um template."""
-        try:
-            preset = self.get_preset(template_id)
-            if not preset:
-                return {"success": False, "message": "Template não encontrado"}
-            componentes = {c["id"]: c.get("label", "") for c in preset.get("components", [])}
-            content_parts = [f"**{v}**" for v in componentes.values() if v]
-            content = "\n\n".join(content_parts) if content_parts else preset.get("label", "")
-            dados = {
-                "student_id": student_id,
-                "title": preset.get("label", "Orientação"),
-                "theme": "Geral",
-                "session_date": datetime.datetime.now().strftime("%Y-%m-%d"),
-                "content": content,
-                "is_markdown": False,
-                "motivational_message": "",
-                "action_plan": [],
-                "psychologist": "Equipe SerPleno",
-            }
-            return self.criar_orientacao(dados)
-        except Exception as e:
-            logger.error(f"Erro ao usar template: {e}")
-            return {"success": False, "message": str(e)}
 
     def listar_templates(self):
         """Lista templates de orientação disponíveis."""

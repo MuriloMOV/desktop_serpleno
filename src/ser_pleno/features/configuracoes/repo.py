@@ -20,12 +20,18 @@ class ConfiguracoesRepository:
         return local_cache.list_user_preferences()
 
     def atualizar_configuracoes(self, dados):
-        query = "UPDATE user_preferences SET theme = %s, notifications = %s WHERE user_id = %s"
-        params = (dados['theme'], dados['notifications'], dados['user_id'])
+        allowed = {"theme", "notifications", "avatar"}
+        campos = {k: v for k, v in dados.items() if k in allowed}
+        if not campos:
+            return
+
+        sets = ", ".join(f"{col} = %s" for col in campos)
+        params = tuple(campos.values()) + (dados.get("user_id"),)
+        query = f"UPDATE user_preferences SET {sets} WHERE user_id = %s"
+
         prefs = {
             "user_id": dados.get("user_id"),
-            "theme": dados.get("theme"),
-            "notifications": dados.get("notifications"),
+            **campos,
         }
 
         def _mysql():

@@ -5,6 +5,7 @@ import logging
 from ser_pleno.features.triagem.repo import TriagemRepository
 from ser_pleno.infrastructure.api.api import ClienteAPI
 from ser_pleno.utils.api_fallback import api_fallback
+from ser_pleno.utils.dates import normalize_date
 from ser_pleno.utils.mappers import safe_str
 
 logger = logging.getLogger(__name__)
@@ -79,10 +80,24 @@ class ServicoTriagem:
         return {"success": True, "data": triagem}
 
     def criar_triagem(self, dados):
+        dados = dict(dados)
+        scheduled_date = dados.get("scheduled_date")
+        if scheduled_date:
+            dados["scheduled_date"] = normalize_date(scheduled_date)
+        followup_date = dados.get("followup_date")
+        if followup_date:
+            dados["followup_date"] = normalize_date(followup_date)
         triagem_id = self.repo.criar(dados)
         return {"success": True, "data": {"id": triagem_id}}
 
     def atualizar_triagem(self, id_triagem, dados):
+        dados = dict(dados)
+        scheduled_date = dados.get("scheduled_date")
+        if scheduled_date:
+            dados["scheduled_date"] = normalize_date(scheduled_date)
+        followup_date = dados.get("followup_date")
+        if followup_date:
+            dados["followup_date"] = normalize_date(followup_date)
         self.repo.atualizar(id_triagem, dados)
         return {"success": True, "message": "Triagem atualizada com sucesso"}
 
