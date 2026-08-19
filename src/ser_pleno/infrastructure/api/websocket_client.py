@@ -66,6 +66,7 @@ class WebSocketChatClient:
         self._reconnect_attempts = 0
         self._max_reconnect_attempts = 5
         self._reconnect_base_delay = 1.0
+        self._connect_lock = threading.Lock()
 
     def _get_ws_url(self) -> str:
         api_url = self.base_url
@@ -110,7 +111,7 @@ class WebSocketChatClient:
     def connect(self, user_a_id: int, user_b_id: int) -> bool:
         if not websockets:
             return False
-        with threading.Lock():
+        with self._connect_lock:
             if self._connected or self._connecting:
                 return self._connected
             self._room_name = (
@@ -126,7 +127,7 @@ class WebSocketChatClient:
     def connect_group(self, user_id: int) -> bool:
         if not websockets:
             return False
-        with threading.Lock():
+        with self._connect_lock:
             if self._connected or self._connecting:
                 return self._connected
             self._room_name = f"group-{user_id}"

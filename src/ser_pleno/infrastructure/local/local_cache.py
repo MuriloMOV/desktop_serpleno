@@ -41,6 +41,7 @@ TABLE_WHITELIST = {
     "availability",
     "interventions",
     "user_profiles",
+    "documents",
 }
 
 
@@ -70,6 +71,7 @@ from ser_pleno.infrastructure.local.migrations import (
     m_008_add_interventions,
     m_009_add_minigame_block_log,
     m_010_add_notifications,
+    m_011_add_documents,
 )
 
 MIGRATIONS = [
@@ -83,6 +85,7 @@ MIGRATIONS = [
     (m_008_add_interventions.MIGRATION_ID, m_008_add_interventions.UP_SQL, m_008_add_interventions.DOWN_SQL),
     (m_009_add_minigame_block_log.MIGRATION_ID, m_009_add_minigame_block_log.UP_SQL, m_009_add_minigame_block_log.DOWN_SQL),
     (m_010_add_notifications.MIGRATION_ID, m_010_add_notifications.UP_SQL, m_010_add_notifications.DOWN_SQL),
+    (m_011_add_documents.MIGRATION_ID, m_011_add_documents.UP_SQL, m_011_add_documents.DOWN_SQL),
 ]
 
 
@@ -250,7 +253,7 @@ class LocalCache:
 
     def add_sync_queue(self, operation: str, entity: str, entity_id: int, data: Dict[str, Any]) -> None:
         item = {
-            "id": f"{operation}_{entity}_{entity_id}_{datetime.now().timestamp()}",
+            "id": f"{operation}_{entity}_{entity_id}_{int(datetime.now().timestamp() * 1000)}",
             "operation": operation,
             "entity": entity,
             "entity_id": entity_id,
@@ -552,6 +555,23 @@ class LocalCache:
 
     def delete_intervention(self, intervention_id: int) -> None:
         self.delete("interventions", "id", intervention_id)
+
+    # Documents
+
+    def upsert_document(self, document: Dict[str, Any]) -> None:
+        document["updated_at"] = datetime.now().isoformat()
+        self.upsert("documents", document)
+
+    def list_documents(self, student_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        where = None
+        params: tuple = ()
+        if student_id is not None:
+            where = "student_id=?"
+            params = (student_id,)
+        return self.list_all("documents", where_clause=where, params=params)
+
+    def delete_document(self, document_id: int) -> None:
+        self.delete("documents", "id", document_id)
 
 
 # Singleton do cache local SQLite.
