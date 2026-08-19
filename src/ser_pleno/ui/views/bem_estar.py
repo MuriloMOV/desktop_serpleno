@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from typing import Any
 
 import customtkinter as ctk
 
@@ -676,7 +677,7 @@ class _ChallengeFormModal(ctk.CTkToplevel):
 
 
 class BemEstarFrame(ctk.CTkScrollableFrame):
-    def __init__(self, parent, controller):
+    def __init__(self, parent: ctk.CTkFrame, controller: Any) -> None:
         import time as _time
 
         self._t0 = _time.perf_counter()
@@ -686,8 +687,8 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             scrollbar_button_color=THEME["border_strong"],
             scrollbar_button_hover_color=THEME["text_muted"],
         )
-        self.controller = controller
-        self.servico_bem_estar = getattr(controller, "servico_bem_estar", None)
+        self.controller: Any = controller
+        self.servico_bem_estar: Any = getattr(controller, "servico_bem_estar", None)
         self.colunas_risco: dict = {}
         self._chart_data: list = []
         self._selected_student: dict | None = None
@@ -811,7 +812,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
     def _exportar_dados(self):
         self._show_success("Exportando dados de bem-estar...", duration=2000)
 
-    def _abrir_mood_modal(self):
+    def _abrir_mood_modal(self) -> None:
         if not self._selected_student:
             self._show_error("Selecione um estudante primeiro.", title="Atenção")
             return
@@ -824,11 +825,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             student_name=nome,
         )
 
-    def _salvar_mood_entry(self, dados):
-        def fetch():
+    def _salvar_mood_entry(self, dados: dict) -> None:
+        def fetch() -> Any:
             return self.servico_bem_estar.criar_entrada_humor(dados)
 
-        def on_success(res):
+        def on_success(res: dict) -> None:
             if res.get("success"):
                 self._show_success(res.get("message", "Humor registrado."))
                 self.load_data()
@@ -838,12 +839,12 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             else:
                 self._show_error(res.get("message", "Falha ao registrar humor."))
 
-        def on_error(exc):
+        def on_error(exc: Exception) -> None:
             self._show_error(f"Falha ao registrar humor.\n{exc}")
 
         AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
-    def _abrir_checkin_modal(self):
+    def _abrir_checkin_modal(self) -> None:
         if not self._selected_student:
             self._show_error("Selecione um estudante primeiro.", title="Atenção")
             return
@@ -856,11 +857,11 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             student_name=nome,
         )
 
-    def _salvar_checkin(self, dados):
-        def fetch():
+    def _salvar_checkin(self, dados: dict) -> None:
+        def fetch() -> Any:
             return self.servico_bem_estar.criar_checkin(dados)
 
-        def on_success(res):
+        def on_success(res: dict) -> None:
             if res.get("success"):
                 self._show_success(res.get("message", "Check-in registrado."))
                 self.load_data()
@@ -870,7 +871,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             else:
                 self._show_error(res.get("message", "Falha ao criar check-in."))
 
-        def on_error(exc):
+        def on_error(exc: Exception) -> None:
             self._show_error(f"Falha ao criar check-in.\n{exc}")
 
         AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
@@ -1521,17 +1522,17 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
-    def load_data(self):
+    def load_data(self) -> None:
         self._set_status_carregando()
 
-        def fetch():
+        def fetch() -> tuple:
             dash = self.servico_bem_estar.obter_dashboard()
             checkins = self.servico_bem_estar.listar_checkins()
             risks = self.servico_bem_estar.listar_estudantes_risco()
             medias = self.servico_bem_estar.obter_medias_humor()
             return dash, checkins, risks, medias
 
-        def on_success(result):
+        def on_success(result: tuple) -> None:
             dash, checkins, risks, medias = result
             self.update_ui(dash, checkins, risks)
             if isinstance(medias, dict):
@@ -1540,7 +1541,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
                     avg = data.get("average_mood")
                     self._atualizar_medias_ui(general_avg=avg)
 
-        def on_error(exc):
+        def on_error(exc: Exception) -> None:
             self._show_error(
                 f"Não foi possível carregar os dados de bem-estar.\n{exc}", title="Erro de conexão"
             )
@@ -1548,23 +1549,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
 
         AsyncRunner.run(task=fetch, on_success=on_success, on_error=on_error, widget_ref=self)
 
-    def _set_status_carregando(self):
-        try:
-            self._kpi_humor.set_value("...")
-            self._kpi_part.set_value("...")
-            self._kpi_crit.set_value("...")
-        except Exception:
-            pass
-
-    def _set_status_erro(self):
-        try:
-            self._kpi_humor.set_value("—")
-            self._kpi_part.set_value("—")
-            self._kpi_crit.set_value("—")
-        except Exception:
-            pass
-
-    def update_ui(self, dash_res, checkins_res, risks_res):
+    def update_ui(self, dash_res: dict, checkins_res: dict, risks_res: dict) -> None:
         if dash_res.get("success"):
             self.update_metrics(dash_res.get("data", {}))
         else:
@@ -1589,7 +1574,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         else:
             logging.warning("Risco retornou erro: %s", risks_res)
 
-    def update_metrics(self, data):
+    def update_metrics(self, data: dict) -> None:
         summary = data.get("summary", {})
         humor = summary.get("average_mood")
         if humor is not None and hasattr(self, "_kpi_humor"):
@@ -2351,6 +2336,6 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
         modal.wait_window(modal)
         return resultado.get("ok", False)
 
-    def _confirmar_callback(self, modal: ctk.CTkToplevel, resultado: dict):
+    def _confirmar_callback(self, modal: ctk.CTkToplevel, resultado: dict) -> None:
         resultado["ok"] = True
         modal.destroy()

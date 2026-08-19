@@ -84,6 +84,7 @@ from ser_pleno.features.pedidos_ajuda.service import ServicoPedidosAjuda
 from ser_pleno.features.audit_logs.service import ServicoAuditLogs
 from ser_pleno.features.compartilhamento.service import ServicoCompartilhamentoDadosClinicos
 from ser_pleno.features.comunicacao.service import ServicoComunicacao
+from ser_pleno.features.documents.service import ServicoDocuments
 from ser_pleno.application.services.autenticacao import ServicoAutenticacao
 
 
@@ -134,7 +135,7 @@ class App(ctk.CTk):
     def _setup_window(self) -> None:
         apply_global_style("light")
         self.title("SerPleno")
-        self.minsize(1920, 1080)
+        self.minsize(1280, 720)
         self.configure(fg_color=THEME["bg"])
         try:
             self.state("zoomed")
@@ -191,6 +192,7 @@ class App(ctk.CTk):
         self.servico_audit = ServicoAuditLogs(auth_service=self.auth_service)
         self.servico_compartilhamento = ServicoCompartilhamentoDadosClinicos(auth_service=self.auth_service)
         self.servico_comunicacao = ServicoComunicacao(auth_service=self.auth_service)
+        self.servico_documents = ServicoDocuments(auth_service=self.auth_service)
         self.servico_autenticacao = ServicoAutenticacao(auth_service=self.auth_service)
 
     def _log_boot_perf(self) -> None:
@@ -281,8 +283,8 @@ class App(ctk.CTk):
                             notif = json.loads(notifications)
                             sound_enabled = notif.get("Efeitos Sonoros", True)
                             self._desktop_notifier.set_sound_enabled(bool(sound_enabled))
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.debug("Falha ao aplicar configuracoes de notificacao: %s", exc)
                     break
         except Exception as exc:
             logger.debug("Falha ao aplicar configurações de notificação: %s", exc)
@@ -303,8 +305,8 @@ class App(ctk.CTk):
         try:
             self.bind_all("<Control-k>", _focus_search)
             self.bind_all("<Control-K>", _focus_search)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Falha ao registrar atalho de busca global: %s", exc)
 
     def reiniciar_onboarding(self) -> None:
         if self.onboarding_tour is not None:

@@ -1,5 +1,6 @@
 import datetime
 import logging
+import mimetypes
 import os
 import shutil
 import time
@@ -835,6 +836,9 @@ class ComunicacaoFrame(ctk.CTkFrame):
         ext = os.path.splitext(caminho)[1].lower()
         if ext not in _ALLOWED_EXTENSIONS:
             return False, f"Tipo de arquivo não permitido: {ext or 'sem extensão'}"
+        mime, _ = mimetypes.guess_type(caminho)
+        if mime and mime.startswith("application/x-msdos-program") or (mime and "executable" in mime):
+            return False, "Tipo de arquivo não permitido por segurança."
         tamanho = os.path.getsize(caminho)
         if tamanho > _MAX_FILE_SIZE_BYTES:
             tamanho_str = _formatar_tamanho(_MAX_FILE_SIZE_BYTES)

@@ -91,7 +91,19 @@ class _DateField(ctk.CTkFrame):
         self.entry.bind(
             "<FocusIn>", lambda e: self.configure(border_color=THEME["input_border_focus"])
         )
-        self.entry.bind("<FocusOut>", lambda e: self.configure(border_color=THEME["input_border"]))
+        self.entry.bind("<FocusOut>", lambda e: self._on_focus_out(e))
+
+    def _on_focus_out(self, event):
+        self.configure(border_color=THEME["input_border"])
+        raw = self.entry.get().strip()
+        if raw:
+            try:
+                normalized = normalize_date(raw)
+                if normalized != raw:
+                    self.entry.delete(0, "end")
+                    self.entry.insert(0, normalized)
+            except ValueError:
+                pass
 
     def get(self) -> str:
         return self.entry.get()

@@ -500,16 +500,16 @@ class AlterarSenhaModal(FormModal):
 #  Frame principal de configurações
 # •••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
 class ConfiguracoesFrame(ctk.CTkScrollableFrame):
-    def __init__(self, parent, controller):
+    def __init__(self, parent: ctk.CTkFrame, controller: Any) -> None:
         import time as _time
 
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
-        self.controller = controller
-        self.servico_configuracoes = getattr(controller, "servico_configuracoes", None)
+        self.controller: Any = controller
+        self.servico_configuracoes: Any = getattr(controller, "servico_configuracoes", None)
         from ser_pleno.config.paths import get_project_root
 
-        self.base_path = get_project_root()
+        self.base_path: str = get_project_root()
         self._notificacoes_state: dict[str, bool] = {}
         self._toggle_rows: dict[str, Any] = {}
         self._images: dict[str, Any] = {}
@@ -760,6 +760,20 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
     def _on_toggle_notificacao(self, tipo: str, estado: bool):
         self._notificacoes_state[tipo] = estado
         logger.info("Notificação '%s' %s", tipo, "ativada" if estado else "desativada")
+        try:
+            user_id = None
+            auth = getattr(self.servico_configuracoes, "_auth_service", None)
+            if auth and getattr(auth, "user", None):
+                user_id = auth.user.get("id")
+            dados = {
+                "user_id": user_id,
+                "theme": self._theme_btn.cget("text"),
+                "notifications": json.dumps(self._notificacoes_state),
+            }
+            self.servico_configuracoes.atualizar_configuracoes(dados)
+            self._apply_notification_settings()
+        except Exception as exc:
+            logger.debug("Falha ao persistir notificação: %s", exc)
 
     # —— aparência ------------------------------------------------------------
     def _build_aparencia(self, container):
@@ -870,7 +884,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         except Exception as exc:
             logger.exception("Erro ao alterar tema: %s", exc)
 
-    def _carregar_configuracoes(self):
+    def _carregar_configuracoes(self) -> None:
         try:
             res = self.servico_configuracoes.obter_configuracoes()
             if res.get("success") and res.get("data"):
@@ -900,25 +914,25 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                                             switch.select()
                                         else:
                                             switch.deselect()
-                            except Exception:
-                                pass
+                            except Exception as exc:
+                                logger.debug("Falha ao carregar notificacoes: %s", exc)
                         break
         except Exception as exc:
-            logger.exception("Erro ao carregar configurações: %s", exc)
+            logger.exception("Erro ao carregar configuracoes: %s", exc)
         self._apply_notification_settings()
 
-    def _salvar_configuracoes(self):
+    def _salvar_configuracoes(self) -> None:
         user_id = None
         auth = getattr(self.servico_configuracoes, "_auth_service", None)
         if auth and getattr(auth, "user", None):
             user_id = auth.user.get("id")
-        
+
         dados = {
             "user_id": user_id,
             "theme": self._theme_btn.cget("text"),
             "notifications": json.dumps(self._notificacoes_state),
         }
-        
+
         try:
             res = self.servico_configuracoes.atualizar_configuracoes(dados)
             if res.get("success"):
@@ -927,7 +941,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
             else:
                 self._show_error(res.get("message", "Falha ao salvar preferências."))
         except Exception as exc:
-            logger.exception("Erro ao salvar configurações: %s", exc)
+            logger.exception("Erro ao salvar configuracoes: %s", exc)
             self._show_error("Falha ao salvar preferências.")
 
     def _apply_notification_settings(self) -> None:
@@ -1016,10 +1030,10 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 return
             self._encerrar_sessao()
 
-    def _abrir_modal_senha(self):
+    def _abrir_modal_senha(self) -> None:
         AlterarSenhaModal(self, on_save=self._salvar_senha)
 
-    def _salvar_senha(self, senha_atual: str, nova_senha: str):
+    def _salvar_senha(self, senha_atual: str, nova_senha: str) -> None:
         auth = getattr(self.servico_configuracoes, "_auth_service", None)
         if not auth:
             self._show_error("Serviço de autenticação indisponível.")
