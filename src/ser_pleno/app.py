@@ -64,6 +64,27 @@ from ser_pleno.ui.theme import (
 )
 from ser_pleno.infrastructure.desktop.native_notifier import get_desktop_notifier
 from ser_pleno.application.services.bootstrap import BootstrapService
+from ser_pleno.features.agenda.service import ServicoAgendamento
+from ser_pleno.features.estudantes.service import ServicoEstudante
+from ser_pleno.features.orientacoes.service import ServicoOrientacoes
+from ser_pleno.features.triagem.service import ServicoTriagem
+from ser_pleno.features.bem_estar.service import ServicoBemEstar
+from ser_pleno.features.alertas.service import ServicoAlertas
+from ser_pleno.features.dashboard.service import ServicoDashboard
+from ser_pleno.features.analytics.service import ServicoAnalytics
+from ser_pleno.features.interventions.service import ServicoIntervencoes
+from ser_pleno.features.metas.service import ServicoMetas
+from ser_pleno.features.wellness_challenges.service import ServicoWellnessChallenges
+from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+from ser_pleno.features.notificacoes.service import ServicoNotificacoes
+from ser_pleno.features.relatorio.service import ServicoRelatorio
+from ser_pleno.features.report_template.service import ServicoReportTemplate
+from ser_pleno.application.services.mural import ServicoMural
+from ser_pleno.features.pedidos_ajuda.service import ServicoPedidosAjuda
+from ser_pleno.features.audit_logs.service import ServicoAuditLogs
+from ser_pleno.features.compartilhamento.service import ServicoCompartilhamentoDadosClinicos
+from ser_pleno.features.comunicacao.service import ServicoComunicacao
+from ser_pleno.application.services.autenticacao import ServicoAutenticacao
 
 
 def _global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -149,6 +170,29 @@ class App(ctk.CTk):
         frame = LoginFrame(self.container, self)
         frame.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
+    def _init_services(self) -> None:
+        self.servico_agenda = ServicoAgendamento(auth_service=self.auth_service)
+        self.servico_estudantes = ServicoEstudante(auth_service=self.auth_service)
+        self.servico_orientacoes = ServicoOrientacoes(auth_service=self.auth_service)
+        self.servico_triagem = ServicoTriagem(auth_service=self.auth_service)
+        self.servico_bem_estar = ServicoBemEstar(auth_service=self.auth_service)
+        self.servico_alertas = ServicoAlertas(auth_service=self.auth_service)
+        self.servico_dashboard = ServicoDashboard(auth_service=self.auth_service)
+        self.servico_analytics = ServicoAnalytics(auth_service=self.auth_service)
+        self.servico_intervencoes = ServicoIntervencoes(auth_service=self.auth_service)
+        self.servico_metas = ServicoMetas(auth_service=self.auth_service)
+        self.servico_wellness_challenges = ServicoWellnessChallenges(auth_service=self.auth_service)
+        self.servico_configuracoes = ServicoConfiguracoes(auth_service=self.auth_service)
+        self.servico_notificacoes = ServicoNotificacoes(auth_service=self.auth_service)
+        self.servico_relatorio = ServicoRelatorio(auth_service=self.auth_service)
+        self.servico_report_template = ServicoReportTemplate(auth_service=self.auth_service)
+        self.servico_mural = ServicoMural(auth_service=self.auth_service)
+        self.servico_pedidos_ajuda = ServicoPedidosAjuda(auth_service=self.auth_service)
+        self.servico_audit = ServicoAuditLogs(auth_service=self.auth_service)
+        self.servico_compartilhamento = ServicoCompartilhamentoDadosClinicos(auth_service=self.auth_service)
+        self.servico_comunicacao = ServicoComunicacao(auth_service=self.auth_service)
+        self.servico_autenticacao = ServicoAutenticacao(auth_service=self.auth_service)
+
     def _log_boot_perf(self) -> None:
         self._t_boot_fim = time.perf_counter()
         try:
@@ -171,6 +215,7 @@ class App(ctk.CTk):
         self.usuario_logado = user_data
         self.usuario_logado_id = user_data["id"]
         self.auth_service = auth_service
+        self._init_services()
 
         self.navigation.clear_screen()
 
