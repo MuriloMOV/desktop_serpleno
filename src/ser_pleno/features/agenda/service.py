@@ -23,8 +23,8 @@ class ServicoAgendamento:
     API_BASE_URL = API_ROOT_URL
     # URL base da API Desktop (agora usa config oficial)
     API_DESKTOP_URL = DESKTOP_API_URL
-    # Token para autenticação na API
-    API_TOKEN = DESKTOP_API_TOKEN or "serpleno-desktop-token-2024"
+    # Token para autenticacao na API (obrigatorio; configurar SERPLENO_DESKTOP_API_TOKEN)
+    API_TOKEN = DESKTOP_API_TOKEN
 
     def __init__(self, auth_service=None):
         self.repo = AgendamentoRepository()
@@ -47,6 +47,26 @@ class ServicoAgendamento:
             logging.error(f"Erro ao listar horários base: {e}")
             return []
 
+    def adicionar_horario(self, horario: str):
+        """Adiciona um horário à grade de disponibilidade."""
+        try:
+            result = self.repo.adicionar_horario_disponibilidade(horario)
+            _invalidate_dashboard_cache()
+            return result
+        except Exception as e:
+            logging.error(f"Erro ao adicionar horário: {e}")
+            return {"success": False, "message": str(e)}
+
+    def remover_horario(self, horario: str):
+        """Remove um horário da grade de disponibilidade."""
+        try:
+            result = self.repo.remover_horario_disponibilidade(horario)
+            _invalidate_dashboard_cache()
+            return result
+        except Exception as e:
+            logging.error(f"Erro ao remover horário: {e}")
+            return {"success": False, "message": str(e)}
+
     def _get_session(self):
         """Retorna a sessão HTTP do serviço de autenticação"""
         auth = self._auth_service
@@ -58,7 +78,12 @@ class ServicoAgendamento:
         return requests
 
     def _get_headers(self):
-        """Retorna os headers para as requisições API, incluindo CSRF token"""
+        """Retorna os headers para as requisicoes API, incluindo CSRF token"""
+        if not self.API_TOKEN:
+            raise ValueError(
+                "DESKTOP_API_TOKEN nao configurado. "
+                "Defina a variavel de ambiente SERPLENO_DESKTOP_API_TOKEN."
+            )
         headers = {"Content-Type": "application/json", "X-Desktop-Token": self.API_TOKEN}
         auth = self._auth_service
         if auth and hasattr(auth, "csrf_token") and auth.csrf_token:

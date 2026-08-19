@@ -47,7 +47,10 @@ class AutenticacaoRepository:
         rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
         return rows[0] if rows else None
 
-    def obter_senha_usuario(self, user_id):
+    # AVISO: Este metodo retorna o hash da senha apenas para verificacao.
+    # Nunca retorne o hash para a UI ou para qualquer camada externa.
+    @with_local_fallback("_local_obter_hash_senha_para_verificacao")
+    def obter_hash_senha_para_verificacao(self, user_id):
         _local_rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
         if _local_rows:
             return {"password": _local_rows[0].get("password", "")}
@@ -55,10 +58,10 @@ class AutenticacaoRepository:
             query = "SELECT password FROM auth_user WHERE id = %s"
             return fetch_one(query, (user_id,))
         except Exception as exc:
-            logger.debug("MySQL indisponivel para obter_senha_usuario: %s", exc)
+            logger.debug("MySQL indisponivel para obter_hash_senha_para_verificacao: %s", exc)
             return None
 
-    def _local_obter_senha_usuario(self, user_id):
+    def _local_obter_hash_senha_para_verificacao(self, user_id):
         rows = local_cache.list_all("auth_users", where_clause="id=?", params=(user_id,))
         if rows:
             return {"password": rows[0].get("password")}

@@ -24,7 +24,7 @@ from ser_pleno.config.db_config import get_db_connection
 from ser_pleno.config.operation_mode import (
     OperationConfig, OperationMode, get_operation_config
 )
-from ser_pleno.infrastructure.local.local_cache import local_cache
+from ser_pleno.infrastructure.local.local_cache import local_cache, _validate_identifier
 from ser_pleno.repositories.base import is_local_id, execute_non_query, fetch_all, fetch_one
 
 logger = logging.getLogger(__name__)
@@ -477,6 +477,8 @@ class SyncService:
                 continue
             if isinstance(fk_value, int) and fk_value < 0:
                 continue
+            validate_mysql_table_name(table)
+            _validate_identifier(pk_column)
             try:
                 row = fetch_one(f"SELECT 1 FROM {table} WHERE {pk_column} = %s", (fk_value,))
                 if not row:
@@ -867,11 +869,11 @@ class SyncService:
 
     def _sync_students(self):
         """Sincroniza estudantes locais com a API"""
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
-            # Busca estudantes modificados apos ultima sincronizacao
             last_sync = self.config.last_sync
             query = "SELECT * FROM aluno"
             if last_sync:
@@ -881,24 +883,28 @@ class SyncService:
                 cursor.execute(query)
 
             students = cursor.fetchall()
-            conn.close()
 
             if students:
                 logger.info(f"Sincronizando {len(students)} estudantes")
-                # Envia para a API em lote
                 url = f"{self.config.api_base_url}/api/v1/desktop/students/sync/"
                 self._session.post(url, json={'students': students}, timeout=30)
 
         except Exception as exc:
             logger.error(f"Erro ao sincronizar estudantes: {exc}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def _sync_appointments(self):
         """Sincroniza agendamentos locais com a API"""
+        conn = None
         try:
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
 
-            # Busca agendamentos modificados apos ultima sincronizacao
             last_sync = self.config.last_sync
             query = "SELECT * FROM agendamento"
             if last_sync:
@@ -908,7 +914,6 @@ class SyncService:
                 cursor.execute(query)
 
             appointments = cursor.fetchall()
-            conn.close()
 
             if appointments:
                 logger.info(f"Sincronizando {len(appointments)} agendamentos")
@@ -917,6 +922,12 @@ class SyncService:
 
         except Exception as exc:
             logger.error(f"Erro ao sincronizar agendamentos: {exc}")
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
     def add_to_queue(self, operation: str, entity: str, entity_id: int, data: Dict[str, Any]):
         """Adiciona operacao na fila de sincronizacao"""

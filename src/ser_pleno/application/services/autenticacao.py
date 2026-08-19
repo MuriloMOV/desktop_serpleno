@@ -116,7 +116,7 @@ class ServicoAutenticacao:
             response = self.session.post(
                 login_url,
                 json={"username": usuario, "password": senha},
-                timeout=1.5,
+                timeout=5,
             )
 
             if response.status_code == 200:
@@ -164,7 +164,7 @@ class ServicoAutenticacao:
             response = self.session.post(
                 login_url,
                 json={"username": usuario, "password": senha},
-                timeout=1.5,
+                timeout=5,
             )
             if response.status_code == 200:
                 self._get_csrf_token()
@@ -218,7 +218,7 @@ class ServicoAutenticacao:
         if not self.user:
             return {"success": False, "message": "Nenhum usuário logado."}
         try:
-            row = self.repo.obter_senha_usuario(self.user.get("id"))
+            row = self.repo.obter_hash_senha_para_verificacao(self.user.get("id"))
             if not row:
                 return {"success": False, "message": "Usuário não encontrado."}
             hash_value = row["password"]
