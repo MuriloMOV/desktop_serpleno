@@ -1,3 +1,41 @@
+"""
+WebSocket clients for real-time desktop communication.
+
+When to use WebSocket:
+- Chat between users (WebSocketChatClient)
+- Real-time notifications (NotificationWebSocketClient)
+- Any feature requiring instant push updates from the server
+
+When NOT to use WebSocket:
+- Simple CRUD operations — use REST API instead
+- Infrequent data synchronization — REST polling is sufficient
+- Backend does not support WebSocket — fallback to REST
+- Network environments with strict firewalls that block WebSocket
+
+All WebSocket clients in this module are OPTIONAL. The application functions
+completely via REST API. WebSocket is only used when:
+1. The backend supports it
+2. The websockets library is installed
+3. Real-time updates are explicitly needed
+
+If any of these conditions is not met, the client silently returns False
+and the application continues working normally via REST polling.
+
+Examples:
+    Chat:
+        >>> client = WebSocketChatClient(base_url="https://api.serpleno.com", auth_service=auth)
+        >>> client.connect(user_a_id=1, user_b_id=2)
+        >>> client.on("message", lambda msg: print(msg))
+        >>> client.send({"text": "olá"})
+        >>> client.disconnect()
+
+    Notifications:
+        >>> client = NotificationWebSocketClient(base_url="https://api.serpleno.com", auth_service=auth)
+        >>> client.connect(user_id=1)
+        >>> client.on("notification", lambda n: print(n))
+        >>> client.disconnect()
+"""
+
 import asyncio
 import json
 import logging

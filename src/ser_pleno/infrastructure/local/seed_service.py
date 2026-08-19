@@ -157,6 +157,8 @@ def sync_critical_entities(since: Optional[str] = None) -> Dict[str, Any]:
             results["failed"].append({"table": mysql_table, "error": str(exc)})
 
     results["finished_at"] = datetime.now().isoformat()
+    if not results["failed"]:
+        config.update_last_sync()
     return results
 
 
@@ -171,3 +173,78 @@ def ensure_local_cache_populated() -> Dict[str, Any]:
             logger.error("Erro ao contar %s: %s", sqlite_table, exc)
             counts[sqlite_table] = -1
     return counts
+
+
+_BASIC_ROLES = [
+    {"user_id": -1, "role": "visitante", "permissions": "[]", "is_active_profile": 1},
+    {"user_id": -2, "role": "psicologo", "permissions": "[]", "is_active_profile": 1},
+    {"user_id": -3, "role": "admin", "permissions": "[]", "is_active_profile": 1},
+    {"user_id": -4, "role": "coordenador", "permissions": "[]", "is_active_profile": 1},
+    {"user_id": -5, "role": "analista", "permissions": "[]", "is_active_profile": 1},
+    {"user_id": -6, "role": "suporte", "permissions": "[]", "is_active_profile": 1},
+]
+
+_DEFAULT_REPORT_TEMPLATES = [
+    {
+        "id": "study_support",
+        "name": "Apoio Pedagógico",
+        "report_type": "orientacao",
+        "template_config": "{}",
+        "default_parameters": "{}",
+        "is_active": 1,
+    },
+    {
+        "id": "emotional_support",
+        "name": "Apoio Emocional",
+        "report_type": "orientacao",
+        "template_config": "{}",
+        "default_parameters": "{}",
+        "is_active": 1,
+    },
+    {
+        "id": "career_guidance",
+        "name": "Orientação Profissional",
+        "report_type": "orientacao",
+        "template_config": "{}",
+        "default_parameters": "{}",
+        "is_active": 1,
+    },
+]
+
+
+def seed_static_entities() -> Dict[str, Any]:
+    """Seeds basic roles, permissions, and templates into local cache."""
+    results: Dict[str, Any] = {"seeded": 0, "skipped": 0, "failed": []}
+
+    _seed_basic_roles(results)
+    _seed_report_templates(results)
+
+    return results
+
+
+def _seed_basic_roles(results: Dict[str, Any]) -> None:
+    existing = {r.get("user_id") for r in local_cache.list_user_profiles()}
+    for role in _BASIC_ROLES:
+        if role.get("user_id") in existing:
+            results["skipped"] += 1
+            continue
+        try:
+            local_cache.upsert_user_profile(role)
+            results["seeded"] += 1
+        except Exception as exc:
+            logger.error("Falha ao seed role %s: %s", role.get("role"), exc)
+            results["failed"].append({"entity": "role", "role": role.get("role"), "error": str(exc)})
+
+
+def _seed_report_templates(results: Dict[str, Any]) -> None:
+    existing = {t.get("id") for t in local_cache.list_report_templates()}
+    for template in _DEFAULT_REPORT_TEMPLATES:
+        if template.get("id") in existing:
+            results["skipped"] += 1
+            continue
+        try:
+            local_cache.upsert_report_template(template)
+            results["seeded"] += 1
+        except Exception as exc:
+            logger.error("Falha ao seed template %s: %s", template.get("id"), exc)
+            results["failed"].append({"entity": "template", "template": template.get("id"), "error": str(exc)})
