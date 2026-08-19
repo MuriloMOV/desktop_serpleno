@@ -1,8 +1,7 @@
-import customtkinter as ctk
 import json
 
-from ser_pleno.features.estudantes.service import ServicoEstudante
-from ser_pleno.features.triagem.service import ServicoTriagem
+import customtkinter as ctk
+
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.ui.components.ui_components import (
     Avatar,
@@ -13,19 +12,13 @@ from ser_pleno.ui.components.ui_components import (
     GhostButton,
     KPICard,
     PrimaryButton,
-    Toast,
 )
 from ser_pleno.ui.theme import (
-    FONT_FAMILY,
-    THEME,
     RADIUS,
     SPACING,
-    TYPO,
-    font,
-    mono_font,
+    THEME,
     themed_font,
 )
-from ser_pleno.ui.theme_extensions import extend_theme
 from ser_pleno.ui.views.base import _ErrorModal
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.avatar_utils import get_avatar_color
@@ -122,8 +115,8 @@ class TriagemFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color=THEME["primary"],
         )
         self.controller = controller
-        self.servico_triagem = ServicoTriagem()
-        self.servico_estudantes = ServicoEstudante()
+        self.servico_triagem = getattr(controller, "servico_triagem", None)
+        self.servico_estudantes = getattr(controller, "servico_estudantes", None)
         self.data_master = []
         self._estudantes = []
         self._formularios = []
@@ -496,6 +489,11 @@ class TriagemFrame(ctk.CTkScrollableFrame):
         st = self.filtro_status.get()
         pr = self.filtro_prioridade.get()
         busca = self.filtro_busca.get().strip()
+        data_inicio_raw = self.data_inicial.get().strip()
+        data_fim_raw = self.data_final.get().strip()
+        data_inicio = normalize_date(data_inicio_raw) if data_inicio_raw else None
+        data_fim = normalize_date(data_fim_raw) if data_fim_raw else None
+
         filtered = [
             d
             for d in self.data_master
@@ -506,6 +504,8 @@ class TriagemFrame(ctk.CTkScrollableFrame):
                 or busca.lower() in d["student"].lower()
                 or busca.lower() in d.get("form_name", "").lower()
             )
+            and (not data_inicio or d["date"] >= data_inicio)
+            and (not data_fim or d["date"] <= data_fim)
         ]
         self._atualizar_kpis(filtered)
         self.renderizar_tabela(filtered)

@@ -1,21 +1,27 @@
-# -*- coding: utf-8 -*-
 """View de Notificacoes."""
 
 from __future__ import annotations
 
 import logging
+
 import customtkinter as ctk
 
 from ser_pleno.features.notificacoes.service import ServicoNotificacoes
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
-from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
-    Card, EmptyState, PrimaryButton, GhostButton, Divider, Badge, SkeletonLoader, Toast, BaseModal,
+    Badge,
+    Card,
+    EmptyState,
+    GhostButton,
+    PrimaryButton,
+    SkeletonLoader,
+    Toast,
 )
+from ser_pleno.ui.theme import RADIUS, THEME, font, themed_font
+from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.ui.views.base import _ErrorModal
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
-from ser_pleno.ui.views.base import _ErrorModal
 
 logger = logging.getLogger("apps.desktop")
 
@@ -26,7 +32,7 @@ class NotificacoesFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(master, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_notificacoes = ServicoNotificacoes(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_notificacoes = getattr(controller, "servico_notificacoes", None)
         self.app = getattr(controller, "app", None)
         self.notificacoes: list[dict] = []
         self._mostrar_nao_lidas = False
@@ -84,6 +90,11 @@ class NotificacoesFrame(ctk.CTkFrame):
             text_color=THEME["text_muted"], anchor="w",
         )
         self.status_lbl.pack(side="left")
+        self.unread_lbl = ctk.CTkLabel(
+            self.status_bar, text="", font=font(size=12, weight="bold"),
+            text_color=THEME["info"], anchor="e",
+        )
+        self.unread_lbl.pack(side="right")
 
     def _aplicar_filtro(self, valor):
         self._mostrar_nao_lidas = valor == "Nao lidas"
@@ -136,7 +147,7 @@ class NotificacoesFrame(ctk.CTkFrame):
                     title="Nenhuma notificacao encontrada",
                     subtitle="Tente ajustar os filtros",
                 ).pack(pady=30)
-                self._atualizar_status(0)
+                self._atualizar_status(0, 0)
                 self._atualizar_desktop_notifier(0)
                 return
 
@@ -146,8 +157,9 @@ class NotificacoesFrame(ctk.CTkFrame):
                     continue
                 batch.add(lambda n=n: self._criar_card(n))
             batch.execute()
-            self._atualizar_status(len(self.notificacoes))
-            self._atualizar_desktop_notifier(len(self.notificacoes))
+            unread_count = sum(1 for n in notificacoes if not (n.get("lida") or n.get("is_read") or False))
+            self._atualizar_status(len(self.notificacoes), unread_count)
+            self._atualizar_desktop_notifier(unread_count)
 
         def _on_error(exc):
             if not self.winfo_exists():
@@ -159,7 +171,7 @@ class NotificacoesFrame(ctk.CTkFrame):
                 title="Erro ao carregar notificacoes",
                 subtitle=str(exc),
             ).pack(pady=20)
-            self._atualizar_status(0)
+            self._atualizar_status(0, 0)
 
         AsyncRunner.run(
             task=_fetch,
@@ -181,18 +193,22 @@ class NotificacoesFrame(ctk.CTkFrame):
             return res
         return []
 
-    def _atualizar_status(self, total: int):
+    def _atualizar_status(self, total: int, unread: int = 0):
         self.status_lbl.configure(
             text=f"Mostrando {total} notificacoes"
         )
+        if hasattr(self, "unread_lbl") and self.unread_lbl is not None and self.unread_lbl.winfo_exists():
+            self.unread_lbl.configure(
+                text=f"{unread} nao lida(s)" if unread > 0 else ""
+            )
 
-    def _atualizar_desktop_notifier(self, total: int) -> None:
+    def _atualizar_desktop_notifier(self, unread: int) -> None:
         try:
             notifier = getattr(self.app, "_desktop_notifier", None)
             if notifier is None:
                 return
-            notifier.update_unread_badge(total)
-            if total <= 0:
+            notifier.update_unread_badge(unread)
+            if unread <= 0:
                 notifier.clear_badge()
         except Exception as exc:
             logger.debug("Falha ao atualizar notificador desktop: %s", exc)

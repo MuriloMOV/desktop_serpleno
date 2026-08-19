@@ -107,7 +107,7 @@ class ComunicacaoFrame(ctk.CTkFrame):
         self._t0 = time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_comunicacao = ServicoComunicacao()
+        self.servico_comunicacao = getattr(controller, "servico_comunicacao", None)
         self.contatos: list = []
         self.conversa_ativa = None
         self.conversa_atual = None
@@ -156,8 +156,8 @@ class ComunicacaoFrame(ctk.CTkFrame):
 
     def _get_ws_base_url(self) -> str:
         try:
-            api = ClienteAPI()
-            return api.base_url
+            from ser_pleno.config.config import DESKTOP_API_URL
+            return DESKTOP_API_URL
         except Exception as exc:
             logger.debug("Falha ao obter base_url da API: %s", exc)
             return "http://localhost:8000"
@@ -1235,22 +1235,11 @@ class ComunicacaoFrame(ctk.CTkFrame):
     def enviar_arquivo(self, caminho: str, categoria: str):
         if not self.conversa_ativa:
             return
-        try:
-            nome = os.path.basename(caminho)
-            if self.conversa_ativa["role"] == "group":
-                res = self.servico_comunicacao.enviar_mensagem_grupo(
-                    self.usuario_logado_id, nome, caminho, categoria
-                )
-            else:
-                res = self.servico_comunicacao.enviar_mensagem(
-                    self.usuario_logado_id, self.conversa_ativa["id"], nome
-                )
-            if res["success"]:
-                self.carregar_mensagens()
-            if self.modal_arquivos is not None and self.modal_arquivos.winfo_exists():
-                self.modal_arquivos.grid_remove()
-        except Exception as e:
-            logger.error("Erro ao enviar arquivo: %s", e)
+        valido, erro = self._validar_arquivo(caminho)
+        if not valido:
+            self._concluir_envio(False, erro)
+            return
+        self._enviar_com_progresso(caminho, categoria)
 
     def visualizar_arquivo(self, caminho: str):
         try:

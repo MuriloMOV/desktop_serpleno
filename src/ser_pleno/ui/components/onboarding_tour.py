@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Onboarding tour guiado — overlay, tooltips e persistência de estado."""
 
 from __future__ import annotations
@@ -6,14 +5,14 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 import customtkinter as ctk
 
 from ser_pleno.infrastructure.local.local_cache import get_local_cache
 from ser_pleno.ui.navigation import MENU_ITEMS
-from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
+from ser_pleno.ui.theme import RADIUS, SPACING, THEME, themed_font
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +111,9 @@ class OnboardingTourOverlay(ctk.CTkToplevel):
         self._on_close = on_close
         self._on_next = on_next
         self._on_prev = on_prev
-        self._highlight_frame: Optional[ctk.CTkFrame] = None
+        self._highlight_frame: ctk.CTkFrame | None = None
         self._alive = True
-        self._anim_job: Optional[str] = None
+        self._anim_job: str | None = None
 
         self.overrideredirect(True)
         self.attributes("-topmost", True)
@@ -211,7 +210,7 @@ class OnboardingTourTooltip(ctk.CTkToplevel):
 
     def __init__(self, master, step: OnboardingTourStep, step_index: int,
                  total_steps: int, on_next: Callable, on_prev: Callable,
-                 on_skip: Callable):
+                 on_skip: Callable, on_replay: Callable | None = None):
         super().__init__(master)
         self._step = step
         self._step_index = step_index
@@ -219,6 +218,7 @@ class OnboardingTourTooltip(ctk.CTkToplevel):
         self._on_next = on_next
         self._on_prev = on_prev
         self._on_skip = on_skip
+        self._on_replay = on_replay
         self._alive = True
 
         self.overrideredirect(True)
@@ -289,6 +289,18 @@ class OnboardingTourTooltip(ctk.CTkToplevel):
         prev_btn.pack(side="right", padx=(8, 0))
 
         is_last = self._step_index >= self._total_steps - 1
+        if is_last and self._on_replay:
+            replay_btn = ctk.CTkButton(
+                footer, text="Reiniciar",
+                command=self._on_replay,
+                fg_color=THEME["bg_alt"], hover_color=THEME["border"],
+                text_color=THEME["text"],
+                border_width=1, border_color=THEME["border"],
+                font=themed_font("body", "bold"), width=90, height=32,
+                corner_radius=RADIUS["button"], cursor="hand2",
+            )
+            replay_btn.pack(side="right", padx=(0, 8))
+
         next_text = "Concluir" if is_last else "Proximo"
         next_btn = ctk.CTkButton(
             footer, text=next_text,
@@ -359,10 +371,10 @@ class OnboardingTourController:
         self._storage = OnboardingTourStorage(user_id=getattr(app, "usuario_logado_id", 0))
         self._steps: list[OnboardingTourStep] = []
         self._current_index: int = 0
-        self._overlay: Optional[OnboardingTourOverlay] = None
-        self._tooltip: Optional[OnboardingTourTooltip] = None
+        self._overlay: OnboardingTourOverlay | None = None
+        self._tooltip: OnboardingTourTooltip | None = None
         self._active: bool = False
-        self._move_job: Optional[str] = None
+        self._move_job: str | None = None
         self._build_steps()
 
     def _build_steps(self):
@@ -438,6 +450,15 @@ class OnboardingTourController:
         self._storage.mark_skipped()
         self.stop()
 
+    def _replay_from_tooltip(self) -> None:
+        self.stop()
+        self._storage.reset()
+        self._active = True
+        self._current_index = 0
+        self._create_overlay_and_tooltip()
+        self._show_step(0)
+        self._start_move_listener()
+
     def complete(self) -> None:
         self._storage.mark_completed()
         self.stop()
@@ -471,6 +492,7 @@ class OnboardingTourController:
             on_next=self.next,
             on_prev=self.prev,
             on_skip=self.skip,
+            on_replay=self._replay_from_tooltip,
         )
 
     def _destroy_overlay(self):

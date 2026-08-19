@@ -5,8 +5,6 @@ import os
 import customtkinter as ctk
 
 from ser_pleno.config.paths import get_project_root
-from ser_pleno.features.analytics.service import ServicoAnalytics
-from ser_pleno.features.dashboard.service import ServicoDashboard
 from ser_pleno.ui.components.icons import ICONS, IconLabel
 from ser_pleno.ui.components.ui_components import (
     AlertRow,
@@ -22,6 +20,7 @@ from ser_pleno.ui.components.ui_components import (
 )
 from ser_pleno.ui.theme import FONT_FAMILY, RADIUS, SPACING, THEME, themed_font
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.ui.views.base import _ErrorModal
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.cache import NotificationCache
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
@@ -274,12 +273,8 @@ class DashboardFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_dashboard = ServicoDashboard(
-            auth_service=getattr(controller, "auth_service", None)
-        )
-        self.servico_analytics = ServicoAnalytics(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_dashboard = getattr(controller, "servico_dashboard", None)
+        self.servico_analytics = getattr(controller, "servico_analytics", None)
         self._notification_cache = NotificationCache(ttl=60)
         self._responsive_after = None
         self._last_responsive_width = None
@@ -499,20 +494,20 @@ class DashboardFrame(ctk.CTkFrame):
                 "target": "bem_estar",
             },
             {
+                "id": "agendar",
+                "label": "Agendar Atendimento",
+                "icon": ICONS["calendar"],
+                "description": "Agendar novo atendimento",
+                "action_type": "navigate",
+                "target": "agenda",
+            },
+            {
                 "id": "add_student",
                 "label": "Adicionar Estudante",
                 "icon": ICONS["add"],
                 "description": "Cadastrar novo estudante",
                 "action_type": "navigate",
                 "target": "estudantes",
-            },
-            {
-                "id": "criar_orientacao",
-                "label": "Criar Orientação",
-                "icon": ICONS["compass"],
-                "description": "Nova orientação para encaminhamento",
-                "action_type": "navigate",
-                "target": "orientacoes",
             },
         ]
 
@@ -603,7 +598,7 @@ class DashboardFrame(ctk.CTkFrame):
         target = acao.get("target")
         if target:
             try:
-                self.controller.app.mostrar_tela(target)
+                self.controller.navigation.show(target)
             except Exception as e:
                 self._show_error(f"Não foi possível abrir {acao.get('label', '')}.\n{e}")
 
@@ -1418,11 +1413,7 @@ class DashboardFrame(ctk.CTkFrame):
                 if not _senha_atende_policy(senha):
                     self._show_error("A senha deve ter pelo menos 8 caracteres, incluindo maiúscula, minúscula, número e símbolo.")
                     return
-                from ser_pleno.application.services.autenticacao import ServicoAutenticacao
-
-                auth_service = ServicoAutenticacao(
-                    auth_service=getattr(self.controller, "auth_service", None)
-                )
+                auth_service = self.controller.servico_autenticacao
                 res = auth_service.alterar_senha(user.get("password", ""), senha)
                 if not res.get("success"):
                     self._show_error(res.get("message", "Falha ao alterar senha."))

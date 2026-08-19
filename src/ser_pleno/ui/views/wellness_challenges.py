@@ -219,8 +219,8 @@ class WellnessChallengesFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico = ServicoWellnessChallenges(auth_service=getattr(controller, "auth_service", None))
-        self.servico_estudantes = ServicoEstudante(auth_service=getattr(controller, "auth_service", None))
+        self.servico = getattr(controller, "servico_wellness_challenges", None)
+        self.servico_estudantes = getattr(controller, "servico_estudantes", None)
         self._challenges: list[dict] = []
         self._students: list[dict] = []
         self._filtro_cat = ""

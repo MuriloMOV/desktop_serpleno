@@ -12,7 +12,7 @@ from ser_pleno.ui.theme import THEME, SPACING, RADIUS, font, themed_font
 from ser_pleno.ui.theme_extensions import spacing
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
-    Card, EmptyState, PrimaryButton, GhostButton, Divider, BaseModal, Toast,
+    Card, EmptyState, PrimaryButton, GhostButton, Divider, BaseModal, Toast, SkeletonLoader,
 )
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
@@ -102,7 +102,7 @@ class ReportTemplateFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(master, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_report_template = ServicoReportTemplate(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_report_template = getattr(controller, "servico_report_template", None)
         self.app = getattr(controller, "app", None)
         self._templates: list[dict] = []
         self._filtro_tipo = ""

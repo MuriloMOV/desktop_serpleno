@@ -8,11 +8,11 @@ from collections import OrderedDict
 
 import customtkinter as ctk
 
-from ser_pleno.ui.theme import THEME, SPACING, font
-from ser_pleno.ui.components.icons import ICONS
-from ser_pleno.ui.components.ui_components import GhostButton, Avatar, Divider
-from ser_pleno.ui.view_factory import ViewFactory
 from ser_pleno.infrastructure.desktop.native_notifier import get_desktop_notifier
+from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.ui.components.ui_components import Avatar, Divider, GhostButton
+from ser_pleno.ui.theme import SPACING, THEME, font
+from ser_pleno.ui.view_factory import ViewFactory
 from ser_pleno.utils.async_runner import AsyncRunner
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,10 @@ MENU_ITEMS = [
      "header": ("Comunicacao", "Mensagens internas e suporte")},
     {"key": "orientacoes",   "label": "Orientacoes",       "icon": ICONS["compass"],
      "header": ("Orientacoes", "Fluxo de apoio e encaminhamentos")},
+    {"key": "intervencoes",  "label": "Intervencoes",      "icon": ICONS["heart_blue"],
+     "header": ("Intervencoes", "Gestao de intervencoes e acompanhamentos")},
+    {"key": "wellness_challenges", "label": "Wellness Challenges", "icon": ICONS["heart"],
+     "header": ("Wellness Challenges", "Desafios e metas de bem-estar")},
     {"key": "avisos",        "label": "Quadro de avisos",  "icon": ICONS["megaphone"],
      "header": ("Avisos", "Quadro de comunicacao institucional")},
     {"key": "configuracoes", "label": "Configuracoes",     "icon": ICONS["settings"],
@@ -293,10 +297,40 @@ class NavigationManager:
             from ser_pleno.features.analytics.service import ServicoAnalytics
             service = ServicoAnalytics(auth_service=getattr(self.app, "auth_service", None))
             result = service.buscar_global(term)
-            items = result.get("results", []) if isinstance(result, dict) else []
+            items = self._normalize_search_result(result)
         except Exception:
             items = []
         self._show_search_dropdown(items)
+
+    @staticmethod
+    def _normalize_search_result(result: dict) -> list[dict]:
+        if not isinstance(result, dict):
+            return []
+        if "results" in result:
+            return result.get("results", [])
+        items: list[dict] = []
+        for student in result.get("students", []) or []:
+            items.append({
+                "type": "student",
+                "label": student.get("name", "Estudante"),
+                "subtitle": "Estudante",
+                "target": "estudantes",
+            })
+        for appt in result.get("appointments", []) or []:
+            items.append({
+                "type": "appointment",
+                "label": appt.get("name", "Agendamento"),
+                "subtitle": appt.get("detail", "") or appt.get("curso", ""),
+                "target": "agenda",
+            })
+        for screening in result.get("screenings", []) or []:
+            items.append({
+                "type": "screening",
+                "label": screening.get("name", "Triagem"),
+                "subtitle": screening.get("status", "pending"),
+                "target": "analise",
+            })
+        return items
 
     def _show_search_dropdown(self, items):
         for child in getattr(self, "search_dropdown", []).winfo_children() if hasattr(self, "search_dropdown") else []:
@@ -308,32 +342,59 @@ class NavigationManager:
             self._hide_search_dropdown()
             return
         dropdown = self.search_dropdown
-        dropdown.configure(width=320)
+        dropdown.configure(width=340)
         dropdown.place(x=60, y=86)
         dropdown.lift()
-        for item in items[:8]:
-            tipo = item.get("type", "item")
-            label = item.get("label", "Sem título")
-            subtitle = item.get("subtitle", "")
-            target = item.get("target")
-            row = ctk.CTkFrame(dropdown, fg_color="transparent")
-            row.pack(fill="x", padx=8, pady=4)
-            btn = ctk.CTkButton(
-                row,
-                text=f"{label}\n{subtitle}" if subtitle else label,
+
+        groups: dict[str, list] = {}
+        for item in items:
+            tipo = item.get("type", "outros")
+            label_map = {
+                "student": "Estudantes",
+                "appointment": "Agendamentos",
+                "screening": "Triagens",
+                "outros": "Outros",
+            }
+            group_key = label_map.get(tipo, tipo.title())
+            groups.setdefault(group_key, []).append(item)
+
+        type_order = ["Estudantes", "Agendamentos", "Triagens", "Outros"]
+        for group_key in type_order:
+            group_items = groups.get(group_key)
+            if not group_items:
+                continue
+            header = ctk.CTkLabel(
+                dropdown,
+                text=group_key,
+                font=font(10, "bold"),
+                text_color=THEME["text_muted"],
                 anchor="w",
-                height=44,
-                corner_radius=8,
-                fg_color="transparent",
-                hover_color=THEME["nav_hover"],
-                text_color=THEME["text"],
-                font=font(12),
             )
-            btn.pack(fill="x")
-            if target:
-                btn.configure(command=lambda k=target: self._navigate_search_result(k))
-        close = ctk.CTkButton(dropdown, text="Fechar", width=280, height=28, command=self._hide_search_dropdown)
-        close.pack(pady=(4, 8))
+            header.pack(fill="x", padx=12, pady=(8, 2))
+
+            for item in group_items[:5]:
+                label = item.get("label", "Sem título")
+                subtitle = item.get("subtitle", "") or item.get("detail", "") or item.get("status", "")
+                target = item.get("target")
+                row = ctk.CTkFrame(dropdown, fg_color="transparent")
+                row.pack(fill="x", padx=8, pady=2)
+                btn = ctk.CTkButton(
+                    row,
+                    text=f"{label}\n{subtitle}" if subtitle else label,
+                    anchor="w",
+                    height=44,
+                    corner_radius=8,
+                    fg_color="transparent",
+                    hover_color=THEME["nav_hover"],
+                    text_color=THEME["text"],
+                    font=font(12),
+                )
+                btn.pack(fill="x")
+                if target:
+                    btn.configure(command=lambda k=target: self._navigate_search_result(k))
+
+        close = ctk.CTkButton(dropdown, text="Fechar", width=300, height=28, command=self._hide_search_dropdown)
+        close.pack(pady=(6, 8))
 
     def _hide_search_dropdown(self):
         try:

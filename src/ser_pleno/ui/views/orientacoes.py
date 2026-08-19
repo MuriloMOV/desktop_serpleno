@@ -10,7 +10,6 @@ from PIL import Image as PILImage
 
 import customtkinter as ctk
 
-from ser_pleno.features.orientacoes.service import ServicoOrientacoes
 from ser_pleno.ui.components.ui_components import (
     Avatar,
     BaseModal,
@@ -296,9 +295,7 @@ class OrientacoesFrame(ctk.CTkFrame):
         self._t0 = time.perf_counter()
         super().__init__(parent, fg_color=O["page_bg"])
         self.controller = controller
-        self.servico_orientacoes = ServicoOrientacoes(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_orientacoes = getattr(controller, "servico_orientacoes", None)
         self._selected_student: Optional[Dict[str, Any]] = None
         self._selected_card: Optional[StudentCard] = None
         self._orientacao_editando_id: Optional[int] = None
@@ -1669,7 +1666,7 @@ class OrientacoesFrame(ctk.CTkFrame):
                 novos = [
                     a
                     for a in self._anexos_selecionados
-                    if "caminho" in a and not a.get("_existente") and os.path.exists(a.get("caminho", ""))
+                    if a.get("caminho") and not a.get("_existente") and os.path.exists(a["caminho"])
                 ]
                 if novos:
                     self._upload_anexos(oid, novos)
@@ -1966,7 +1963,6 @@ class OrientacoesFrame(ctk.CTkFrame):
             values = []
             for t in data:
                 v = t.get("value") if isinstance(t, dict) else str(t)
-                l = t.get("label", v) if isinstance(t, dict) else str(t)
                 values.append(v)
             if not values:
                 values = ["Geral"]

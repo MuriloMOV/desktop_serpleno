@@ -190,9 +190,7 @@ class PedidosAjudaFrame(BaseViewFrame):
             auto_header=True,
         )
         self.controller = controller
-        self.servico_pedidos = ServicoPedidosAjuda(
-            auth_service=getattr(controller, "auth_service", None),
-        )
+        self.servico_pedidos = getattr(controller, "servico_pedidos_ajuda", None)
         self.app = getattr(controller, "app", None)
 
         self.pedidos: list[dict] = []

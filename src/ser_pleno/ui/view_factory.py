@@ -61,9 +61,37 @@ class ViewFactory:
             return None
 
         if controller is not None:
-            return frame_cls(parent, controller)
+            frame = frame_cls(parent, controller)
+        else:
+            frame = frame_cls(parent, self.app)
 
-        return frame_cls(parent, self.app)
+        service_map = {
+            "dashboard": ["servico_dashboard", "servico_analytics"],
+            "estudantes": ["servico_estudantes", "servico_orientacoes", "servico_agenda"],
+            "agenda": ["servico_agenda"],
+            "bem_estar": ["servico_bem_estar"],
+            "analise": ["servico_triagem", "servico_estudantes"],
+            "relatorios": ["servico_relatorio", "servico_report_template"],
+            "comunicacao": ["servico_comunicacao"],
+            "orientacoes": ["servico_orientacoes"],
+            "intervencoes": ["servico_intervencoes"],
+            "avisos": ["servico_mural"],
+            "notificacoes": ["servico_notificacoes"],
+            "configuracoes": ["servico_configuracoes"],
+            "metas": ["servico_metas"],
+            "alertas": ["servico_alertas"],
+            "analytics": ["servico_analytics"],
+            "audit_logs": ["servico_audit"],
+            "compartilhamento": ["servico_compartilhamento"],
+            "pedidos_ajuda": ["servico_pedidos_ajuda"],
+            "wellness_challenges": ["servico_wellness_challenges", "servico_estudantes"],
+        }
+
+        for attr in service_map.get(key, []):
+            if hasattr(self.app, attr):
+                setattr(frame, attr, getattr(self.app, attr))
+
+        return frame
 
     @property
     def keys(self):

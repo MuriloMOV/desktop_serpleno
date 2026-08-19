@@ -5,13 +5,12 @@ import os
 import shutil
 import time
 from tkinter import filedialog
-from typing import Optional
 
 import customtkinter as ctk
 
-from ser_pleno.features.relatorio.service import ServicoRelatorio
-from ser_pleno.features.report_template.service import ServicoReportTemplate
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
+    _CLICKABLE_EXCLUDE,
     BaseModal,
     Card,
     Chip,
@@ -21,14 +20,13 @@ from ser_pleno.ui.components.ui_components import (
     GhostButton,
     PrimaryButton,
     SummaryCard,
-    Toast,
-    _CLICKABLE_EXCLUDE,
 )
-from ser_pleno.ui.views.base import BaseViewFrame
-from ser_pleno.ui.components.icons import ICONS, IconLabel
-from ser_pleno.ui.theme import FONT_FAMILY, RADIUS, SPACING, THEME, font, themed_font
+from ser_pleno.ui.rbac import apply_rbac_to_button
+from ser_pleno.ui.theme import FONT_FAMILY, RADIUS, SPACING, THEME, themed_font
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.ui.views.base import BaseViewFrame
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
+from ser_pleno.utils.dates import normalize_date
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
 
 logger = logging.getLogger(__name__)
@@ -122,9 +120,8 @@ class RelatorioFrame(BaseViewFrame):
             scrollbar_button_color="#C7D2FE",
             scrollbar_button_hover_color="#A5B4FC",
         )
-        auth_service = getattr(controller, "auth_service", None)
-        self.servico_relatorio = ServicoRelatorio(auth_service=auth_service)
-        self.servico_report_template = ServicoReportTemplate(auth_service=auth_service)
+        self.servico_relatorio = getattr(controller, "servico_relatorio", None)
+        self.servico_report_template = getattr(controller, "servico_report_template", None)
 
         self._kpi_cards: dict[str, SummaryCard] = {}
         self._summary_vals: dict[str, ctk.CTkLabel] = {}
@@ -711,6 +708,8 @@ class RelatorioFrame(BaseViewFrame):
         btn_row = ctk.CTkFrame(card.body, fg_color="transparent")
         btn_row.pack(fill="x", pady=(0, SPACING["item_gap"]))
 
+        _export_buttons: list[ctk.CTkButton] = []
+
         exports = [
             (
                 f"{ICONS['chart']}  Estudantes",
@@ -752,7 +751,7 @@ class RelatorioFrame(BaseViewFrame):
                 text_color=accent,
             ).pack(anchor="w")
 
-            ctk.CTkButton(
+            export_btn = ctk.CTkButton(
                 inner,
                 text="Exportar",
                 command=self._criar_handler_exportacao(cmd),
@@ -763,7 +762,12 @@ class RelatorioFrame(BaseViewFrame):
                 fg_color=accent,
                 hover_color=THEME["primary_hover"],
                 text_color=THEME["text_on_primary"],
-            ).pack(anchor="w", pady=(SPACING["label_gap"], 0))
+            )
+            export_btn.pack(anchor="w", pady=(SPACING["label_gap"], 0))
+            _export_buttons.append(export_btn)
+
+        for btn in _export_buttons:
+            apply_rbac_to_button(btn, self.controller, "manage_reports")
 
     def _criar_handler_exportacao(self, metodo):
         def handler():
@@ -1431,28 +1435,48 @@ class RelatorioFrame(BaseViewFrame):
                 if sid.isdigit():
                     parametros["student_id"] = int(sid)
             if tipo in ("agendamentos", "triagens", "intervencoes"):
-                parametros["date_from"] = self._modal_data_inicio.get().strip()
-                parametros["date_to"] = self._modal_data_fim.get().strip()
+                date_from = self._modal_data_inicio.get().strip()
+                date_to = self._modal_data_fim.get().strip()
+                if date_from or date_to:
+                    if not date_from or not date_to:
+                        self._show_error("Preencha ambos os campos de período.", title="Atenção")
+                        return
+                    try:
+                        normalize_date(date_from)
+                        normalize_date(date_to)
+                    except ValueError:
+                        self._show_error("Data inválida. Use o formato YYYY-MM-DD.", title="Atenção")
+                        return
+                parametros["date_from"] = date_from
+                parametros["date_to"] = date_to
             parametros["format"] = formato
 
             if id_template:
-                task = lambda: self.servico_relatorio.gerar_relatorio_por_template(
-                    id_template, parametros
-                )
+
+                def _task_template():
+                    return self.servico_relatorio.gerar_relatorio_por_template(
+                        id_template, parametros
+                    )
+
+                task = _task_template
             else:
-                task = lambda: self.servico_relatorio.gerar_relatorio(
-                    {
-                        "name": nome or f"Relatório {tipo}",
-                        "report_type": tipo,
-                        "format": formato,
-                        "parameters": str(parametros),
-                        "data": "{}",
-                        "file_path": "",
-                        "file_size": 0,
-                        "is_public": False,
-                        "generated_by_id": 1,
-                    }
-                )
+
+                def _task_direct():
+                    return self.servico_relatorio.gerar_relatorio(
+                        {
+                            "name": nome or f"Relatório {tipo}",
+                            "report_type": tipo,
+                            "format": formato,
+                            "parameters": str(parametros),
+                            "data": "{}",
+                            "file_path": "",
+                            "file_size": 0,
+                            "is_public": False,
+                            "generated_by_id": 1,
+                        }
+                    )
+
+                task = _task_direct
 
             AsyncRunner.run(
                 task=task,
@@ -1599,14 +1623,26 @@ class RelatorioFrame(BaseViewFrame):
         content.insert("end", f"Formato: {report.get('format', '—')}\n")
         content.insert("end", f"Gerado em: {report.get('generated_at', '—')}\n")
         content.insert("end", f"Caminho: {report.get('file_path', '—')}\n")
+
+        file_path = report.get("file_path", "")
+        if file_path and os.path.exists(file_path):
+            fmt = report.get("format", "")
+            if fmt in ("csv", "json", "txt"):
+                try:
+                    with open(file_path, encoding="utf-8") as f:
+                        file_content = f.read()
+                    content.insert("end", "\nConteúdo:\n")
+                    content.insert("end", file_content[:5000])
+                except Exception:
+                    pass
         content.configure(state="disabled")
 
         btns = ctk.CTkFrame(wrapper, fg_color="transparent")
         btns.pack(fill="x", pady=(SPACING["label_gap"], 0))
         PrimaryButton(
             btns,
-            text=f"{ICONS['download']} Baixar PDF",
-            command=lambda: self._baixar_relatorio_formato(report, "pdf"),
+            text=f"{ICONS['download']} Baixar",
+            command=lambda: self._abrir_modal_download(report),
             width=140,
             height=38,
         ).pack(side="right", padx=(spacing("sm"), 0))

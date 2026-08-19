@@ -3,7 +3,6 @@ from datetime import datetime
 
 import customtkinter as ctk
 
-from ser_pleno.features.bem_estar.service import ServicoBemEstar
 from ser_pleno.ui.components.icons import ICONS, MOOD_EMOJIS, MOOD_LABELS
 from ser_pleno.ui.components.ui_components import (
     Avatar,
@@ -688,9 +687,7 @@ class BemEstarFrame(ctk.CTkScrollableFrame):
             scrollbar_button_hover_color=THEME["text_muted"],
         )
         self.controller = controller
-        self.servico_bem_estar = ServicoBemEstar(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_bem_estar = getattr(controller, "servico_bem_estar", None)
         self.colunas_risco: dict = {}
         self._chart_data: list = []
         self._selected_student: dict | None = None

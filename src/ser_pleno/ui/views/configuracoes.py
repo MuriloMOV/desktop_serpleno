@@ -8,8 +8,6 @@ from typing import Any
 
 import customtkinter as ctk
 
-from ser_pleno.application.services.autenticacao import ServicoAutenticacao
-from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
 from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
     Badge,
@@ -19,8 +17,10 @@ from ser_pleno.ui.components.ui_components import (
     PrimaryButton,
     Toast,
 )
+from ser_pleno.ui.rbac import has_permission
 from ser_pleno.ui.theme import RADIUS, SPACING, THEME, themed_font
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.ui.views.base import _ErrorModal
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 
 logger = logging.getLogger("apps.desktop")
@@ -506,12 +506,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_configuracoes = ServicoConfiguracoes(
-            auth_service=getattr(controller, "auth_service", None)
-        )
-        self._servico_autenticacao = ServicoAutenticacao(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_configuracoes = getattr(controller, "servico_configuracoes", None)
         from ser_pleno.config.paths import get_project_root
 
         self.base_path = get_project_root()
@@ -557,6 +552,9 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         except Exception:
             return {}
 
+    def _get_cached_avatar(self) -> str:
+        return getattr(self, "_cached_avatar_name", "") or self._profile_data().get("avatar", "")
+
     # —— layout ---------------------------------------------------------------
     def _build_header(self):
         header = PageHeader(
@@ -592,7 +590,7 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         card.pack(fill="both", expand=True)
 
         profile = self._profile_data()
-        avatar_name = profile.get("avatar", "avatar-1.jpg")
+        avatar_name = self._get_cached_avatar() or profile.get("avatar", "avatar-1.jpg")
 
         # Avatar com ring
         av_outer = ctk.CTkFrame(card.body, fg_color="transparent")
@@ -713,11 +711,25 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
         img = self._load_image(filename, (160, 160))
         if img:
             self.avatar_display.configure(image=img)
-            try:
-                with open(os.path.join(self.base_path, "user_profile.json"), "w") as f:
-                    json.dump({"avatar": filename}, f)
-            except Exception as exc:
-                logger.exception("Erro ao salvar avatar: %s", exc)
+            self._cached_avatar_name = filename
+
+            user_id = None
+            auth = getattr(self.servico_configuracoes, "_auth_service", None)
+            if auth and getattr(auth, "user", None):
+                user_id = auth.user.get("id")
+
+            def _persist():
+                res = self.servico_configuracoes.atualizar_avatar(filename, user_id=user_id)
+                if res.get("success"):
+                    try:
+                        with open(os.path.join(self.base_path, "user_profile.json"), "w") as f:
+                            json.dump({"avatar": filename}, f)
+                    except Exception as exc:
+                        logger.debug("Avatar local cache atualizado: %s", exc)
+                else:
+                    self._show_error(res.get("message", "Falha ao salvar avatar."))
+
+            AsyncRunner.run(task=_persist, widget_ref=self)
         self.gallery_frame.pack_forget()
 
     # —— central de avisos ----------------------------------------------------
@@ -818,7 +830,6 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
         btn = self._theme_btn if kind == "theme" else self._font_btn
         values = self._theme_values if kind == "theme" else self._font_values
-        current = btn.cget("text")
 
         menu = tk.Menu(btn, tearoff=0)
         for v in values:
@@ -867,11 +878,14 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
                 auth = getattr(self.servico_configuracoes, "_auth_service", None)
                 if auth and getattr(auth, "user", None):
                     user_id = auth.user.get("id")
-                
+
                 for item in res["data"]:
                     if item.get("user_id") == user_id and user_id is not None:
                         theme = item.get("theme")
                         notifications = item.get("notifications")
+                        avatar = item.get("avatar")
+                        if avatar:
+                            self._cached_avatar_name = avatar
                         if theme:
                             self._theme_btn.configure(text=theme)
                             self._alterar_tema(theme)
@@ -986,15 +1000,31 @@ class ConfiguracoesFrame(ctk.CTkScrollableFrame):
 
     def _on_seguranca_action(self, btn_text: str):
         if btn_text == "Alterar Senha":
+            if not has_permission(self.controller, "manage_users"):
+                try:
+                    _ErrorModal(self.winfo_toplevel(), message="Permissão necessária: manage_users", title="Acesso negado")
+                except Exception:
+                    pass
+                return
             self._abrir_modal_senha()
         elif btn_text == "Encerrar Acesso":
+            if not has_permission(self.controller, "manage_users"):
+                try:
+                    _ErrorModal(self.winfo_toplevel(), message="Permissão necessária: manage_users", title="Acesso negado")
+                except Exception:
+                    pass
+                return
             self._encerrar_sessao()
 
     def _abrir_modal_senha(self):
         AlterarSenhaModal(self, on_save=self._salvar_senha)
 
     def _salvar_senha(self, senha_atual: str, nova_senha: str):
-        res = self._servico_autenticacao.alterar_senha(senha_atual, nova_senha)
+        auth = getattr(self.servico_configuracoes, "_auth_service", None)
+        if not auth:
+            self._show_error("Serviço de autenticação indisponível.")
+            return
+        res = auth.alterar_senha(senha_atual, nova_senha)
         if res.get("success"):
             self._show_success(res.get("message", "Senha alterada com sucesso."))
         else:

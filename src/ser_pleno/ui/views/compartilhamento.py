@@ -65,7 +65,7 @@ class CompartilhamentoDadosFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_compartilhamento = ServicoCompartilhamentoDadosClinicos(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_compartilhamento = getattr(controller, "servico_compartilhamento", None)
         self._compartilhamentos: list = []
         self._selecionados: set = set()
         self._item_widgets: dict = {}

@@ -270,9 +270,7 @@ class IntervencoesFrame(ctk.CTkFrame):
         self._t0 = time.perf_counter()
         super().__init__(parent, fg_color=I["page_bg"])
         self.controller = controller
-        self.servico_intervencoes = ServicoIntervencoes(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_intervencoes = getattr(controller, "servico_intervencoes", None)
         self._selected_student: Optional[Dict[str, Any]] = None
         self._selected_card: Optional[StudentCardIntervention] = None
         self._todas_intervencoes: List[Dict[str, Any]] = []

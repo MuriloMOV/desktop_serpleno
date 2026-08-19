@@ -4,10 +4,8 @@ from datetime import datetime
 
 import customtkinter as ctk
 
-from ser_pleno.features.agenda.service import ServicoAgendamento
-from ser_pleno.features.estudantes.service import ServicoEstudante
-from ser_pleno.features.orientacoes.service import ServicoOrientacoes
 from ser_pleno.infrastructure.db.query_helpers import fetch_one
+from ser_pleno.ui.components.icons import ICONS
 from ser_pleno.ui.components.ui_components import (
     Avatar,
     Card,
@@ -19,8 +17,7 @@ from ser_pleno.ui.components.ui_components import (
     SkeletonLoader,
     bind_clickable,
 )
-from ser_pleno.ui.views.base import _ErrorModal
-from ser_pleno.ui.components.icons import ICONS
+from ser_pleno.ui.rbac import apply_rbac_to_button
 from ser_pleno.ui.theme import (
     RADIUS,
     SPACING,
@@ -29,6 +26,7 @@ from ser_pleno.ui.theme import (
     themed_font,
 )
 from ser_pleno.ui.theme_extensions import spacing
+from ser_pleno.ui.views.base import _ErrorModal
 from ser_pleno.utils.async_runner import AsyncRunner, log_view_init_ms
 from ser_pleno.utils.avatar_utils import get_avatar_color
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
@@ -39,15 +37,9 @@ class EstudantesFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_estudantes = ServicoEstudante(
-            auth_service=getattr(controller, "auth_service", None)
-        )
-        self.servico_orientacoes = ServicoOrientacoes(
-            auth_service=getattr(controller, "auth_service", None)
-        )
-        self.servico_agenda = ServicoAgendamento(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_estudantes = getattr(controller, "servico_estudantes", None)
+        self.servico_orientacoes = getattr(controller, "servico_orientacoes", None)
+        self.servico_agenda = getattr(controller, "servico_agenda", None)
         self._todos_estudantes: list = []
         self._selecionado: dict | None = None
         self._item_widgets: dict = {}
@@ -119,13 +111,15 @@ class EstudantesFrame(ctk.CTkFrame):
         right = ctk.CTkFrame(bar, fg_color="transparent")
         right.pack(side="right")
 
-        PrimaryButton(
+        btn_novo = PrimaryButton(
             right,
             text=f"{ICONS['add']}  Novo Estudante",
             command=self.novo_estudante_click,
             height=40,
             width=168,
-        ).pack()
+        )
+        btn_novo.pack()
+        apply_rbac_to_button(btn_novo, self.controller, "manage_students")
 
     def _criar_conteudo(self):
         wrap = ctk.CTkFrame(self, fg_color="transparent")
@@ -363,6 +357,17 @@ class EstudantesFrame(ctk.CTkFrame):
             text_color=THEME["text_secondary"],
         )
         self.btn_log.pack(side="left")
+
+        action_buttons = [
+            self.btn_editar,
+            self.btn_bloquear,
+            self.btn_desbloquear,
+            self.btn_suspicious,
+            self.btn_log,
+        ]
+        for btn in action_buttons:
+            if btn is not None:
+                apply_rbac_to_button(btn, self.controller, "manage_students")
 
         ctk.CTkFrame(panel, height=1, fg_color=THEME["divider"]).pack(
             fill="x",
@@ -2023,7 +2028,7 @@ class EstudantesFrame(ctk.CTkFrame):
 
             batch = WidgetBatchBuilder(parent=scroll, batch_size=20)
             for log in logs:
-                batch.add(lambda l=log, p=scroll: self._criar_item_log(p, l))
+                batch.add(lambda log_item=log, p=scroll: self._criar_item_log(p, log_item))
             batch.execute()
 
         def on_error(exc):

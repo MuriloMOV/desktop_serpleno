@@ -270,7 +270,7 @@ class MetasFrame(ctk.CTkFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_metas = ServicoMetas(auth_service=getattr(controller, "auth_service", None))
+        self.servico_metas = getattr(controller, "servico_metas", None)
         self._todas_metas: list = []
         self._selecionado: dict | None = None
         self._filter_after_id = None

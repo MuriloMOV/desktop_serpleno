@@ -72,7 +72,7 @@ class AlertasFrame(ctk.CTkFrame):
         super().__init__(master, fg_color=THEME["bg"])
         self.controller = controller
         self.app = getattr(controller, "app", None)
-        self.servico_alertas = ServicoAlertas(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_alertas = getattr(controller, "servico_alertas", None)
         self.alertas: list[dict] = []
         self._filtros = {
             "alert_type": None,

@@ -162,7 +162,7 @@ class AuditLogsFrame(BaseViewFrame):
             auto_header=False,
         )
         self.controller = controller
-        self.servico_audit = ServicoAuditLogs(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_audit = getattr(controller, "servico_audit", None)
         self._logs: list[dict] = []
         self._stats: dict = {}
         self._filtro_after_id = None

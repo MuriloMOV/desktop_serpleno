@@ -15,7 +15,6 @@ from ser_pleno.ui.components.ui_components import BaseModal, Card, PrimaryButton
 from ser_pleno.ui.views.base import BaseViewFrame
 from ser_pleno.utils.async_runner import log_view_init_ms, AsyncRunner
 from ser_pleno.utils.widget_batch import WidgetBatchBuilder
-from ser_pleno.application.services.mural import ServicoMural
 
 logger = logging.getLogger("apps.desktop")
 
@@ -642,7 +641,7 @@ class AvisosFrame(BaseViewFrame):
         )
 
         self.controller = controller
-        self.servico_mural = ServicoMural(auth_service=getattr(controller, 'auth_service', None))
+        self.servico_mural = getattr(controller, "servico_mural", None)
         self.app = getattr(controller, "app", None)
         self.usuario_logado = usuario_logado
         self.is_admin = is_admin

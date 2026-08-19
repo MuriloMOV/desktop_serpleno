@@ -16,6 +16,7 @@ from ser_pleno.ui.components.ui_components import (
     Toast,
     bind_clickable,
 )
+from ser_pleno.ui.rbac import apply_rbac_to_button
 from ser_pleno.ui.theme import (
     RADIUS,
     SPACING,
@@ -390,18 +391,27 @@ class CalendarDayModal(BaseModal):
             child.destroy()
 
         if not self.agendamentos:
-            EmptyState(
-                self.lista_frame,
-                icon=ICONS["calendar"],
-                title="Nenhum agendamento",
-                subtitle="Clique em Novo Agendamento para criar",
-            ).pack(pady=20)
+            self.after_idle(
+                lambda: EmptyState(
+                    self.lista_frame,
+                    icon=ICONS["calendar"],
+                    title="Nenhum agendamento",
+                    subtitle="Clique em Novo Agendamento para criar",
+                ).pack(pady=20)
+                if self.lista_frame.winfo_exists()
+                else None
+            )
             return
 
-        batch = WidgetBatchBuilder(parent=self.lista_frame, batch_size=20)
-        for agt in self.agendamentos:
-            batch.add(lambda a=agt: self._criar_item_lista(a))
-        batch.execute()
+        def _build():
+            if not self.lista_frame.winfo_exists():
+                return
+            batch = WidgetBatchBuilder(parent=self.lista_frame, batch_size=20)
+            for agt in self.agendamentos:
+                batch.add(lambda a=agt: self._criar_item_lista(a))
+            batch.execute()
+
+        self.after_idle(_build)
 
     def _criar_item_lista(self, agt):
         row = ctk.CTkFrame(
@@ -682,9 +692,7 @@ class AgendaFrame(ctk.CTkScrollableFrame):
         self._t0 = _time.perf_counter()
         super().__init__(parent, fg_color=THEME["bg"])
         self.controller = controller
-        self.servico_agenda = ServicoAgendamento(
-            auth_service=getattr(controller, "auth_service", None)
-        )
+        self.servico_agenda = getattr(controller, "servico_agenda", None)
 
         self.data_selecionada = datetime.now()
         self.ano_calendario = self.data_selecionada.year
@@ -792,19 +800,32 @@ class AgendaFrame(ctk.CTkScrollableFrame):
             self.horarios_base = []
 
     def load_grid_data(self):
-        try:
+        def fetch():
             data_str = self.data_selecionada.strftime("%Y-%m-%d")
             agendamentos_dia = self.servico_agenda.listar_agendamentos(data=data_str)
-            mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
-            self._renderizar_grid(self.container_grid, mapa_dia)
-
             proxima_semana_str = (self.data_selecionada + timedelta(days=7)).strftime("%Y-%m-%d")
             agendamentos_prox = self.servico_agenda.listar_agendamentos(data=proxima_semana_str)
+            return data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox
+
+        def on_success(result):
+            if not self.winfo_exists():
+                return
+            data_str, agendamentos_dia, proxima_semana_str, agendamentos_prox = result
+            mapa_dia = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_dia}
             mapa_prox = {agt["data_hora"].strftime("%H:%M"): agt for agt in agendamentos_prox}
+            self._renderizar_grid(self.container_grid, mapa_dia)
             self._renderizar_grid(self.container_semana, mapa_prox)
             self._atualizar_subtitulo_proxima_semana()
-        except Exception as e:
-            logger.error("AgendaFrame.load_grid_data: ERRO = %s", e, exc_info=True)
+
+        def on_error(exc):
+            logger.error("AgendaFrame.load_grid_data: ERRO = %s", exc)
+
+        AsyncRunner.run(
+            task=fetch,
+            on_success=on_success,
+            on_error=on_error,
+            widget_ref=self,
+        )
 
     def _criar_calendario_mensal(self):
         card = Card(self)
@@ -1058,13 +1079,15 @@ class AgendaFrame(ctk.CTkScrollableFrame):
 
         right = ctk.CTkFrame(toolbar, fg_color="transparent")
         right.pack(side="right")
-        PrimaryButton(
+        btn_gestao = PrimaryButton(
             right,
             text="Gerenciar Horários",
             command=self._abrir_modal_gestao,
             width=170,
             icon=ICONS["settings"],
-        ).pack()
+        )
+        btn_gestao.pack()
+        apply_rbac_to_button(btn_gestao, self.controller, "manage_schedule")
 
     def _botao_navegacao(self, parent, texto, delta):
         ctk.CTkButton(
