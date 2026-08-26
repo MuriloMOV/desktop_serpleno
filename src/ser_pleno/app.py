@@ -142,6 +142,25 @@ class App(ctk.CTk):
         except Exception as exc:
             logger.debug("Falha ao aplicar estado maximizado: %s", exc)
 
+        self.after_idle(self._apply_window_icon)
+
+    def _apply_window_icon(self) -> None:
+        try:
+            from PIL import Image, ImageTk
+
+            icon_path = os.path.join(
+                getattr(sys, "_MEIPASS", base_dir),
+                "serpleno_icon.png",
+            )
+            if not os.path.exists(icon_path):
+                return
+            pil_image = Image.open(icon_path).resize((64, 64), Image.LANCZOS)
+            img = ImageTk.PhotoImage(pil_image)
+            self.tk.call("wm", "iconphoto", self._w, img)
+            self._icon_photo = img
+        except Exception as exc:
+            logger.debug("Falha ao aplicar icone da janela: %s", exc)
+
     def _setup_container(self) -> None:
         self.container = ctk.CTkFrame(self, fg_color=THEME["bg"])
         self.container.pack(fill="both", expand=True)
@@ -190,7 +209,9 @@ class App(ctk.CTk):
         self.servico_mural = ServicoMural(auth_service=self.auth_service)
         self.servico_pedidos_ajuda = ServicoPedidosAjuda(auth_service=self.auth_service)
         self.servico_audit = ServicoAuditLogs(auth_service=self.auth_service)
-        self.servico_compartilhamento = ServicoCompartilhamentoDadosClinicos(auth_service=self.auth_service)
+        self.servico_compartilhamento = ServicoCompartilhamentoDadosClinicos(
+            auth_service=self.auth_service
+        )
         self.servico_comunicacao = ServicoComunicacao(auth_service=self.auth_service)
         self.servico_documents = ServicoDocuments(auth_service=self.auth_service)
         self.servico_autenticacao = ServicoAutenticacao(auth_service=self.auth_service)
@@ -266,6 +287,7 @@ class App(ctk.CTk):
     def _apply_saved_notification_settings(self) -> None:
         try:
             from ser_pleno.features.configuracoes.service import ServicoConfiguracoes
+
             servico = ServicoConfiguracoes(auth_service=self.auth_service)
             res = servico.obter_configuracoes()
             if not res.get("success") or not res.get("data"):
@@ -279,6 +301,7 @@ class App(ctk.CTk):
                     notifications = item.get("notifications")
                     if notifications:
                         import json
+
                         try:
                             notif = json.loads(notifications)
                             sound_enabled = notif.get("Efeitos Sonoros", True)
@@ -302,6 +325,7 @@ class App(ctk.CTk):
             search = getattr(self.navigation.app, "global_search", None)
             if search and hasattr(search, "focus"):
                 search.focus()
+
         try:
             self.bind_all("<Control-k>", _focus_search)
             self.bind_all("<Control-K>", _focus_search)
